@@ -1,0 +1,101 @@
+﻿import { SCHULDENPLAN } from "../data/schuldenplan";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import type { MonthId, SchuldenPlanItem } from "../types";
+
+type Props = {
+  selectedMonth: MonthId;
+};
+
+const currency = (value: number) => `€${value}`;
+
+const SchuldenPlanTable = ({ selectedMonth }: Props) => {
+  const itemsWithState = SCHULDENPLAN.map((item) => {
+    const [done, setDone] = useLocalStorage<boolean>(`schuldenplan-${item.month}`, false);
+    const [paidAmount, setPaidAmount] = useLocalStorage<number>(
+      `schuldenplan-paid-${item.month}`,
+      0
+    );
+    const safePaid = isNaN(paidAmount) ? 0 : paidAmount;
+    return { item, done, setDone, paidAmount: safePaid, setPaidAmount };
+  });
+
+  const totals = itemsWithState.reduce(
+    (acc, entry) => {
+      acc.total += entry.item.doelBedrag;
+      acc.sumPaid += entry.paidAmount;
+      if (entry.done) {
+        acc.doneAmount += entry.item.doelBedrag;
+        acc.doneCount += 1;
+      }
+      return acc;
+    },
+    { total: 0, doneAmount: 0, doneCount: 0, sumPaid: 0 }
+  );
+
+  return (
+    <section>
+      <div className="mb-3">
+        <h2 className="text-lg font-semibold text-slate-900">Schuldenplan 2025–2026</h2>
+        <p className="text-xs text-slate-500">
+          Volg per maand welke schuld je afbouwt en wat het doelbedrag is.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="mb-3 text-xs text-slate-600">
+          Voltooid: {totals.doneCount} van {SCHULDENPLAN.length} maanden · Totaal doelbedrag: {currency(totals.total)} · Reeds afgerond: {currency(totals.doneAmount)} · Werkelijk betaald: {currency(totals.sumPaid)}
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto text-xs">
+            <thead className="bg-slate-100 text-slate-700">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">Maand</th>
+                <th className="px-3 py-2 text-left font-semibold">Focus</th>
+                <th className="px-3 py-2 text-left font-semibold">Doel</th>
+                <th className="px-3 py-2 text-left font-semibold">Beschrijving</th>
+                <th className="px-3 py-2 text-right font-semibold">Betaald (€)</th>
+                <th className="px-3 py-2 text-left font-semibold text-center">Gedaan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itemsWithState.map(
+                ({ item, done, setDone, paidAmount, setPaidAmount }: { item: SchuldenPlanItem; done: boolean; setDone: (value: boolean) => void; paidAmount: number; setPaidAmount: (value: number) => void }) => (
+                  <tr
+                    key={item.id}
+                    className={`border-b last:border-b-0 ${
+                      item.month === selectedMonth ? "bg-indigo-50/70" : ""
+                    }`}
+                  >
+                    <td className="px-3 py-2 align-top font-medium text-slate-900">{item.labelMaand}</td>
+                    <td className="px-3 py-2 align-top text-slate-900">{item.focusSchuld}</td>
+                    <td className="px-3 py-2 align-top text-slate-900">{currency(item.doelBedrag)}</td>
+                    <td className="px-3 py-2 align-top text-slate-700">{item.beschrijving}</td>
+                    <td className="px-3 py-2 align-top text-right">
+                      <input
+                        type="number"
+                        className="w-24 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        value={paidAmount || ""}
+                        onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top text-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-400 text-indigo-600 focus:ring-indigo-500"
+                        checked={done}
+                        onChange={(event) => setDone(event.target.checked)}
+                      />
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default SchuldenPlanTable;
