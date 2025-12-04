@@ -11,7 +11,7 @@ export function BufferCard() {
 
   return (
     <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Buffer & spaardoel 2026</h2>
+      <h2 className="text-lg font-semibold text-slate-900">Buffer & spaardoel</h2>
       <p className="text-xs text-slate-500">Hou bij hoeveel financiële buffer je al hebt opgebouwd.</p>
 
       <div className="mt-3 space-y-3">
