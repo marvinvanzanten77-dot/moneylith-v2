@@ -108,6 +108,15 @@ export function FixedCostsList() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="bg-slate-50 font-semibold text-slate-800">
+              <td className="px-3 py-2 text-right" colSpan={1}>
+                Subtotaal
+              </td>
+              <td className="px-3 py-2 text-right">€{totalFixed.toFixed(0)}</td>
+              <td className="px-3 py-2" colSpan={3}></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

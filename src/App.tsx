@@ -8,6 +8,7 @@ import { SettingsCard } from "./components/SettingsCard";
 import { UserProfileCard } from "./components/UserProfileCard";
 import PotjesPaneel from "./components/PotjesPaneel";
 import SchuldenPlanTable from "./components/SchuldenPlanTable";
+import { SchuldenLijstCard } from "./components/SchuldenLijstCard";
 import type { MonthId } from "./types";
 
 const MONTHS: { id: MonthId; label: string }[] = [
@@ -66,6 +67,7 @@ const App = () => {
         <section className="space-y-6">
           <DashboardSummary selectedMonth={selectedMonth} />
           <PotjesPaneel selectedMonth={selectedMonth} />
+          <SchuldenLijstCard />
           <SchuldenPlanTable selectedMonth={selectedMonth} />
           <BufferCard />
           <AnalyticsCard />

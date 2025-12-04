@@ -21,6 +21,7 @@ export interface SchuldenPlanItem {
   focusSchuld: string;
   doelBedrag: number;
   beschrijving: string;
+  debtId?: string;
 }
 
 export interface FixedCostItem {
@@ -30,3 +31,13 @@ export interface FixedCostItem {
   dagVanMaand: number; // 1-31
   opmerking?: string;
 }
+
+export type SchuldItem = {
+  id: string;
+  naam: string;
+  crediteur?: string;
+  openBedrag: number;
+  minBetaling?: number;
+  prioriteit?: number;
+  notitie?: string;
+};

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 const APP_KEYS_PREFIXES = ["potje-", "schuldenplan-"];
 const APP_KEYS_EXACT = [
+  "schulden-lijst",
   "income-netto",
   "fixed-costs",
   "fixed-costs-list",

@@ -221,6 +221,10 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
             )
           )}
         </div>
+
+        <div className="mt-4 text-xs text-slate-700">
+          Subtotaal limiet potjes: <span className="font-semibold">€{totalLimit.toFixed(0)}</span> · Subtotaal uitgegeven: <span className="font-semibold">€{totalSpent.toFixed(0)}</span> · Subtotaal resterend: <span className="font-semibold">€{totalRemaining.toFixed(0)}</span>
+        </div>
       </div>
     </section>
   );
