@@ -21,40 +21,61 @@ const rangeMonths = (start: MonthId, end: MonthId): MonthId[] => {
   return months;
 };
 
-const ALL_MONTH_LIMITS: MonthLimit[] = rangeMonths("2025-12", "2026-12").map((month) => ({
-  month,
-  limit: 0,
-}));
+export const createZeroLimits = (): MonthLimit[] =>
+  rangeMonths("2025-12", "2026-12").map((month) => ({
+    month,
+    limit: 0,
+  }));
 
-export const POTJES: PotjeDef[] = [
+export const getDefaultPotjes = (): PotjeDef[] => [
   {
     id: "snacks",
-    label: "Snacks (Esso/werk)",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
   {
     id: "roken",
-    label: "Roken / vapen",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
   {
     id: "googleplay",
-    label: "Google Play / mini-aankopen",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
   {
     id: "ai",
-    label: "AI-tools (Suno / Hailuo / ElevenLabs / etc.)",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
   {
     id: "impuls",
-    label: "Impulsaankopen (Action / Rockx / snacks)",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
   {
     id: "tanken",
-    label: "Tanken",
-    limits: ALL_MONTH_LIMITS,
+    label: "",
+    description: "",
+    limits: createZeroLimits(),
+    categoryKey: "",
+    customName: "",
   },
 ];
+
+export const POTJES: PotjeDef[] = getDefaultPotjes();

@@ -1,4 +1,4 @@
-﻿import { POTJES } from "../data/potjes";
+﻿import { POTJES, getDefaultPotjes } from "../data/potjes";
 import { SCHULDENPLAN } from "../data/schuldenplan";
 import type { MonthId } from "../types";
 
@@ -27,9 +27,24 @@ const readNumber = (key: string) => {
 };
 
 export function AnalyticsCard() {
+  const storedPotjes = (() => {
+    if (typeof window === "undefined") return POTJES;
+    try {
+      const raw = window.localStorage.getItem("potjes-config");
+      if (!raw) return POTJES;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return POTJES;
+      return parsed;
+    } catch {
+      return POTJES;
+    }
+  })();
+
+  const potjesToUse = storedPotjes && storedPotjes.length > 0 ? storedPotjes : getDefaultPotjes();
+
   const rows = MONTHS.map((month) => {
     let potjesSpent = 0;
-    POTJES.forEach((potje) => {
+    potjesToUse.forEach((potje) => {
       const key = `potje-${potje.id}-${month.id}`;
       potjesSpent += readNumber(key);
     });

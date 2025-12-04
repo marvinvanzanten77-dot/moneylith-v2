@@ -7,9 +7,11 @@ export interface MonthLimit {
 
 export interface PotjeDef {
   id: string; // bv "snacks"
-  label: string; // bv "Snacks (Esso/werk)"
+  label: string; // vrij veld, kan leeg of generiek
   description?: string;
   limits: MonthLimit[]; // maand -> limiet in euro
+  categoryKey: string; // verwijzing naar algemene categorie
+  customName?: string; // optioneel eigen naam/thema
 }
 
 export interface SchuldenPlanItem {

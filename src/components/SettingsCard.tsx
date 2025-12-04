@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 
 const APP_KEYS_PREFIXES = ["potje-", "schuldenplan-"];
 const APP_KEYS_EXACT = [
@@ -9,6 +9,7 @@ const APP_KEYS_EXACT = [
   "buffer-current",
   "user-name",
   "user-email",
+  "potjes-config",
 ];
 
 export function SettingsCard() {
@@ -130,7 +131,7 @@ export function SettingsCard() {
       {exportData && (
         <div className="mt-3">
           <label className="mb-1 block text-xs font-medium text-slate-700">
-            JSON export (alleen lezen, kopiëren met Ctrl+C)
+            JSON export (alleen lezen, kopieren met Ctrl+C)
           </label>
           <textarea
             className="w-full rounded-md border-slate-300 bg-slate-50 p-2 text-[11px] font-mono leading-snug"
