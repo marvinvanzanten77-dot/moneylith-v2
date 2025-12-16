@@ -5,6 +5,7 @@ import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
 import type { TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import type { AiActions } from "../../logic/extractActions";
+import { BackupCard } from "../BackupCard";
 
 interface StepAfschriftenProps {
   accounts: MoneylithAccount[];
@@ -678,6 +679,8 @@ export function StepAfschriften({
               <p className="text-[11px] text-slate-400">Volledig AI-antwoord en aanvullende chat zie je in de AI-gids rechts.</p>
             </div>
           </div>
+
+          <BackupCard />
         </div>
       </div>
     </div>
