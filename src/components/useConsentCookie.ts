@@ -22,6 +22,10 @@ function parseCookie(): ConsentValue | null {
   return null;
 }
 
+export function parseConsentCookie(): ConsentValue | null {
+  return parseCookie();
+}
+
 function setConsentCookie(val: ConsentValue) {
   if (typeof document === "undefined") return;
   const isSecure = window.location.protocol === "https:";

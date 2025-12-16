@@ -40,6 +40,8 @@ import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from
 import { LegalPage } from "./components/LegalPage";
 import { useEffect } from "react";
 import { CookieBanner } from "./components/CookieBanner";
+import { parseConsentCookie } from "./components/useConsentCookie";
+import { initAnalytics } from "./analytics/initAnalytics";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -240,6 +242,16 @@ const App = () => {
       m.name = "robots";
       m.content = "noindex,nofollow";
       document.head.appendChild(m);
+    }
+
+    const consent = parseConsentCookie();
+    if (consent?.analytics) {
+      if (import.meta.env.MODE === "development") {
+        console.debug("[analytics] consent=true, init analytics");
+      }
+      initAnalytics();
+    } else if (import.meta.env.MODE === "development") {
+      console.debug("[analytics] consent missing/false, skip analytics");
     }
   }, []);
 
