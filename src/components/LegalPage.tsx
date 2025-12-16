@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
 
-const lastUpdated = "2025-01-01";
+const lastUpdated = "2025-12-16";
 
 const sections: Record<LegalKind, { title: string; blocks: { heading: string; bullets: string[] }[] }> = {
   privacy: {
@@ -67,6 +67,9 @@ export function LegalPage({ path }: { path: string }) {
           <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Moneylith</p>
           <h1 className="text-3xl font-semibold">{content.title}</h1>
           <p className="text-sm text-slate-400">Laatst bijgewerkt: {lastUpdated}</p>
+          <p className="text-sm text-slate-300">
+            Contact: <a href="mailto:info@moneylith.nl" className="underline hover:text-white">info@moneylith.nl</a>
+          </p>
         </header>
 
         <div className="space-y-5 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/30">
