@@ -23,7 +23,7 @@ export async function verifyTurnstile(req: VercelRequest): Promise<boolean> {
 export function requireTurnstile(req: VercelRequest, res: VercelResponse) {
   return verifyTurnstile(req).then((ok) => {
     if (!ok) {
-      res.status(429).json({ error: "Captcha validatie mislukt" });
+      res.status(403).json({ error: "Verificatie mislukt, probeer opnieuw." });
       return false;
     }
     return true;
