@@ -38,6 +38,7 @@ import type { AiActions } from "./logic/extractActions";
 import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/applyIncomeSuggestion";
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
 import { LegalPage } from "./components/LegalPage";
+import { StatusPage } from "./components/StatusPage";
 import { useEffect } from "react";
 import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
@@ -229,9 +230,13 @@ const ActionZone = ({
 
 const App = () => {
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
+  const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
   if (legalPaths.includes(currentPath)) {
     return <LegalPage path={currentPath} />;
+  }
+  if (statusPaths.includes(currentPath)) {
+    return <StatusPage />;
   }
 
   useEffect(() => {
@@ -1778,6 +1783,10 @@ const App = () => {
         <span className="text-slate-500">•</span>
         <a href="/cookies" className="hover:text-white underline-offset-4 hover:underline">
           Cookies
+        </a>
+        <span className="text-slate-500">•</span>
+        <a href="/status" className="hover:text-white underline-offset-4 hover:underline">
+          Status
         </a>
       </footer>
       <CookieBanner />
