@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { rateLimit } from "../utils/rateLimit";
 import { verifyTurnstile } from "../utils/verifyTurnstile";
 import { initSentry, Sentry } from "../utils/sentry";
+import { auditLog } from "../utils/audit";
 
 const MODEL = "gpt-4.1-mini";
 
@@ -12,11 +13,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (!rateLimit(req, res, { limit: 20, windowMs: 60_000 })) return;
+  const started = Date.now();
+  let rateLimited = false;
+  const okLimit = rateLimit(req, res, { limit: 20, windowMs: 60_000 });
+  if (!okLimit) {
+    rateLimited = true;
+    auditLog({
+      ts: new Date().toISOString(),
+      route: "api/moneylith/analyse",
+      status: "fail",
+      latencyMs: Date.now() - started,
+      rateLimited: true,
+      turnstile: false,
+    });
+    return;
+  }
 
   const ok = await verifyTurnstile(req);
   if (!ok) {
     res.status(403).json({ error: "Verificatie mislukt, probeer opnieuw." });
+    auditLog({
+      ts: new Date().toISOString(),
+      route: "api/moneylith/analyse",
+      status: "fail",
+      latencyMs: Date.now() - started,
+      rateLimited,
+      turnstile: false,
+    });
     return;
   }
 
@@ -53,6 +76,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const content = completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
+    auditLog({
+      ts: new Date().toISOString(),
+      route: "api/moneylith/analyse",
+      status: "success",
+      latencyMs: Date.now() - started,
+      rateLimited,
+      turnstile: true,
+      tokens: completion?.usage
+        ? {
+            prompt: completion.usage.prompt_tokens,
+            completion: completion.usage.completion_tokens,
+          }
+        : undefined,
+    });
     res.status(200).json({ content });
   } catch (error) {
     Sentry.captureException(error, {
@@ -64,5 +101,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       "- Controleer je OPENAI_API_KEY\n" +
       "- Probeer later opnieuw";
     res.status(200).json({ content: fallback });
+    auditLog({
+      ts: new Date().toISOString(),
+      route: "api/moneylith/analyse",
+      status: "fail",
+      latencyMs: Date.now() - started,
+      rateLimited,
+      turnstile: true,
+    });
   }
 }
