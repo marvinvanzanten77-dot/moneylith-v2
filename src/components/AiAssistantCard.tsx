@@ -5,6 +5,7 @@ import { buildMoneylithPrompt } from "../logic/aiPrompt";
 import { useObserver } from "../hooks/useObserver";
 import { appendAiMessage, getAiMessages, subscribeToAiMessages } from "../logic/aiMessageBus";
 import type { AiActions } from "../logic/extractActions";
+import { TurnstileWidget } from "./TurnstileWidget";
 
 interface AiAssistantCardProps {
   mode?: "personal" | "business";
@@ -19,6 +20,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   const [aiError, setAiError] = useState<string | null>(null);
   const [lastAiActions, setLastAiActions] = useState<AiActions | null>(actions ?? null);
   const [chatInput, setChatInput] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const [messages, setMessages] = useState(getAiMessages());
 
@@ -71,7 +73,10 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   }, [messages]);
 
   const handleChatSend = async () => {
-    if (!aiPayload || !chatInput.trim()) return;
+    if (!aiPayload || !chatInput.trim() || !turnstileToken) {
+      setAiError("Verificatie mislukt, probeer opnieuw.");
+      return;
+    }
     const question = chatInput.trim();
     setChatInput("");
     try {
@@ -80,9 +85,11 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
         system: aiPayload.system,
         user: `${aiPayload.user}\n\nVraag: ${question}`,
         displayUserMessage: question,
+        turnstileToken,
       });
       if (result) {
         setAiError(null);
+        setTurnstileToken(null); // force nieuwe token next time
       } else {
         setAiError("AI kon nu je vraag niet verwerken. Probeer het later opnieuw.");
       }
@@ -130,24 +137,31 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
       </div>
 
       <div className="mt-3 flex gap-2">
-        <input
-          type="text"
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          placeholder="Stel een vraag aan de AI..."
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && chatInput.trim()) {
-              e.preventDefault();
-              void handleChatSend();
-            }
-          }}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 disabled:opacity-50"
-          disabled={!aiPayload || aiLoading}
-        />
+        <div className="flex-1 space-y-2">
+          <TurnstileWidget
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
+            onVerify={(token) => setTurnstileToken(token)}
+            theme="dark"
+          />
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Stel een vraag aan de AI..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && chatInput.trim()) {
+                e.preventDefault();
+                void handleChatSend();
+              }
+            }}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 disabled:opacity-50"
+            disabled={!aiPayload || aiLoading}
+          />
+        </div>
         <button
           type="button"
           onClick={handleChatSend}
-          disabled={!aiPayload || aiLoading || !chatInput.trim()}
+          disabled={!aiPayload || aiLoading || !chatInput.trim() || !turnstileToken}
           className="rounded-lg bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 disabled:opacity-50"
         >
           {aiLoading ? "Bezig..." : "Stel vraag"}

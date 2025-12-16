@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
 import { rateLimit } from "./utils/rateLimit";
+import { verifyTurnstile } from "./utils/verifyTurnstile";
 
 const MODEL = "gpt-4.1-mini";
 
@@ -11,6 +12,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!rateLimit(req, res, { limit: 20, windowMs: 60_000 })) return;
+
+  const ok = await verifyTurnstile(req);
+  if (!ok) {
+    res.status(403).json({ error: "Verificatie mislukt, probeer opnieuw." });
+    return;
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   const { system, user } = (req.body || {}) as { system?: string; user?: string };

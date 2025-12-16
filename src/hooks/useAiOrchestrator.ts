@@ -28,9 +28,10 @@ interface RunAiInput {
   system: string;
   user: string;
   displayUserMessage?: string;
+  turnstileToken?: string;
 }
 
-async function postAnalyse(body: { system: string; user: string }) {
+async function postAnalyse(body: { system: string; user: string; turnstileToken?: string }) {
   // Probeer eerst de bekende serverless route met koppelteken, val dan terug op de variant zonder
   // Only use the known backend route; the old hyphenated path caused 404 noise in Vite dev.
   const endpoints = ["/api/moneylith/analyse"];
