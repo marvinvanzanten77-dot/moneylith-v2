@@ -1,6 +1,14 @@
-﻿import { POTJES, getDefaultPotjes } from "../data/potjes";
+﻿import { lazy, Suspense } from "react";
+import { POTJES, getDefaultPotjes } from "../data/potjes";
 import { SCHULDENPLAN } from "../data/schuldenplan";
 import type { MonthId } from "../types";
+import type { MonthlySpendingChartDatum } from "./charts/MonthlySpendingStackedChart";
+
+const MonthlySpendingStackedChart = lazy(() =>
+  import("./charts/MonthlySpendingStackedChart").then((m) => ({
+    default: m.MonthlySpendingStackedChart,
+  }))
+);
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -58,14 +66,25 @@ export function AnalyticsCard() {
     };
   });
 
-  return (
-    <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Analyse over tijd</h2>
-      <p className="text-xs text-slate-500">
-        Ruwe samenvatting van uitgaven per maand (potjes + schulden).
-      </p>
+  const chartData: MonthlySpendingChartDatum[] = rows.map((row) => ({
+    maand: row.month.label,
+    potjes: row.potjesSpent,
+    schuld: row.schuldPaid,
+    totaal: row.total,
+  }));
 
-      <div className="mt-3 overflow-x-auto">
+  return (
+    <div className="mt-8 card-shell p-5 text-slate-900">
+      <h2 className="text-lg font-semibold">Tijdslijn</h2>
+      <p className="text-xs text-slate-600">Zie per maand hoeveel naar potjes en schulden ging.</p>
+
+      <div className="mt-4">
+        <Suspense fallback={<div className="h-64 rounded-2xl bg-white/50" />}>
+          <MonthlySpendingStackedChart data={chartData} />
+        </Suspense>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
         <table className="min-w-full table-auto text-xs">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
@@ -90,3 +109,4 @@ export function AnalyticsCard() {
     </div>
   );
 }
+

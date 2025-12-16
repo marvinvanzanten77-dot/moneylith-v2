@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 
 const APP_KEYS_PREFIXES = ["potje-", "schuldenplan-"];
 const APP_KEYS_EXACT = [
@@ -101,8 +101,8 @@ export function SettingsCard() {
     <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Instellingen & data</h2>
-          <p className="text-xs text-slate-500">Exporteer of reset alle gegevens van deze planner.</p>
+          <h2 className="text-lg font-semibold text-slate-900">Bewaren & resetten</h2>
+          <p className="text-xs text-slate-500">Bewaar eerst een kopie van je gegevens voordat je iets opruimt.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -110,21 +110,21 @@ export function SettingsCard() {
             onClick={handleExport}
             className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
           >
-            Exporteer data
+            Bewaar kopie
           </button>
           <button
             type="button"
             onClick={handleDownload}
             className="inline-flex items-center rounded-md bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm hover:bg-slate-300"
           >
-            Download JSON
+            Download bestand
           </button>
           <button
             type="button"
             onClick={handleReset}
             className="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-red-700"
           >
-            Reset alle data
+            Reset alles (met zorg)
           </button>
         </div>
       </div>
@@ -132,7 +132,7 @@ export function SettingsCard() {
       {exportData && (
         <div className="mt-3">
           <label className="mb-1 block text-xs font-medium text-slate-700">
-            JSON export (alleen lezen, kopieren met Ctrl+C)
+            Data-export (alleen lezen, kopieer met Ctrl+C)
           </label>
           <textarea
             className="w-full rounded-md border-slate-300 bg-slate-50 p-2 text-[11px] font-mono leading-snug"
@@ -145,7 +145,7 @@ export function SettingsCard() {
 
       <div className="mt-4">
         <label className="mb-1 block text-xs font-medium text-slate-700">
-          Import JSON (plak export hier en importeer)
+          Data terugzetten (plak je export hier)
         </label>
         <textarea
           className="w-full rounded-md border-slate-300 bg-white p-2 text-[11px] font-mono leading-snug"
@@ -159,11 +159,12 @@ export function SettingsCard() {
             onClick={handleImport}
             className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
           >
-            Importeer data
+            Importeer
           </button>
-          <p className="text-[11px] text-slate-500">Alleen keys van deze planner worden geladen.</p>
+          <p className="text-[11px] text-slate-500">Alleen de planner-gegevens worden teruggezet.</p>
         </div>
       </div>
     </div>
   );
 }
+

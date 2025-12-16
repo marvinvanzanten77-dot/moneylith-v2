@@ -1,6 +1,7 @@
 ﻿import { SCHULDENPLAN } from "../data/schuldenplan";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { MonthId, SchuldenPlanItem, SchuldItem } from "../types";
+import { DebtOverTimeChart } from "./charts/DebtOverTimeChart";
 
 type Props = {
   selectedMonth: MonthId;
@@ -54,26 +55,36 @@ const SchuldenPlanTable = ({ selectedMonth }: Props) => {
   const sumPlanned = itemsWithState.reduce((acc, entry) => acc + entry.item.doelBedrag, 0);
   const sumPaid = itemsWithState.reduce((acc, entry) => acc + entry.paidAmount, 0);
 
+  const chartData = itemsWithState.map(({ item, paidAmount }) => ({
+    maand: item.labelMaand,
+    doel: item.doelBedrag,
+    betaald: paidAmount,
+  }));
+
   return (
     <section>
       <div className="mb-3">
-        <h2 className="text-lg font-semibold text-slate-900">Schuldenplan 2025–2026</h2>
-        <p className="text-xs text-slate-500">
-          Volg per maand welke schuld je afbouwt en wat het doelbedrag is.
+        <h2 className="text-lg font-semibold text-white">Aflospad per maand</h2>
+        <p className="text-xs text-slate-200/80">
+          Kies per maand welke schuld aandacht krijgt en welk bedrag je wilt halen.
         </p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="mb-3 text-xs text-slate-600">
-          Voltooid: {totals.doneCount} van {SCHULDENPLAN.length} maanden · Totaal doelbedrag: {currency(totals.total)} · Reeds afgerond: {currency(totals.doneAmount)} · Werkelijk betaald: {currency(totals.sumPaid)}
+      <div className="card-shell p-5 text-slate-900">
+        <p className="mb-3 text-xs text-slate-700">
+          {totals.doneCount} van {SCHULDENPLAN.length} maanden ingevuld · Doel totaal: {currency(totals.total)} · Afgerond: {currency(totals.doneAmount)} · Echt betaald: {currency(totals.sumPaid)}
         </p>
+
+        <div className="mb-4">
+          <DebtOverTimeChart data={chartData} />
+        </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full table-auto text-xs">
             <thead className="bg-slate-100 text-slate-700">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold">Maand</th>
-                <th className="px-3 py-2 text-left font-semibold">Focus</th>
+                <th className="px-3 py-2 text-left font-semibold">Focusschuld</th>
                 <th className="px-3 py-2 text-left font-semibold">Doel</th>
                 <th className="px-3 py-2 text-left font-semibold">Beschrijving</th>
                 <th className="px-3 py-2 text-right font-semibold">Betaald (€)</th>
@@ -84,7 +95,7 @@ const SchuldenPlanTable = ({ selectedMonth }: Props) => {
               {itemsWithState.map(
                 ({ item, done, setDone, paidAmount, setPaidAmount, linkedDebt, setLinkedDebt }: { item: SchuldenPlanItem; done: boolean; setDone: (value: boolean) => void; paidAmount: number; setPaidAmount: (value: number) => void; linkedDebt: string | ""; setLinkedDebt: (value: string | "") => void }) => {
                   const debtLabel = schuldenLijst.find((d) => d.id === linkedDebt)?.naam || "";
-                  const focusText = debtLabel || item.focusSchuld || "Nog geen focus";
+                  const focusText = debtLabel || item.focusSchuld || "Kies een schuld als focus";
                   return (
                     <tr
                       key={item.id}
@@ -96,11 +107,11 @@ const SchuldenPlanTable = ({ selectedMonth }: Props) => {
                       <td className="px-3 py-2 align-top text-slate-900 space-y-1">
                         <div className="text-xs font-semibold text-slate-900">{focusText}</div>
                         <select
-                          className="block w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="block w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           value={linkedDebt}
                           onChange={(e) => setLinkedDebt(e.target.value)}
                         >
-                          <option value="">Geen schuld gekoppeld</option>
+                          <option value="">Koppel een schuld</option>
                           {schuldenLijst.map((schuld) => (
                             <option key={schuld.id} value={schuld.id}>
                               {schuld.naam || "(naamloos)"}
@@ -113,7 +124,7 @@ const SchuldenPlanTable = ({ selectedMonth }: Props) => {
                       <td className="px-3 py-2 align-top text-right">
                         <input
                           type="number"
-                          className="w-24 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           value={paidAmount || ""}
                           onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
                         />
@@ -149,3 +160,4 @@ const SchuldenPlanTable = ({ selectedMonth }: Props) => {
 };
 
 export default SchuldenPlanTable;
+

@@ -1,0 +1,685 @@
+import { useMemo, useState, useCallback } from "react";
+import { useEffect } from "react";
+import type { AccountStatementMeta, MoneylithAccount, MoneylithTransaction } from "../../types";
+import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
+import type { TabKey } from "../../hooks/useAiOrchestrator";
+import { appendAiMessage } from "../../logic/aiMessageBus";
+import type { AiActions } from "../../logic/extractActions";
+
+interface StepAfschriftenProps {
+  accounts: MoneylithAccount[];
+  statements: AccountStatementMeta[];
+  transactions: MoneylithTransaction[];
+  onAddStatement: (meta: AccountStatementMeta) => void;
+  onDeleteStatement: (id: string) => void;
+  onUpsertTransaction: (tx: MoneylithTransaction) => void;
+  onDeleteTransaction: (id: string) => void;
+  aiAnalysisDone?: boolean;
+  aiAnalysisDoneAt?: string | null;
+  aiAnalysisRaw?: string | null;
+  onAiAnalysisComplete?: (payload: { raw: string; at: string }) => void;
+  onAiActionsChange?: (actions: AiActions | null) => void;
+  onBucketsRefresh?: () => void;
+  fixedCostLabels?: string[];
+}
+
+export function StepAfschriften({
+  accounts,
+  statements,
+  transactions: _transactions,
+  onAddStatement,
+  onDeleteStatement,
+  onUpsertTransaction: _onUpsertTransaction,
+  onDeleteTransaction: _onDeleteTransaction,
+  aiAnalysisDone = false,
+  aiAnalysisDoneAt = null,
+  aiAnalysisRaw = null,
+  onAiAnalysisComplete,
+  onAiActionsChange,
+  onBucketsRefresh,
+  fixedCostLabels = [],
+}: StepAfschriftenProps) {
+  const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? "");
+  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [fileName, setFileName] = useState<string>("");
+  const [fileContent, setFileContent] = useState<string>("");
+  const [fileNote, setFileNote] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(aiAnalysisDone ? "AI-analyse uitgevoerd" : null);
+  const [pendingTx, setPendingTx] = useState<MoneylithTransaction[]>([]);
+
+  const { runAi } = useAiOrchestrator({
+    mode: "personal",
+    appendMessage: appendAiMessage,
+    setLoading: setAiLoading,
+    setLastActions: onAiActionsChange,
+  });
+
+  const [aiBuckets, setAiBuckets] = useState<
+    { id: string; label: string; monthlyAvg: number; count?: number }[]
+  >(() => {
+    try {
+      const raw = localStorage.getItem("moneylith.personal.aiBuckets");
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    return [];
+  });
+
+  const parseBucketsFromText = useCallback(
+    (raw: string) => {
+      const fixedLower = fixedCostLabels.map((f) => f.toLowerCase());
+      const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+      const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
+      lines.forEach((l, idx) => {
+        const m = l.match(/^[-*\d.\)]*\s*([^:]+):\s*€?\s*([\d.,]+)/i);
+        if (!m) return;
+        const label = m[1].trim();
+        const num = parseFloat(m[2].replace(/\./g, "").replace(",", "."));
+        if (!Number.isFinite(num)) return;
+        const isFixed = fixedLower.some((f) => f && label.toLowerCase().includes(f));
+        if (isFixed) return;
+        parsed.push({
+          id: `ai-bucket-${idx}-${label.toLowerCase().replace(/\s+/g, "-").slice(0, 40)}`,
+          label,
+          monthlyAvg: Math.round(num),
+        });
+      });
+      return parsed.slice(0, 6);
+    },
+    [fixedCostLabels]
+  );
+
+  const detectBankLabel = useCallback(() => {
+    const haystack = `${fileName} ${fileContent}`.toLowerCase();
+    const accountName = accounts.find((a) => a.id === accountId)?.name || "";
+    if (haystack.includes("bunq")) return "bunq";
+    if (haystack.includes("rabobank") || haystack.includes("rabo")) return "rabo";
+    if (haystack.includes("ing")) return "ing";
+    if (haystack.includes("abn")) return "abn";
+    if (haystack.includes("sns")) return "sns";
+    if (haystack.includes("asnbank") || haystack.includes("asn")) return "asn";
+    if (accountName) {
+      const first = accountName.split(/\s+/)[0].toLowerCase();
+      if (first.length) return first;
+    }
+    return "bank";
+  }, [accountId, accounts, fileContent, fileName]);
+
+  useEffect(() => {
+    if (aiAnalysisDone) {
+      setAiStatus("AI-analyse uitgevoerd");
+    }
+  }, [aiAnalysisDone]);
+
+  const parseTransactionsFromCsv = useCallback((): MoneylithTransaction[] => {
+    if (!fileContent || !accountId) return [];
+    const lines = fileContent
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lines.length) return [];
+    const delimiter = lines[0].includes(";") && lines[0].split(";").length >= lines[0].split(",").length ? ";" : ",";
+    const parseLine = (line: string) => line.split(delimiter).map((s) => s.trim());
+    const headers = parseLine(lines[0]).map((h) => h.toLowerCase());
+    const hasHeader = headers.some((h) => h.includes("datum") || h.includes("amount") || h.includes("omschrijving"));
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+    const dateIdx = headers.findIndex((h) => h.includes("datum") || h.includes("date"));
+    const descIdx = headers.findIndex((h) => h.includes("omschr") || h.includes("descr") || h.includes("tegenpartij"));
+    const amountIdx = headers.findIndex((h) => h.includes("bedrag") || h.includes("amount") || h.includes("waarde"));
+
+    const toNumber = (val: string) => {
+      const normalized = val.replace(/[€\s]/g, "").replace(",", ".").replace("\u00a0", "");
+      const num = parseFloat(normalized);
+      return Number.isFinite(num) ? num : 0;
+    };
+    const toDate = (val: string) => {
+      const parsed = new Date(val);
+      if (Number.isNaN(parsed.getTime())) return new Date();
+      return parsed;
+    };
+
+    return dataLines
+      .map((line, idx) => {
+        const cells = parseLine(line);
+        const get = (i: number | undefined, fallbackIdx?: number) => {
+          if (typeof i === "number" && i >= 0 && i < cells.length) return cells[i];
+          if (typeof fallbackIdx === "number" && fallbackIdx >= 0 && fallbackIdx < cells.length) return cells[fallbackIdx];
+          return "";
+        };
+        const desc = get(descIdx >= 0 ? descIdx : 0);
+        const amt = toNumber(get(amountIdx >= 0 ? amountIdx : 1));
+        const dt = toDate(get(dateIdx >= 0 ? dateIdx : 2));
+        if (!desc && amt === 0) return null;
+        return {
+          id: `${Date.now()}-${idx}-${Math.random().toString(16).slice(2)}`,
+          accountId,
+          date: dt.toISOString().slice(0, 10),
+          amount: amt,
+          description: desc || "Transactie",
+          counterparty: undefined,
+          category: null,
+        } as MoneylithTransaction;
+      })
+      .filter(Boolean) as MoneylithTransaction[];
+  }, [accountId, fileContent]);
+
+  const statementsByAccount = useMemo(() => {
+    const map = new Map<string, AccountStatementMeta[]>();
+    statements.forEach((s) => {
+      if (!map.has(s.accountId)) map.set(s.accountId, []);
+      map.get(s.accountId)!.push(s);
+    });
+    return map;
+  }, [statements]);
+
+  const buckets = useMemo(() => {
+    if (aiBuckets.length) return aiBuckets;
+    if (_transactions && _transactions.length > 0) {
+      const now = Date.now();
+      const cutoffMs = now - 90 * 24 * 60 * 60 * 1000;
+      let minDate = Number.MAX_SAFE_INTEGER;
+      let maxDate = 0;
+      const spendTxs = _transactions.filter((t) => {
+        if (t.amount >= 0) return false;
+        const ts = Date.parse(t.date);
+        if (Number.isFinite(ts)) {
+          minDate = Math.min(minDate, ts);
+          maxDate = Math.max(maxDate, ts);
+          return ts >= cutoffMs;
+        }
+        return true;
+      });
+      if (!spendTxs.length) return [];
+
+      const map = new Map<string, { total: number; count: number }>();
+      spendTxs.forEach((t) => {
+        const key = (t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
+        const entry = map.get(key) ?? { total: 0, count: 0 };
+        entry.total += Math.abs(t.amount);
+        entry.count += 1;
+        map.set(key, entry);
+      });
+
+      const spanDays =
+        minDate !== Number.MAX_SAFE_INTEGER && maxDate > 0
+          ? Math.max(1, Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)))
+          : 30;
+      const months = Math.max(1, Math.round(spanDays / 30));
+
+      const computed = Array.from(map.entries())
+        .map(([label, info]) => ({
+          id: `bucket-${label}`,
+          label: label || "potje",
+          monthlyAvg: Math.round(info.total / months),
+          count: info.count,
+        }))
+        .filter((b) => b.monthlyAvg > 0)
+        .sort((a, b) => b.monthlyAvg - a.monthlyAvg)
+        .slice(0, 6);
+      if (computed.length) return computed;
+    }
+
+    // Lege placeholders (alleen visuals) als fallback
+    return Array.from({ length: 6 }).map((_, idx) => ({
+      id: `ph-${idx}`,
+      label: "",
+      monthlyAvg: 0,
+      count: 0,
+    }));
+  }, [_transactions, aiBuckets]);
+
+  const runAiBuckets = useCallback(async () => {
+    const spendTxs = (_transactions ?? []).filter((t) => t.amount < 0);
+    if (!spendTxs.length) return;
+    const sample = spendTxs.slice(0, 120).map((t) => {
+      const amt = Math.abs(t.amount).toFixed(2);
+      return `${t.date} | ${t.description || "onbekend"} | €${amt}`;
+    });
+    const system = "Moneylith - categoriseer variabele uitgaven in max 6 potjes. Vermijd vaste lasten (huur, hypotheek, energie, zorgverzekering).";
+    const user = [
+      "Je krijgt een lijst uitgaven (negatieve bedragen). Groepeer in maximaal 6 categorieën en geef per categorie een maandgemiddelde (EUR, afgerond).",
+      "Formaat per regel: <label>: €<bedrag>",
+      "Gebruik alleen variabele uitgaven; sla vaste lasten over.",
+      "Data:",
+      sample.join("\n"),
+    ].join("\n\n");
+    try {
+      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user });
+      if (!result) return;
+      const lines = result.split("\n").map((l) => l.trim()).filter(Boolean);
+      const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
+      const fixedLower = fixedCostLabels.map((f) => f.toLowerCase());
+      lines.forEach((l, idx) => {
+        const m = l.match(/^[-*\d.\)]*\s*([^:]+):\s*€?\s*([\d.,]+)/i);
+        if (!m) return;
+        const label = m[1].trim();
+        const num = parseFloat(m[2].replace(/\./g, "").replace(",", "."));
+        if (!Number.isFinite(num)) return;
+        const isFixed = fixedLower.some((f) => f && label.toLowerCase().includes(f));
+        if (isFixed) return;
+        parsed.push({
+          id: `ai-bucket-${idx}-${label.toLowerCase().replace(/\s+/g, "-").slice(0, 40)}`,
+          label,
+          monthlyAvg: Math.round(num),
+        });
+      });
+      if (parsed.length) {
+        setAiBuckets(parsed.slice(0, 6));
+        try {
+          localStorage.setItem("moneylith.personal.aiBuckets", JSON.stringify(parsed.slice(0, 6)));
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch (err) {
+      console.error("AI bucket analyse mislukt", err);
+    }
+  }, [_transactions, runAi]);
+
+  const handleSubmit = () => {
+    if (!accountId) return;
+    const exists = statements.some((s) => s.accountId === accountId && s.month === month && s.year === year);
+    if (exists) {
+      const ok = window.confirm("Voor deze rekening en maand bestaat al een afschrift. Wil je deze overschrijven?");
+      if (!ok) return;
+    }
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const bankLabel = detectBankLabel();
+    const extMatch = fileName.match(/(\.[a-zA-Z0-9]+)$/);
+    const ext = extMatch ? extMatch[1] : ".csv";
+    const safeMonth = String(month).padStart(2, "0");
+    const generatedName = `${bankLabel}-${year}-${safeMonth}${ext}`;
+    const meta: AccountStatementMeta = {
+      id,
+      accountId,
+      month,
+      year,
+      fileName: generatedName || fileName || undefined,
+      uploadedAt: new Date().toISOString(),
+    };
+    onAddStatement(meta);
+    if (pendingTx.length > 0 && _onUpsertTransaction) {
+      pendingTx.forEach((tx) => _onUpsertTransaction(tx));
+      setPendingTx([]);
+    }
+    setFileName("");
+  };
+
+  const activeAccountOptions = accounts.filter((a) => a.active && a.type === "betaalrekening");
+  const hasUploads = statements.length > 0;
+
+  const runAiAnalysis = async () => {
+    if (!hasUploads) return;
+    if (!fileContent) {
+      setAiError("Geen bestandsinhoud geladen. Upload eerst een bestand (csv/xlsx/pdf).");
+      return;
+    }
+    setAiError(null);
+    setAiStatus("AI-analyse wordt uitgevoerd...");
+    const system = "Moneylith analyse van bankafschriften";
+    const snippet = fileContent.slice(0, 10000);
+    const fixedList =
+      fixedCostLabels && fixedCostLabels.length
+        ? `Vaste lasten (uitsluiten uit potjes): ${fixedCostLabels.join(", ")}`
+        : "";
+    const user = [
+      "Analyseer mijn geuploade afschrift(en) en geef een korte samenvatting.",
+      `Bestand: ${fileName || "onbekend"}`,
+      fileNote ? `Opmerking: ${fileNote}` : "",
+      "Maak daarnaast een lijst van variabele uitgavenpotjes (max 6). Per regel: <label>: €<bedrag/maand> (afronden), laat vaste lasten zoals huur/hypotheek/energie/zorgverzekering achterwege.",
+      fixedList,
+      "Inhoud (eerste deel):",
+      snippet || "[Geen inhoud beschikbaar]",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    try {
+      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user });
+      if (!result) {
+        setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
+        setAiStatus("AI-analyse mislukt");
+        return;
+      }
+      setAiStatus("AI-analyse uitgevoerd");
+      const at = new Date().toISOString();
+      onAiAnalysisComplete?.({ raw: result, at });
+      onBucketsRefresh?.();
+      await runAiBuckets();
+    } catch (err) {
+      console.error(err);
+      setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
+      setAiStatus("AI-analyse mislukt");
+    }
+  };
+
+  useEffect(() => {
+    if (!aiAnalysisRaw) return;
+    const parsed = parseBucketsFromText(aiAnalysisRaw);
+    if (parsed.length) {
+      setAiBuckets(parsed);
+      try {
+        localStorage.setItem("moneylith.personal.aiBuckets", JSON.stringify(parsed));
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [aiAnalysisRaw, parseBucketsFromText]);
+
+  // Reset potjes als er geen uploads of analyse zijn (bijv. na F7 clear)
+  useEffect(() => {
+    const hasUploads = statements.length > 0;
+    if (!hasUploads && !aiAnalysisDone && aiBuckets.length > 0) {
+      setAiBuckets([]);
+      try {
+        localStorage.removeItem("moneylith.personal.aiBuckets");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [aiAnalysisDone, aiBuckets.length, statements.length]);
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-6 flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold text-slate-50">AI-analyse</h1>
+        <p className="text-sm text-slate-400">
+          Upload hier je bankafschriften (bij voorkeur van de laatste 3 maanden). Dit wordt lokaal gebruikt voor
+          uitgavenpatronen.
+        </p>
+        <p className="text-sm text-slate-400">
+          Zonder recente afschriften kan je ritme en analyse niet betrouwbaar worden berekend.
+        </p>
+        <p className="text-xs text-slate-500">Tip: begin met de laatste 3 maanden. Voeg elke maand een nieuw afschrift toe.</p>
+        <p className="text-xs text-slate-500">Afschriften laten zien wat je echt doet met geld - niet wat je van plan was.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2 flex flex-col gap-4">
+          {activeAccountOptions.length === 0 ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-400">
+              Zonder actieve betaalrekening kun je geen afschriften koppelen. Voeg eerst een rekening toe.
+            </div>
+          ) : (
+            activeAccountOptions.map((acc) => {
+              const list = statementsByAccount.get(acc.id) ?? [];
+              return (
+                <div key={acc.id} className="card-shell p-5 text-slate-900">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">{acc.name}</h2>
+                      <p className="text-xs text-slate-500 capitalize">{acc.type}</p>
+                    </div>
+                    <span className="text-[11px] text-slate-500">{list.length} afschrift(en)</span>
+                  </div>
+                  {list.length === 0 ? (
+                    <p className="text-sm text-slate-500">Nog geen afschriften geüpload voor deze rekening.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm text-slate-700">
+                      {list.map((s) => (
+                        <li
+                          key={s.id}
+                          className="group relative flex items-center justify-between rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                        >
+                          <div className="flex flex-col">
+                            <span>
+                              {s.month}/{s.year} - {s.fileName ?? "bestand"}
+                            </span>
+                            <span className="text-slate-400">{new Date(s.uploadedAt).toLocaleDateString()}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteStatement(s.id)}
+                            className="ml-2 hidden rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-red-100 hover:text-red-600 group-hover:inline-flex"
+                            title="Verwijder dit afschrift"
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          <div className="card-shell p-5 text-slate-900">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Potjes uit afschriften</h2>
+                <p className="text-xs text-slate-500">Max 6 categorieën, automatisch gegroepeerd.</p>
+              </div>
+              <span className="text-[11px] text-slate-500">{buckets.length} potje(n)</span>
+            </div>
+            {buckets.length === 0 ? (
+              <p className="text-sm text-slate-500">Nog geen potjes afgeleid. Upload afschriften om patronen te zien.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {(() => {
+                  const maxAvg = Math.max(...buckets.map((b) => b.monthlyAvg || 0), 1);
+                  return buckets.map((b, idx) => {
+                    const fill = Math.min(100, Math.round(((b.monthlyAvg || 0) / maxAvg) * 100));
+                    const accent =
+                      ["from-fuchsia-500/20 to-blue-500/15", "from-amber-400/25 to-orange-500/20", "from-emerald-400/20 to-cyan-400/15", "from-sky-400/20 to-indigo-500/15", "from-pink-400/20 to-rose-500/15", "from-lime-400/25 to-green-500/15"][idx % 6];
+                    return (
+                      <div
+                        key={b.id}
+                        className={`relative overflow-hidden rounded-xl border border-white/60 bg-white/85 p-3 shadow-lg shadow-slate-900/10 backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${accent}`}
+                      >
+                        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/30 via-transparent to-white/10" />
+                        <div className="flex items-start justify-between relative">
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-slate-900 capitalize">{b.label}</p>
+                            <p className="text-[11px] text-slate-600">{b.count ?? 0} transacties</p>
+                          </div>
+                          <div className="text-right text-[11px] text-slate-500 font-semibold">#{idx + 1}</div>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between text-xs text-slate-700">
+                          <span>Gemiddeld per maand</span>
+                          <span className="font-semibold text-slate-900">
+                            {new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(b.monthlyAvg)}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-slate-200 overflow-hidden shadow-inner">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-slate-900/70 to-slate-900/50 transition-all"
+                            style={{ width: `${fill}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="xl:col-span-1 space-y-4">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-50">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-50">Afschrift toevoegen</h2>
+              <p className="text-xs text-slate-400">
+                Selecteer rekening, maand en jaar en voeg een bestand toe (CSV/XLSX - PDF wordt beperkt ondersteund).
+              </p>
+            </div>
+            <label className="text-xs text-slate-300">
+              Rekening*
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+              >
+                <option value="">-- kies rekening --</option>
+                {activeAccountOptions.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
+              <label>
+                Maand*
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+                />
+              </label>
+              <label>
+                Jaar*
+                <input
+                  type="number"
+                  min={2000}
+                  max={2100}
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+                />
+              </label>
+            </div>
+            <label className="text-xs text-slate-300">
+              Bestand
+              <input
+                type="file"
+                accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  setFileName(file?.name ?? "");
+                  setFileContent("");
+                  setFileNote(null);
+                  if (!file) return;
+
+                  const MAX_CHARS = 200_000;
+
+                  const handleText = (raw: string, notePrefix?: string) => {
+                    let text = raw ?? "";
+                    if (!text || text.length === 0) {
+                      setFileNote("Inhoud kon niet worden gelezen uit dit bestand.");
+                      setFileContent("");
+                      return;
+                    }
+                    if (text.length > MAX_CHARS) {
+                      setFileNote(
+                        `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`
+                      );
+                      text = text.slice(0, MAX_CHARS);
+                    } else {
+                      setFileNote(
+                        `${notePrefix ? `${notePrefix}. ` : ""}Bestandsgrootte: ${text.length} tekens.`
+                      );
+                    }
+                    setFileContent(text);
+                  };
+
+                  const lower = file.name.toLowerCase();
+                  const isCsvLike = lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt");
+                  const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+                  const isPdf = lower.endsWith(".pdf");
+
+                  try {
+                    if (isXlsx) {
+                      const reader = new FileReader();
+                      reader.onload = async (ev) => {
+                        try {
+                          const data = ev.target?.result as ArrayBuffer;
+                          const XLSX = await import("xlsx");
+                          const workbook = XLSX.read(data, { type: "array" });
+                          const firstSheet = workbook.SheetNames[0];
+                          const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
+                          handleText(csv, "Geconverteerd uit Excel");
+                        } catch (err) {
+                          console.error("XLSX parsing failed", err);
+                          setFileNote("Lezen van het Excel-bestand is mislukt.");
+                          setFileContent("");
+                        }
+                      };
+                      reader.onerror = () => {
+                        setFileContent("");
+                        setFileNote("Lezen van het bestand is mislukt.");
+                      };
+                      reader.readAsArrayBuffer(file);
+                    } else if (isCsvLike || isPdf) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = (ev.target?.result as string | undefined) ?? "";
+                        handleText(text, isPdf ? "PDF wordt beperkt ondersteund; tekstextractie kan onvolledig zijn" : undefined);
+                        if (!isPdf) {
+                          const parsed = parseTransactionsFromCsv();
+                          if (parsed.length > 0) {
+                            setPendingTx(parsed);
+                          }
+                        }
+                      };
+                      reader.onerror = () => {
+                        setFileContent("");
+                        setFileNote("Lezen van het bestand is mislukt.");
+                      };
+                      reader.readAsText(file);
+                    } else {
+                      setFileNote("Bestandstype wordt nog niet ondersteund voor analyse.");
+                      setFileContent("");
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    setFileContent("");
+                    setFileNote("Lezen van het bestand is mislukt.");
+                  }
+                }}
+                className="mt-1 w-full text-xs text-slate-200"
+              />
+            </label>
+            <button
+              type="button"
+              className="mt-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-60"
+              onClick={handleSubmit}
+              disabled={!accountId}
+            >
+              Afschrift toevoegen
+            </button>
+
+            <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
+              <div className="flex items-center justify-between">
+                <span>AI-analyse</span>
+                <button
+                  type="button"
+                  onClick={runAiAnalysis}
+                  disabled={!hasUploads || aiLoading}
+                  className="rounded-lg bg-purple-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {aiLoading ? "Analyseren..." : "Analyseer met AI"}
+                </button>
+              </div>
+              {aiError && <p className="text-red-400">{aiError}</p>}
+              {aiStatus && <p className="text-slate-300">{aiStatus}</p>}
+              {!aiStatus && !aiError && <p className="text-slate-400">Wacht op analyse.</p>}
+              {fileName && (
+                <p className="text-[11px] text-slate-500">
+                  Bestand geladen: {fileName} (
+                  {fileContent ? "inhoud beschikbaar" : "inhoud onbekend of niet leesbaar"})
+                </p>
+              )}
+              {fileNote && (
+                <p className="text-[11px] text-slate-500">
+                  {fileNote}
+                </p>
+              )}
+              {aiAnalysisDoneAt && (
+                <p className="text-[11px] text-slate-500">Laatste analyse: {new Date(aiAnalysisDoneAt).toLocaleString()}</p>
+              )}
+              <p className="text-[11px] text-slate-400">Volledig AI-antwoord en aanvullende chat zie je in de AI-gids rechts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

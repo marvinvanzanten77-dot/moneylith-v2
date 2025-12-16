@@ -1,0 +1,3 @@
+﻿  const renderIntent = (variant: "personal" | "business") => (
+    <StepIntent value={userIntent} onChange={setUserIntent} variant={variant} />
+  );

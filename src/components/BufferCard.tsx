@@ -10,25 +10,25 @@ export function BufferCard() {
   const clampedRemaining = remaining < 0 ? 0 : remaining;
 
   return (
-    <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Buffer & spaardoel</h2>
-      <p className="text-xs text-slate-500">Hou bij hoeveel financiële buffer je al hebt opgebouwd.</p>
+    <div className="mt-6 card-shell p-5 text-slate-900">
+      <h2 className="text-lg font-semibold">Buffer & spaardoel</h2>
+      <p className="text-xs text-slate-600">Bouw je vangnet en zie hoe dichtbij je al bent.</p>
 
       <div className="mt-3 space-y-3">
         <div>
-          <label className="block text-xs font-medium text-slate-700">Doelbedrag buffer</label>
+          <label className="block text-xs font-semibold text-slate-700">Doelbedrag buffer</label>
           <input
             type="number"
-            className="mt-1 block w-full rounded-md border-slate-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
             value={safeTarget || ""}
             onChange={(e) => setBufferTarget(parseFloat(e.target.value) || 0)}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700">Huidige buffer</label>
+          <label className="block text-xs font-semibold text-slate-700">Huidige buffer</label>
           <input
             type="number"
-            className="mt-1 block w-full rounded-md border-slate-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
             value={safeCurrent || ""}
             onChange={(e) => setBufferCurrent(parseFloat(e.target.value) || 0)}
           />
@@ -36,7 +36,7 @@ export function BufferCard() {
       </div>
 
       <p className="mt-3 text-xs text-slate-600">
-        Nog te sparen tot doel: {" "}
+        Nog te sparen tot doel:{" "}
         <span className={clampedRemaining <= 0 ? "font-semibold text-emerald-700" : "font-semibold text-slate-800"}>
           €{clampedRemaining.toFixed(0)}
         </span>

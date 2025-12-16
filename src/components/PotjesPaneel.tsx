@@ -1,8 +1,14 @@
 ﻿import type { ChangeEvent } from "react";
+import { lazy, Suspense } from "react";
 import { POT_CATEGORIE_OPTIONS, getPotCategorieLabel } from "../data/potCategorieOptions";
 import { POTJES, createZeroLimits, getDefaultPotjes } from "../data/potjes";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { MonthId, PotjeDef } from "../types";
+import type { CategoryDonutDatum } from "./charts/CategoryPotsDonut";
+
+const CategoryPotsDonut = lazy(() =>
+  import("./charts/CategoryPotsDonut").then((m) => ({ default: m.CategoryPotsDonut }))
+);
 
 type Props = {
   selectedMonth: MonthId;
@@ -69,7 +75,7 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
 
     const displayName =
       potje.customName?.trim() ||
-      (potje.categoryKey ? getPotCategorieLabel(potje.categoryKey) : "Geen categorie gekozen");
+      (potje.categoryKey ? getPotCategorieLabel(potje.categoryKey) : "Kies een thema om te starten");
 
     return {
       potje,
@@ -79,74 +85,98 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
       spent,
       remaining,
       hasOverride,
+      overrideLimit,
       setOverrideLimit,
       handleSpendChange,
     };
   });
 
-  let totalLimit = 0;
-  let totalSpent = 0;
-  potjesData.forEach(({ effectiveLimit, spent }) => {
-    totalLimit += effectiveLimit;
-    totalSpent += spent;
-  });
-  const totalRemaining = totalLimit - totalSpent;
+  const totals = potjesData.reduce(
+    (acc, { effectiveLimit, spent }) => {
+      acc.totalLimit += effectiveLimit;
+      acc.totalSpent += spent;
+      return acc;
+    },
+    { totalLimit: 0, totalSpent: 0 }
+  );
+  const totalRemaining = totals.totalLimit - totals.totalSpent;
   const remainingClass =
     totalRemaining >= 0
       ? "px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"
       : "px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800";
 
+  const donutData: CategoryDonutDatum[] = potjesData
+    .filter(({ effectiveLimit }) => effectiveLimit > 0)
+    .map(({ displayName, effectiveLimit }) => ({ naam: displayName, bedrag: effectiveLimit }));
+
+  const hasChartData = donutData.length > 0;
+
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Potjes per categorie</h2>
-          <p className="text-xs text-slate-500">Limieten en bestedingen voor de geselecteerde maand.</p>
+          <h2 className="text-lg font-semibold text-slate-900">Potjes per thema</h2>
+          <p className="text-xs text-slate-600">Stel per thema je limiet en volg wat je uitgeeft.</p>
         </div>
       </div>
 
-      <div className="rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
+      <div className="card-shell p-5 text-slate-900">
         <div className="mb-4 flex flex-wrap gap-2 text-xs font-medium text-slate-800">
-          <div className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-            <span className="font-semibold">Totaal budget:</span> €{totalLimit.toFixed(0)}
+          <div className="px-3 py-1.5 rounded-full bg-white/80 text-slate-800 shadow-sm">
+            <span className="font-semibold">Budget potjes:</span> €{totals.totalLimit.toFixed(0)}
           </div>
-          <div className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-            <span className="font-semibold">Totaal uitgegeven:</span> €{totalSpent.toFixed(0)}
+          <div className="px-3 py-1.5 rounded-full bg-white/80 text-slate-800 shadow-sm">
+            <span className="font-semibold">Nu uitgegeven:</span> €{totals.totalSpent.toFixed(0)}
           </div>
           <div className={remainingClass}>
-            <span className="font-semibold">Resterend:</span> €{totalRemaining.toFixed(0)}
+            <span className="font-semibold">Nog beschikbaar:</span> €{totalRemaining.toFixed(0)}
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {potjesData.map(
-            ({
-              potje,
-              displayName,
-              baseLimit,
-              effectiveLimit,
-              spent,
-              remaining,
-              handleSpendChange,
-              hasOverride,
-              setOverrideLimit,
-            }) => (
-              <div
-                key={potje.id}
-                className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm shadow-sm"
-              >
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{displayName}</h3>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">
-                    {potje.description ?? ""}
-                  </p>
-                  <p className="text-xs text-slate-700">Limiet: €{effectiveLimit}</p>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <label className="block text-[11px] font-medium text-slate-500">
-                      Categorie
-                    </label>
+        <div className="grid gap-6 lg:grid-cols-[320px,1fr]">
+          <div className="w-full">
+            {hasChartData ? (
+              <Suspense fallback={<div className="h-64 rounded-2xl bg-white/50" />}>
+                <CategoryPotsDonut data={donutData} />
+              </Suspense>
+            ) : (
+              <div className="flex h-64 items-center justify-center rounded-2xl bg-white/60 text-xs text-slate-500">
+                Voeg een limiet toe om de verdeling te zien.
+              </div>
+            )}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {potjesData.map(
+              ({
+                potje,
+                displayName,
+                baseLimit,
+                effectiveLimit,
+                spent,
+                remaining,
+                hasOverride,
+                overrideLimit,
+                setOverrideLimit,
+                handleSpendChange,
+              }) => (
+                <div
+                  key={potje.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-white/30 bg-white/80 p-4 text-sm text-slate-900 shadow-lg transition duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">{displayName}</h3>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                        {potje.description ?? "Geef dit potje een korte noemer."}
+                      </p>
+                    </div>
+                    <span className="pill bg-purple-100 text-purple-700">€{effectiveLimit}</span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <label className="block text-[11px] font-semibold text-slate-600">Thema</label>
                     <select
-                      className="block w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
                       value={potje.categoryKey}
                       onChange={(e) => {
                         const newKey = e.target.value;
@@ -156,7 +186,7 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
                         });
                       }}
                     >
-                      <option value="">Kies categorie...</option>
+                      <option value="">Kies een thema...</option>
                       {POT_CATEGORIE_OPTIONS.map((option) => (
                         <option key={option.key} value={option.key}>
                           {option.label}
@@ -165,65 +195,67 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
                     </select>
                     {potje.categoryKey === "other" && (
                       <div className="space-y-1">
-                        <label className="block text-[11px] font-medium text-slate-500">
-                          Eigen naam / thema
+                        <label className="block text-[11px] font-semibold text-slate-600">
+                          Eigen naam of sfeer
                         </label>
                         <input
                           type="text"
-                          className="block w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
                           value={potje.customName ?? ""}
-                          onChange={(e) =>
-                            updatePotje(potje.id, { customName: e.target.value })
-                          }
+                          onChange={(e) => updatePotje(potje.id, { customName: e.target.value })}
                         />
                       </div>
                     )}
                   </div>
-                  <label className="mt-1 block text-[11px] font-medium text-slate-500">
-                    Aangepaste limiet voor deze maand (optioneel)
-                  </label>
-                  <input
-                    type="number"
-                    className="mt-0.5 block w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    value={hasOverride ? overrideLimit : ""}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (isNaN(val)) {
-                        setOverrideLimit(NaN as any);
-                      } else {
-                        setOverrideLimit(val);
-                      }
-                    }}
-                  />
-                  {hasOverride && (
-                    <p className="text-[11px] text-slate-500">Origineel: €{baseLimit}</p>
-                  )}
+
+                  <div className="space-y-1 text-xs">
+                    <label className="block text-[11px] font-semibold text-slate-600">
+                      Aangepaste limiet voor deze maand (optioneel)
+                    </label>
+                    <input
+                      type="number"
+                      className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
+                      value={hasOverride ? overrideLimit : ""}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) {
+                          setOverrideLimit(NaN as any);
+                        } else {
+                          setOverrideLimit(val);
+                        }
+                      }}
+                    />
+                    {hasOverride && (
+                      <p className="text-[11px] text-slate-500">Origineel: €{baseLimit}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    <label className="block text-[11px] font-semibold text-slate-600" htmlFor={`spent-${potje.id}`}>
+                      Uitgegeven deze maand
+                    </label>
+                    <input
+                      id={`spent-${potje.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
+                      value={Number.isFinite(spent) ? spent : 0}
+                      onChange={handleSpendChange}
+                    />
+                    {effectiveLimit === 0 ? (
+                      <p className="text-[11px] text-slate-500">Stel hier je limiet voor deze maand.</p>
+                    ) : (
+                      <p className="text-[11px] text-slate-600">Nog over binnen dit potje: €{remaining}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-700" htmlFor={`spent-${potje.id}`}>
-                    Uitgegeven deze maand
-                  </label>
-                  <input
-                    id={`spent-${potje.id}`}
-                    type="number"
-                    inputMode="decimal"
-                    className="mt-1 block w-full rounded-md border-slate-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    value={Number.isFinite(spent) ? spent : 0}
-                    onChange={handleSpendChange}
-                  />
-                  {effectiveLimit === 0 ? (
-                    <p className="mt-1 text-xs text-slate-600">Geen budget ingepland</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-600">Resterend: €{remaining}</p>
-                  )}
-                </div>
-              </div>
-            )
-          )}
+              )
+            )}
+          </div>
         </div>
 
         <div className="mt-4 text-xs text-slate-700">
-          Subtotaal limiet potjes: <span className="font-semibold">€{totalLimit.toFixed(0)}</span> · Subtotaal uitgegeven: <span className="font-semibold">€{totalSpent.toFixed(0)}</span> · Subtotaal resterend: <span className="font-semibold">€{totalRemaining.toFixed(0)}</span>
+                    Subtotaal potjes: <span className="font-semibold">€{totals.totalLimit.toFixed(0)}</span> · Uitgegeven: <span className="font-semibold">€{totals.totalSpent.toFixed(0)}</span> · Over: <span className="font-semibold">€{totalRemaining.toFixed(0)}</span>
         </div>
       </div>
     </section>
@@ -231,3 +263,5 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
 };
 
 export default PotjesPaneel;
+
+

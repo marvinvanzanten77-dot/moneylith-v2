@@ -43,42 +43,42 @@ export function DashboardSummary({ selectedMonth }: DashboardSummaryProps) {
       : "px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-800";
 
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="mb-6 card-shell p-5 text-slate-900">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">Overzicht deze maand</h2>
-        <p className="text-xs text-slate-500">{item ? item.labelMaand : selectedMonth}</p>
+        <h2 className="text-lg font-semibold text-slate-900">Missie van de maand</h2>
+        <p className="text-xs text-slate-500">Context: {item ? item.labelMaand : selectedMonth}</p>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs">
         <div className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-          <span className="font-semibold">Totaal potjes-budget:</span> €{totalLimit.toFixed(0)}
+          <span className="font-semibold">Potjesbudget:</span> €{totalLimit.toFixed(0)}
         </div>
         <div className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-          <span className="font-semibold">Uitgegeven in potjes:</span> €{totalSpent.toFixed(0)}
+          <span className="font-semibold">Nu uitgegeven:</span> €{totalSpent.toFixed(0)}
         </div>
         <div className={remainingClass}>
-          <span className="font-semibold">Resterend:</span> €{totalRemaining.toFixed(0)}
+          <span className="font-semibold">Nog beschikbaar:</span> €{totalRemaining.toFixed(0)}
         </div>
       </div>
 
       <div className="mt-2 space-y-1 text-[11px] text-slate-600">
         <p>
-          <span className="font-semibold text-slate-800">Vrije ruimte na vaste lasten:</span> €{freeBudget.toFixed(0)}
+          <span className="font-semibold text-slate-800">Vrij na vaste lasten:</span> €{freeBudget.toFixed(0)}
         </p>
         <p>
           <span className="font-semibold text-slate-800">Gepland (potjes + schuld):</span> €{plannedTotal.toFixed(0)}
           <span className="ml-2">
-            → resterend: <span className={afterPlan >= 0 ? "text-emerald-700" : "text-red-700"}>€{afterPlan.toFixed(0)}</span>
+            → daarna over: <span className={afterPlan >= 0 ? "text-emerald-700" : "text-red-700"}>€{afterPlan.toFixed(0)}</span>
           </span>
         </p>
       </div>
 
       {item ? (
         <p className="mt-3 text-xs text-slate-600">
-          <span className="font-semibold text-slate-800">Focus-schuld:</span> {item.focusSchuld} · <span className="font-semibold text-slate-800">Doel:</span> €{item.doelBedrag} · <span className="font-semibold text-slate-800">Status:</span> {done ? "Afgerond" : "Nog bezig"}
+          <span className="font-semibold text-slate-800">Maandfocus:</span> {item.focusSchuld || "Kies later welke schuld je aanpakt"} · <span className="font-semibold text-slate-800">Doel:</span> €{item.doelBedrag} · <span className="font-semibold text-slate-800">Status:</span> {done ? "Afgerond" : "Nog bezig"}
         </p>
       ) : (
-        <p className="mt-3 text-xs text-slate-600">Geen specifieke schuld-focus voor deze maand.</p>
+        <p className="mt-3 text-xs text-slate-600">Nog geen schuld gekozen voor deze maand.</p>
       )}
     </div>
   );

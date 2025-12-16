@@ -37,8 +37,8 @@ export function SchuldenLijstCard() {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Schulden – overzicht</h2>
-      <p className="text-xs text-slate-500">Lijst van lopende schulden. Sla alles lokaal op; er is geen server.</p>
+      <h2 className="text-lg font-semibold text-slate-900">Schuldenkaart</h2>
+      <p className="text-xs text-slate-500">Wat staat er open en wat verdient als eerste aandacht.</p>
 
       <div className="mt-3 overflow-x-auto">
         <table className="min-w-full table-auto text-xs">

@@ -1,0 +1,145 @@
+import { useEffect, useState } from "react";
+
+type SchuldenSummary = {
+  totalDebt: number;
+  totalMinPayment: number;
+  debtCount: number;
+};
+
+type SchuldenkaartCardProps = {
+  onSummaryChange?: (summary: SchuldenSummary) => void;
+};
+
+type SchuldItem = {
+  id: string;
+  naam: string;
+  saldo: number;
+  rente?: number;
+  minimaleMaandlast?: number;
+};
+
+const createId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `schuld-${Date.now()}-${Math.random()}`);
+
+export const SchuldenkaartCard = ({ onSummaryChange }: SchuldenkaartCardProps) => {
+  const [items, setItems] = useState<SchuldItem[]>([]);
+
+  // stuur samenvatting omhoog bij elke wijziging
+  useEffect(() => {
+    const totalDebt = items.reduce((sum, item) => sum + (Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0), 0);
+    const totalMinPayment = items.reduce(
+      (sum, item) => sum + (Number.isFinite(item.minimaleMaandlast ?? NaN) ? Math.max(0, item.minimaleMaandlast ?? 0) : 0),
+      0,
+    );
+    if (onSummaryChange) {
+      onSummaryChange({ totalDebt, totalMinPayment, debtCount: items.length });
+    }
+  }, [items, onSummaryChange]);
+
+  const addItem = () => {
+    setItems((prev) => [...prev, { id: createId(), naam: "", saldo: 0, rente: undefined, minimaleMaandlast: undefined }]);
+  };
+
+  const updateItem = (id: string, partial: Partial<SchuldItem>) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...partial } : item)));
+  };
+
+  const removeItem = (id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const totalSaldo = items.reduce((sum, item) => sum + (Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0), 0);
+  const totalMinLasten = items.reduce(
+    (sum, item) => sum + (Number.isFinite(item.minimaleMaandlast ?? NaN) ? Math.max(0, item.minimaleMaandlast ?? 0) : 0),
+    0,
+  );
+
+  return (
+    <div className="card-shell p-4 text-slate-900 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-600">Schuldenkaart</p>
+          <h3 className="text-lg font-semibold text-slate-900">Overzicht van je schulden</h3>
+        </div>
+        <button
+          type="button"
+          onClick={addItem}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:shadow"
+        >
+          + Nieuwe schuld
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {items.length === 0 && <p className="text-sm text-slate-600">Nog geen schulden toegevoegd.</p>}
+        {items.map((item) => (
+          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4 text-sm text-slate-800">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Naam</span>
+                <input
+                  type="text"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={item.naam}
+                  onChange={(e) => updateItem(item.id, { naam: e.target.value })}
+                  placeholder="Bijv. DUO"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Saldo (€)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.saldo) ? item.saldo : ""}
+                  onChange={(e) => updateItem(item.id, { saldo: parseFloat(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Rente (%)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.rente ?? NaN) ? item.rente : ""}
+                  onChange={(e) => updateItem(item.id, { rente: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0 })}
+                  placeholder="optioneel"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Min. maandlast (€)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.minimaleMaandlast ?? NaN) ? item.minimaleMaandlast : ""}
+                  onChange={(e) => updateItem(item.id, { minimaleMaandlast: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0 })}
+                  placeholder="optioneel"
+                />
+              </label>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                className="text-xs font-semibold text-red-600 hover:underline"
+              >
+                Verwijderen
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
+        <p>Totaal openstaand: €{totalSaldo.toFixed(2)}</p>
+        <p>Aantal schulden: {items.length}</p>
+        <p>Som minimale maandlasten: €{totalMinLasten.toFixed(2)}</p>
+      </div>
+    </div>
+  );
+};
+

@@ -1,6 +1,8 @@
 ﻿import { useState } from "react";
 
-export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T) => void] {
+type Updater<T> = T | ((prev: T) => T);
+
+export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: Updater<T>) => void] {
   const readValue = () => {
     if (typeof window === "undefined") {
       return defaultValue;
@@ -20,11 +22,12 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T)
 
   const [value, setValue] = useState<T>(readValue);
 
-  const setStoredValue = (nextValue: T) => {
-    setValue(nextValue);
+  const setStoredValue = (nextValue: Updater<T>) => {
+    const valueToStore = typeof nextValue === "function" ? (nextValue as (prev: T) => T)(value) : nextValue;
+    setValue(valueToStore);
     try {
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(nextValue));
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch {
       // ignore write errors

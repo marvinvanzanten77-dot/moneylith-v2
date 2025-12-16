@@ -1,6 +1,19 @@
-﻿import { useId } from "react";
+﻿import { useEffect, useId } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
-import type { FixedCostItem } from "../types";
+import type { FixedCostManualItem } from "../types";
+
+interface FixedCostsListProps {
+  onSumChange?: (sum: number) => void;
+  items?: FixedCostManualItem[];
+  onItemsChange?: (items: FixedCostManualItem[]) => void;
+  storageKey?: string;
+  heading?: string;
+  subheading?: string;
+  addLabel?: string;
+  emptyLabel?: string;
+  totalLabel?: string;
+  readOnly?: boolean;
+}
 
 const newId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -9,124 +22,149 @@ const newId = () => {
   return String(Date.now());
 };
 
-export function FixedCostsList() {
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
+
+export function FixedCostsList({
+  onSumChange,
+  items: controlledItems,
+  onItemsChange,
+  storageKey,
+  heading,
+  subheading,
+  addLabel,
+  emptyLabel,
+  totalLabel,
+  readOnly = false,
+}: FixedCostsListProps) {
   const tableId = useId();
-  const [items, setItems] = useLocalStorage<FixedCostItem[]>("fixed-costs-list", []);
-
-  const totalFixed = items.reduce(
-    (sum, item) => sum + (isNaN(item.bedrag) ? 0 : item.bedrag),
-    0
+  const [localItems, setLocalItems] = useLocalStorage<FixedCostManualItem[]>(
+    storageKey ?? "moneylith.personal.fixedCosts",
+    [],
   );
+  const items = controlledItems ?? localItems;
+  const setItems = onItemsChange ?? setLocalItems;
+  const isReadOnly = readOnly === true;
 
-  const updateItem = (id: string, partial: Partial<FixedCostItem>) => {
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...partial } : it)));
+  useEffect(() => {
+    onSumChange?.(items.reduce((sum, item) => sum + (item.bedrag || 0), 0));
+  }, [items, onSumChange]);
+
+  const updateItems = (next: FixedCostManualItem[]) => {
+    if (isReadOnly) return;
+    setItems(next);
+    onSumChange?.(next.reduce((sum, item) => sum + (item.bedrag || 0), 0));
   };
 
-  const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
+  const updateItem = (id: string, patch: Partial<FixedCostManualItem>) => {
+    if (isReadOnly) return;
+    updateItems(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
   const addItem = () => {
+    if (isReadOnly) return;
     const id = newId();
-    setItems((prev) => [
-      ...prev,
-      { id, naam: "", bedrag: 0, dagVanMaand: 1, opmerking: "" },
-    ]);
+    const next = [...items, { id, naam: "", bedrag: 0, dagVanMaand: 1, opmerking: "" }];
+    updateItems(next);
+  };
+
+  const removeItem = (id: string) => {
+    if (isReadOnly) return;
+    const next = items.filter((item) => item.id !== id);
+    updateItems(next);
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">Vaste lasten – specificatie</h2>
-      <p className="text-xs text-slate-500">
-        Overzicht van welke lasten wanneer afgeschreven worden. Gebruik de som eventueel voor je vaste-lasten veld.
-      </p>
-      <p className="mt-1 text-xs text-slate-600">
-        Totaal vaste lasten volgens overzicht: <span className="font-semibold">€{totalFixed.toFixed(0)}</span>
-      </p>
-
-      <div className="mt-3 overflow-x-auto">
-        <table className="min-w-full table-auto text-xs" aria-labelledby={tableId}>
-          <thead className="bg-slate-100 text-slate-700">
-            <tr>
-              <th className="px-3 py-2 text-left font-semibold">Naam</th>
-              <th className="px-3 py-2 text-right font-semibold">Bedrag (€)</th>
-              <th className="px-3 py-2 text-center font-semibold">Dag</th>
-              <th className="px-3 py-2 text-left font-semibold">Opmerking</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-b last:border-b-0">
-                <td className="px-3 py-2 align-top">
-                  <input
-                    type="text"
-                    className="w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    value={item.naam}
-                    onChange={(e) => updateItem(item.id, { naam: e.target.value })}
-                  />
-                </td>
-                <td className="px-3 py-2 align-top text-right">
-                  <input
-                    type="number"
-                    className="w-24 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-right"
-                    value={isNaN(item.bedrag) ? "" : item.bedrag}
-                    onChange={(e) =>
-                      updateItem(item.id, { bedrag: parseFloat(e.target.value) || 0 })
-                    }
-                  />
-                </td>
-                <td className="px-3 py-2 align-top text-center">
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    className="w-16 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-center"
-                    value={item.dagVanMaand || ""}
-                    onChange={(e) =>
-                      updateItem(item.id, { dagVanMaand: parseInt(e.target.value) || 1 })
-                    }
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <input
-                    type="text"
-                    className="w-full rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    value={item.opmerking ?? ""}
-                    onChange={(e) => updateItem(item.id, { opmerking: e.target.value })}
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.id)}
-                    className="text-[11px] text-red-600 hover:underline"
-                  >
-                    Verwijderen
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="bg-slate-50 font-semibold text-slate-800">
-              <td className="px-3 py-2 text-right" colSpan={1}>
-                Subtotaal
-              </td>
-              <td className="px-3 py-2 text-right">€{totalFixed.toFixed(0)}</td>
-              <td className="px-3 py-2" colSpan={3}></td>
-            </tr>
-          </tfoot>
-        </table>
+    <div className="card-shell space-y-3 p-4 text-slate-900">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-600">{heading ?? "Vaste lasten"}</p>
+          <h3 className="text-lg font-semibold text-slate-900">{subheading ?? "Overzicht van je vaste lasten"}</h3>
+        </div>
+        <button
+          type="button"
+          onClick={addItem}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:shadow"
+          disabled={isReadOnly}
+        >
+          {addLabel ?? "+ Nieuwe vaste last"}
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={addItem}
-        className="mt-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
-      >
-        + Nieuwe vaste last
-      </button>
+      <div className="space-y-3">
+        {items.length === 0 && <p className="text-sm text-slate-600">{emptyLabel ?? "Nog geen vaste lasten toegevoegd."}</p>}
+        {items.map((item) => (
+          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm text-sm text-slate-800">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Naam</span>
+                <input
+                  type="text"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={item.naam}
+                  onChange={(e) => updateItem(item.id, { naam: e.target.value })}
+                  placeholder="Bijv. huur"
+                  readOnly={isReadOnly}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Bedrag (€)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
+                  onChange={(e) => updateItem(item.id, { bedrag: parseFloat(e.target.value) || 0 })}
+                  placeholder="0"
+                  readOnly={isReadOnly}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Dag</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.dagVanMaand) ? item.dagVanMaand : ""}
+                  onChange={(e) => updateItem(item.id, { dagVanMaand: parseInt(e.target.value) || 1 })}
+                  placeholder="1"
+                  readOnly={isReadOnly}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Opmerking</span>
+                <input
+                  type="text"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={item.opmerking ?? ""}
+                  onChange={(e) => updateItem(item.id, { opmerking: e.target.value })}
+                  placeholder="optioneel"
+                  readOnly={isReadOnly}
+                />
+              </label>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                className="text-xs font-semibold text-red-600 hover:underline"
+                disabled={isReadOnly}
+              >
+                Verwijderen
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
+        <div className="flex items-center justify-between">
+          <span>{totalLabel ?? "Som van vaste lasten"}</span>
+          <span className="font-semibold">{formatCurrency(items.reduce((sum, item) => sum + (item.bedrag || 0), 0))}</span>
+        </div>
+      </div>
     </div>
   );
 }

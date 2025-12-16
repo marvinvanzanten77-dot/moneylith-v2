@@ -3,8 +3,70 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-start: #0f172a;
+    --bg-end: #111827;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --border-soft: rgba(255, 255, 255, 0.2);
+    --shadow-soft: 0 20px 60px -35px rgba(15, 23, 42, 0.6);
+    --primary: #7c3aed;
+    --primary-strong: #4c1d95;
+    --muted: #94a3b8;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    @apply text-slate-50 antialiased;
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: radial-gradient(120% 120% at 20% 20%, rgba(124, 58, 237, 0.16), transparent 40%),
+      radial-gradient(120% 120% at 80% 0%, rgba(14, 165, 233, 0.18), transparent 35%),
+      linear-gradient(180deg, var(--bg-start), var(--bg-end));
+  }
+
+  ::selection {
+    background: rgba(124, 58, 237, 0.3);
+    color: #fff;
+  }
+}
+
+@layer components {
+  .card-shell {
+    @apply rounded-2xl border border-white/30 bg-white/90 shadow-xl backdrop-blur-xl transition duration-200 ease-out;
+    box-shadow: 0 25px 70px -40px rgba(15, 23, 42, 0.65);
+  }
+
+  .card-shell:hover {
+    @apply shadow-2xl -translate-y-0.5 border-white/50;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold text-slate-900;
+  }
+
+  .card-subtitle {
+    @apply text-xs text-slate-500;
+  }
+
+  .muted {
+    @apply text-slate-400;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition duration-150 ease-out hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-white/20;
+  }
+
+  input,
+  select,
+  textarea {
+    @apply transition duration-150 ease-out;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply ring-2 ring-purple-300 border-purple-300;
   }
 }

@@ -1,0 +1,443 @@
+﻿import { useMemo, useState } from "react";
+import type { FinancialSnapshot, MonthFocus, MoneylithGoal, MoneylithBucket } from "../../types";
+import { projectGoal } from "../../logic/goals";
+
+type StepFocusProps = {
+  value?: MonthFocus;
+  onChange?: (v: MonthFocus) => void;
+  financialSnapshot?: FinancialSnapshot | null;
+  goals?: MoneylithGoal[];
+  onAddGoal?: (goal: Omit<MoneylithGoal, "id">) => void;
+  onUpdateGoal?: (id: string, patch: Partial<MoneylithGoal>) => void;
+  onDeleteGoal?: (id: string) => void;
+  buckets?: MoneylithBucket[];
+};
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
+
+export function StepFocus({
+  value,
+  onChange,
+  financialSnapshot,
+  goals = [],
+  onAddGoal,
+  onUpdateGoal,
+  onDeleteGoal,
+  buckets = [],
+}: StepFocusProps) {
+  const snapshot = financialSnapshot ?? null;
+  const freePerMonth = snapshot ? snapshot.totalIncome.value - snapshot.fixedCostsTotal.value : 0;
+
+  const [formState, setFormState] = useState<{
+    id?: string;
+    label: string;
+    type: MoneylithGoal["type"];
+    targetAmount: number;
+    currentAmount: number;
+    monthlyContribution: number;
+    deadline?: string;
+    linkedBucketIds: string[];
+    isActive: boolean;
+  }>(() => ({
+    label: "",
+    type: "savings",
+    targetAmount: 0,
+    currentAmount: 0,
+    monthlyContribution: 0,
+    deadline: "",
+    linkedBucketIds: [],
+    isActive: true,
+  }));
+
+  const progressGoals = useMemo(() => {
+    if (goals.length > 0) {
+      return goals.map((g) => {
+        const target = g.targetAmount || 0;
+        const current = g.currentAmount || 0;
+        const progress = target > 0 ? Math.min(current / target, 1) : 0;
+        return {
+          id: g.id,
+          label: g.label,
+          type: g.type === "debt_payoff" ? "schuld" : g.type === "buffer" ? "buffer" : "gedrag",
+          targetAmount: g.targetAmount,
+          currentAmount: g.currentAmount,
+          progress,
+          description: g.deadline ? `Deadline: ${g.deadline}` : undefined,
+          fromSnapshot: false,
+        };
+      });
+    }
+
+    const fallback: {
+      id: string;
+      label: string;
+      type: "buffer" | "schuld" | "gedrag";
+      targetAmount?: number;
+      currentAmount?: number;
+      progress: number;
+      description?: string;
+      fromSnapshot?: boolean;
+    }[] = [];
+
+    if (snapshot?.runwayMonths != null && snapshot.runwayMonths < 6) {
+      fallback.push({
+        id: "buffer-3m",
+        label: "Noodbuffer opbouwen",
+        type: "buffer",
+        progress: Math.min(snapshot.runwayMonths / 6, 1),
+        description: "Richting 3-6 maanden vaste lasten als buffer bewegen.",
+        fromSnapshot: true,
+      });
+    }
+
+    if (snapshot?.totalDebt && snapshot.totalDebt > 0) {
+      fallback.push({
+        id: "debt-lower",
+        label: "Schulden afbouwen",
+        type: "schuld",
+        targetAmount: snapshot.totalDebt,
+        progress: 0,
+        description: "Stapsgewijs je totale schuld omlaag brengen.",
+        fromSnapshot: true,
+      });
+    }
+
+    if (fallback.length === 0) {
+      fallback.push({
+        id: "generic-focus",
+        label: "Eén helder doel kiezen",
+        type: "gedrag",
+        progress: 0,
+        description: "Zodra je een concreet financieel doel kiest, verschijnt die hier met voortgang.",
+        fromSnapshot: false,
+      });
+    }
+
+    return fallback;
+  }, [goals, snapshot]);
+
+  const activeGoals = goals.filter((g) => g.isActive);
+  const projections = useMemo(() => new Map(activeGoals.map((g) => [g.id, projectGoal(g)])), [activeGoals]);
+
+  const statusForGoal = (goalId: string) => {
+    const proj = projections.get(goalId);
+    if (!proj) return "—";
+    if (freePerMonth <= 0) return "? onhaalbaar";
+    if (proj.pressurePerMonth <= freePerMonth) return "? haalbaar";
+    if (proj.pressurePerMonth <= freePerMonth * 1.5) return "? krap";
+    return "? onhaalbaar";
+  };
+
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const selectedGoal = progressGoals.find((g) => g.id === selectedGoalId) ?? progressGoals[0] ?? null;
+  const selectedProjection = selectedGoal ? projections.get(selectedGoal.id) : undefined;
+
+  const handleSubmit = () => {
+    if (!formState.label) return;
+    const payload: Omit<MoneylithGoal, "id"> = {
+      label: formState.label,
+      type: formState.type,
+      targetAmount: Number(formState.targetAmount) || 0,
+      currentAmount: Number(formState.currentAmount) || 0,
+      monthlyContribution: Number(formState.monthlyContribution) || 0,
+      deadline: formState.deadline || undefined,
+      linkedBucketIds: formState.linkedBucketIds,
+      isActive: formState.isActive,
+    };
+    if (formState.id) {
+      onUpdateGoal?.(formState.id, payload);
+    } else {
+      onAddGoal?.(payload);
+    }
+    setFormState({
+      id: undefined,
+      label: "",
+      type: "savings",
+      targetAmount: 0,
+      currentAmount: 0,
+      monthlyContribution: 0,
+      deadline: "",
+      linkedBucketIds: [],
+      isActive: true,
+    });
+  };
+
+  const handleEdit = (goalId: string) => {
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    setFormState({
+      id: g.id,
+      label: g.label,
+      type: g.type,
+      targetAmount: g.targetAmount,
+      currentAmount: g.currentAmount,
+      monthlyContribution: g.monthlyContribution,
+      deadline: g.deadline || "",
+      linkedBucketIds: g.linkedBucketIds ?? [],
+      isActive: g.isActive,
+    });
+  };
+
+  const handleBucketToggle = (bucketId: string) => {
+    setFormState((prev) => {
+      const exists = prev.linkedBucketIds.includes(bucketId);
+      return {
+        ...prev,
+        linkedBucketIds: exists ? prev.linkedBucketIds.filter((id) => id !== bucketId) : [...prev.linkedBucketIds, bucketId],
+      };
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 mb-6">
+        <h1 className="text-2xl font-semibold text-slate-50">Doelen</h1>
+        <p className="text-sm text-slate-400">
+          Leg je doelen vast, koppel ze aan potjes en zie hoe dit aansluit bij je intentie en vrije ruimte.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 2xl:grid-cols-3 gap-6">
+        <div className="2xl:col-span-2 flex flex-col gap-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 flex items-center justify-between text-sm">
+            <span className="text-slate-400">Je focus is de brug tussen intentie en gedrag.</span>
+            {snapshot?.intent && (
+              <span className="max-w-[50%] truncate text-right text-slate-200">
+                {snapshot.intent?.primaryGoal || "Intentie vastgelegd"}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {progressGoals.map((goal) => {
+              const progressPercent = Math.round((goal.progress ?? 0) * 100);
+              const status = statusForGoal(goal.id);
+              return (
+                <button
+                  key={goal.id}
+                  type="button"
+                  className="group rounded-2xl border border-slate-800 bg-slate-900/50 p-4 flex flex-col gap-3 text-left hover:border-fuchsia-500/70 hover:bg-slate-900/80 transition-colors"
+                  onClick={() => setSelectedGoalId(goal.id)}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-50">{goal.label}</h2>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {goal.type === "buffer"
+                          ? "Veiligheid & ruimte"
+                          : goal.type === "schuld"
+                          ? "Vrijheid terugwinnen"
+                          : "Gedrag & gewoontes"}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs text-slate-400">
+                      <div>{progressPercent}%</div>
+                      <div>{status}</div>
+                      {goal.fromSnapshot && (
+                        <span className="inline-flex mt-1 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">
+                          Live
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="flex-1 h-0.5 bg-slate-800 rounded-full relative overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 bg-fuchsia-500/80" style={{ width: `${progressPercent}%` }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">{progressPercent >= 100 ? "Doel bereikt" : "Onderweg"}</span>
+                  </div>
+
+                  <div className="mt-1 flex justify-between">
+                    {[0, 25, 50, 75, 100].map((milestone) => {
+                      const active = progressPercent >= milestone;
+                      return (
+                        <div
+                          key={milestone}
+                          className={`h-2 w-2 rounded-full border ${active ? "bg-fuchsia-500 border-fuchsia-400" : "bg-slate-900 border-slate-700"}`}
+                        />
+                      );
+                    })}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="2xl:col-span-1">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 flex flex-col gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-50">{selectedGoal ? selectedGoal.label : "Je doelen"}</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {selectedGoal?.description ?? "Kies een doel links of voeg er één toe om details te zien."}
+              </p>
+            </div>
+
+            {selectedGoal && (
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Voortgang</span>
+                  <span className="font-medium text-slate-50">{Math.round((selectedGoal.progress ?? 0) * 100)}%</span>
+                </div>
+                {selectedGoal.type !== "gedrag" && selectedGoal.targetAmount != null && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Doelbedrag</span>
+                      <span className="font-medium text-slate-50">{formatCurrency(selectedGoal.targetAmount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Resterend</span>
+                      <span className="font-medium text-slate-50">{formatCurrency(selectedGoal.targetAmount - (selectedGoal.currentAmount ?? 0))}</span>
+                    </div>
+                  </>
+                )}
+                {selectedProjection && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Benodig p/m</span>
+                      <span className="font-medium text-slate-50">{formatCurrency(selectedProjection.pressurePerMonth)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Maanden tot doel</span>
+                      <span className="font-medium text-slate-50">{selectedProjection.monthsToTarget ?? "—"}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Vrij per maand: {formatCurrency(freePerMonth)} ? {statusForGoal(selectedGoal.id)}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {!selectedGoal && (
+              <p className="text-xs text-slate-400">Kies of voeg een doel toe om details te zien.</p>
+            )}
+
+            <div className="mt-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-100 mb-2">Doel toevoegen / bewerken</h3>
+              <div className="space-y-2 text-xs text-slate-200">
+                <label className="block">
+                  Label
+                  <input
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                    value={formState.label}
+                    onChange={(e) => setFormState((p) => ({ ...p, label: e.target.value }))}
+                  />
+                </label>
+                <label className="block">
+                  Type
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                    value={formState.type}
+                    onChange={(e) => setFormState((p) => ({ ...p, type: e.target.value as MoneylithGoal["type"] }))}
+                  >
+                    <option value="debt_payoff">Schuld aflossen</option>
+                    <option value="savings">Sparen</option>
+                    <option value="buffer">Buffer</option>
+                    <option value="project">Project</option>
+                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    Doelbedrag
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                      value={formState.targetAmount}
+                      onChange={(e) => setFormState((p) => ({ ...p, targetAmount: Number(e.target.value) }))}
+                    />
+                  </label>
+                  <label className="block">
+                    Huidig
+                    <input
+                      type="number"
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                      value={formState.currentAmount}
+                      onChange={(e) => setFormState((p) => ({ ...p, currentAmount: Number(e.target.value) }))}
+                    />
+                  </label>
+                </div>
+                <label className="block">
+                  Inleg per maand
+                  <input
+                    type="number"
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                    value={formState.monthlyContribution}
+                    onChange={(e) => setFormState((p) => ({ ...p, monthlyContribution: Number(e.target.value) }))}
+                  />
+                </label>
+                <label className="block">
+                  Deadline (optioneel)
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
+                    value={formState.deadline}
+                    onChange={(e) => setFormState((p) => ({ ...p, deadline: e.target.value }))}
+                  />
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formState.isActive}
+                    onChange={(e) => setFormState((p) => ({ ...p, isActive: e.target.checked }))}
+                  />
+                  <span className="text-slate-200">Actief</span>
+                </div>
+
+                <div className="text-xs text-slate-300">
+                  <p className="mb-1 text-slate-400">Koppel aan potjes (optioneel):</p>
+                  <div className="grid grid-cols-1 gap-1 max-h-32 overflow-auto">
+                    {buckets.map((b) => (
+                      <label key={b.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={formState.linkedBucketIds.includes(b.id)}
+                          onChange={() => handleBucketToggle(b.id)}
+                        />
+                        <span className="text-slate-200">{b.label} ({b.type})</span>
+                      </label>
+                    ))}
+                    {buckets.length === 0 && <p className="text-[11px] text-slate-500">Geen potjes beschikbaar.</p>}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-400"
+                    onClick={handleSubmit}
+                  >
+                    {formState.id ? "Goal bijwerken" : "Goal toevoegen"}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200"
+                    onClick={() =>
+                      setFormState({
+                        id: undefined,
+                        label: "",
+                        type: "savings",
+                        targetAmount: 0,
+                        currentAmount: 0,
+                        monthlyContribution: 0,
+                        deadline: "",
+                        linkedBucketIds: [],
+                        isActive: true,
+                      })
+                    }
+                  >
+                    Form leegmaken
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+

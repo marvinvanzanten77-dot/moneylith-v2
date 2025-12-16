@@ -1,0 +1,739 @@
+import { useEffect, useMemo, useState } from "react";
+import { FixedCostsList } from "./components/FixedCostsList";
+import { SchuldenkaartCard } from "./components/SchuldenkaartCard";
+import { VermogenCard } from "./components/VermogenCard";
+import { AiAssistantCard } from "./components/AiAssistantCard";
+import { DashboardSummary } from "./components/DashboardSummary";
+import { FixedCostsWizard } from "./components/FixedCostsWizard";
+import { IncomeList } from "./components/IncomeList";
+import { StepIntent } from "./components/steps/StepIntent";
+import { StepFocus } from "./components/steps/StepFocus";
+import { StepActie } from "./components/steps/StepActie";
+import { StepSchulden } from "./components/steps/StepSchulden";
+import { StepVermogen } from "./components/steps/StepVermogen";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import { detectRecurringCandidates } from "./utils/recurring";
+import type { FixedCostItem, MonthId, Transaction, UserIntent, MonthFocus } from "./types";
+
+const MONTHS: { id: MonthId; label: string }[] = [
+  { id: "2025-12", label: "dec 2025" },
+  { id: "2026-01", label: "jan 2026" },
+  { id: "2026-02", label: "feb 2026" },
+  { id: "2026-03", label: "mrt 2026" },
+  { id: "2026-04", label: "apr 2026" },
+  { id: "2026-05", label: "mei 2026" },
+  { id: "2026-06", label: "jun 2026" },
+  { id: "2026-07", label: "jul 2026" },
+  { id: "2026-08", label: "aug 2026" },
+  { id: "2026-09", label: "sep 2026" },
+  { id: "2026-10", label: "okt 2026" },
+  { id: "2026-11", label: "nov 2026" },
+  { id: "2026-12", label: "dec 2026" },
+];
+
+type StepKey = "intent" | "fundament" | "schulden" | "vermogen" | "ritme" | "focus" | "action";
+type ActionZoneType = "overleven" | "aflossen" | "opbouwen" | "stabiliseren";
+type AflosMode = "minimum" | "aggressive";
+
+type DebtSummary = {
+  totalDebt: number;
+  totalMinPayment: number;
+  debtCount: number;
+};
+
+type AssetSummary = {
+  totalAssets: number;
+  assetsCount: number;
+};
+
+type FinancialSnapshot = {
+  totalIncome: number;
+  fixedCostsTotal: number;
+  netFree: number;
+  totalDebt: number;
+  assetsTotal: number;
+  monthlyPressure: number;
+  runwayMonths: number | null;
+  intent?: UserIntent;
+  focus?: MonthFocus;
+};
+
+const steps: { key: StepKey; label: string; desc: string }[] = [
+  { key: "intent", label: "Intentie", desc: "Doelen & richting" },
+  { key: "fundament", label: "Fundament", desc: "Inkomen, vaste lasten, netto ruimte" },
+  { key: "schulden", label: "Schulden", desc: "Wie, hoeveel, welke druk" },
+  { key: "vermogen", label: "Vermogen", desc: "Sparen, buffers, bezittingen" },
+  { key: "ritme", label: "Ritme", desc: "Maandbudget, afschrijvingsritme, maandstatus" },
+  { key: "focus", label: "Focus", desc: "Kies je richting voor deze maand" },
+  { key: "action", label: "Actie", desc: "Modules passend bij je focus" },
+];
+
+const ActionZone = ({
+  type,
+  onDebtSummary,
+  aflosMode,
+  setAflosMode,
+  debtClearMonthsAggressive,
+  onAssetSummary,
+}: {
+  type: ActionZoneType;
+  onDebtSummary: (s: DebtSummary) => void;
+  aflosMode: AflosMode;
+  setAflosMode: (mode: AflosMode) => void;
+  debtClearMonthsAggressive: number | null;
+  onAssetSummary: (s: AssetSummary) => void;
+}) => {
+  let primary: React.ReactNode = (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Primary slot (leeg)</div>
+  );
+  let secondary: React.ReactNode = (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Secondary slot (leeg)</div>
+  );
+  let timeline: React.ReactNode = (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Timeline slot (leeg)</div>
+  );
+
+  if (type === "aflossen") {
+    primary = (
+      <div className="space-y-3">
+        <div className="mb-2 flex flex-col gap-2 text-sm text-slate-800 md:flex-row md:items-center md:gap-4">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              name="aflosMode"
+              value="minimum"
+              checked={aflosMode === "minimum"}
+              onChange={() => setAflosMode("minimum")}
+            />
+            Aflossen op minimum (minimale maandlast)
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              name="aflosMode"
+              value="aggressive"
+              checked={aflosMode === "aggressive"}
+              onChange={() => setAflosMode("aggressive")}
+              disabled={!debtClearMonthsAggressive}
+            />
+            Aflossen op maximale ruimte
+          </label>
+        </div>
+        <SchuldenkaartCard onSummaryChange={onDebtSummary} />
+      </div>
+    );
+    secondary = (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
+        Hier komt later offersimulatie.
+      </div>
+    );
+    timeline = (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
+        Hier komt later een aflostijdlijn.
+      </div>
+    );
+  }
+
+  if (type === "opbouwen") {
+    primary = <VermogenCard onSummaryChange={onAssetSummary} />;
+    secondary = (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
+        Hier komt later een groeiplan.
+      </div>
+    );
+    timeline = (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
+        Hier komt later een vermogenslijn.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card-shell p-4 text-slate-900 space-y-3">
+        <p className="text-sm text-slate-600">Actiepad</p>
+        <h3 className="text-lg font-semibold text-slate-900">Actiemodules voor {type}</h3>
+        <p className="text-sm text-slate-700">Actiemodules voor {type} komen hier.</p>
+        <div className="space-y-2 text-xs text-slate-500">
+          <div className="action-primary">{primary}</div>
+          <div className="action-secondary">{secondary}</div>
+          <div className="action-timeline">{timeline}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
+  const [currentStep, setCurrentStep] = useState<StepKey>("intent");
+  const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
+    "intent",
+    "fundament",
+    "schulden",
+    "vermogen",
+    "ritme",
+    "focus",
+    "action",
+  ]);
+  const [selectedMonth, setSelectedMonth] = useLocalStorage<MonthId>("selected-month", "2025-12");
+  const [monthFocus, setMonthFocus] = useLocalStorage<MonthFocus>("month-focus", null);
+  const [showOverview, setShowOverview] = useState(false);
+  const [debtsSummary, setDebtsSummary] = useState<DebtSummary>({ totalDebt: 0, totalMinPayment: 0, debtCount: 0 });
+  const [assetsSummary, setAssetsSummary] = useState<AssetSummary>({ totalAssets: 0, assetsCount: 0 });
+  const [aflosMode, setAflosMode] = useState<AflosMode>("minimum");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isFixedCostsWizardOpen, setIsFixedCostsWizardOpen] = useState(false);
+  const [userIntent, setUserIntent] = useLocalStorage<UserIntent>("user-intent", {
+    primaryGoal: null,
+    mainPressure: null,
+    timeHorizon: null,
+    aiStyle: null,
+  });
+  const [financialSnapshot, setFinancialSnapshot] = useState<FinancialSnapshot | null>(null);
+
+  const [netIncome, setNetIncome] = useLocalStorage<number>("income-netto", 0);
+  // INVENTARISATIE (Hoofdstuk 3 - geen wijziging):
+  // fixedCosts wordt nu alleen gehaald uit lokale invoer via useLocalStorage("fixed-costs").
+  // Deze waarde voedt:
+  // - stabiliteit (fixedCostPressure, runwayMonths)
+  // - AI-context (via stateSnapshot richting AiAssistantCard/api-proxy)
+  // Later vervangen door som uit een recurring-engine.
+  const [manualFixedCosts, setManualFixedCosts] = useLocalStorage<number>("fixed-costs", 0);
+  const [fixedCostItems, setFixedCostItems] = useLocalStorage<FixedCostItem[]>("fixed-cost-items", []);
+
+  // systeemaanname v1 (geen UI)
+  const bufferTargetMonths = 3;
+  const bufferMonthlyReserve = 200;
+  const assetMonthlyContribution = 300;
+  const assetTarget = 10000;
+
+  const debtClearMonths =
+    debtsSummary.totalDebt > 0 && debtsSummary.totalMinPayment > 0
+      ? Math.ceil(debtsSummary.totalDebt / debtsSummary.totalMinPayment)
+      : null;
+  const debtClearMonthsAggressive =
+    netIncome > 0 && debtsSummary.totalDebt > 0 ? Math.ceil(debtsSummary.totalDebt / netIncome) : null;
+  const debtClearMonthsBuffered =
+    netIncome - bufferMonthlyReserve > 0 && debtsSummary.totalDebt > 0
+      ? Math.ceil(debtsSummary.totalDebt / (netIncome - bufferMonthlyReserve))
+      : null;
+
+  const recurringCandidates = useMemo(() => detectRecurringCandidates(transactions), [transactions]);
+
+  const mergedFixedCostItems = useMemo(() => {
+    if (!recurringCandidates.length && !fixedCostItems.length) return [];
+
+    const byPattern = new Map<string, FixedCostItem>();
+    for (const item of fixedCostItems) {
+      byPattern.set(item.descriptionPattern, item);
+    }
+
+    const result: FixedCostItem[] = [];
+
+    for (const candidate of recurringCandidates) {
+      const existing = byPattern.get(candidate.descriptionPattern);
+
+      if (existing) {
+        result.push({
+          ...existing,
+          averageAmount: candidate.averageAmount,
+          estimatedMonthlyAmount: candidate.estimatedMonthlyAmount,
+          frequency: candidate.frequency,
+          sampleCount: candidate.sampleCount,
+          lastDate: candidate.lastDate,
+        });
+        byPattern.delete(candidate.descriptionPattern);
+      } else {
+        result.push({
+          id: candidate.id,
+          descriptionPattern: candidate.descriptionPattern,
+          averageAmount: candidate.averageAmount,
+          estimatedMonthlyAmount: candidate.estimatedMonthlyAmount,
+          frequency: candidate.frequency,
+          sampleCount: candidate.sampleCount,
+          lastDate: candidate.lastDate,
+          isFixed: false,
+          isIgnored: false,
+        });
+      }
+    }
+
+    for (const leftover of byPattern.values()) {
+      result.push(leftover);
+    }
+
+    return result.sort((a, b) => {
+      const byPattern = a.descriptionPattern.localeCompare(b.descriptionPattern);
+      if (byPattern !== 0) return byPattern;
+      return a.id.localeCompare(b.id);
+    });
+  }, [recurringCandidates, fixedCostItems]);
+
+  const fixedCostItemsEqual = (a: FixedCostItem, b: FixedCostItem) =>
+    a.id === b.id &&
+    a.descriptionPattern === b.descriptionPattern &&
+    a.averageAmount === b.averageAmount &&
+    a.estimatedMonthlyAmount === b.estimatedMonthlyAmount &&
+    a.frequency === b.frequency &&
+    a.sampleCount === b.sampleCount &&
+    a.lastDate === b.lastDate &&
+    a.isFixed === b.isFixed &&
+    a.isIgnored === b.isIgnored &&
+    a.customLabel === b.customLabel &&
+    a.customMonthlyAmount === b.customMonthlyAmount;
+
+  useEffect(() => {
+    if (
+      fixedCostItems.length === mergedFixedCostItems.length &&
+      fixedCostItems.every((item, idx) => fixedCostItemsEqual(item, mergedFixedCostItems[idx]))
+    ) {
+      return;
+    }
+    setFixedCostItems(mergedFixedCostItems);
+  }, [fixedCostItems, mergedFixedCostItems, setFixedCostItems]);
+
+  const autoFixedCosts = mergedFixedCostItems
+    .filter((item) => item.isFixed && !item.isIgnored)
+    .reduce((sum, item) => {
+      const monthly = item.customMonthlyAmount ?? item.estimatedMonthlyAmount ?? 0;
+      return sum + monthly;
+    }, 0);
+
+  const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts : manualFixedCosts;
+
+  console.log("DEBUG Moneylith - transactions (first 3):", transactions.slice(0, 3));
+  console.log("DEBUG Moneylith - recurring candidates:", recurringCandidates);
+
+  const isFundamentValid = (income: number, costs: number) => income > 0 && costs >= 0 && Number.isFinite(income - costs);
+
+  const fundamentValid = isFundamentValid(netIncome ?? 0, fixedCosts ?? 0);
+  const ritmeValid = fundamentValid && !!selectedMonth;
+  const focusValid = ritmeValid && !!monthFocus;
+
+  const assetTargetMonths =
+    assetMonthlyContribution > 0
+      ? Math.ceil(Math.max(assetTarget - assetsSummary.totalAssets, 0) / assetMonthlyContribution)
+      : null;
+
+  const fixedCostPressure = netIncome > 0 ? fixedCosts / netIncome : null;
+  const runwayMonths = fixedCosts > 0 && assetsSummary.totalAssets > 0 ? Math.floor(assetsSummary.totalAssets / fixedCosts) : null;
+
+  // SNAPSHOT-INVENTARISATIE (nog NIET herstructureren):
+  // - Inkomsten: netIncome uit useLocalStorage("income-netto") + IncomeList-som; total via (netIncome ?? 0)
+  // - Vaste lasten: fixedCosts = autoFixedCosts (fixedCostItems) fallback manualFixedCosts (useLocalStorage("fixed-costs")); fixedCostItems komen uit recurringCandidates merge
+  // - Schulden: schuldenkaart slaat lokaal op, summary in debtsSummary (totalDebt/totalMinPayment/debtCount), aflos-modes/time variabelen
+  // - Vermogen: VermogenCard slaat lokaal op, summary in assetsSummary (totalAssets/assetsCount), assetTarget/assetMonthlyContribution hardcoded v1
+  // - Afgeleiden: netFree = netIncome - fixedCosts (quickSummary.free); fixedCostPressure, runwayMonths; assetTargetMonths uit assetTarget/assetMonthlyContribution; debtClearMonths* uit debtsSummary/netIncome/bufferMonthlyReserve
+
+  const recalculateFinancialSnapshot = () => {
+    const totalIncome = netIncome ?? 0;
+    const fixedCostsTotal = fixedCosts ?? 0;
+    const netFree = totalIncome - fixedCostsTotal;
+    const totalDebt = debtsSummary.totalDebt ?? 0;
+    const assetsTotal = assetsSummary.totalAssets ?? 0;
+    const monthlyPressure = debtsSummary.totalMinPayment ?? 0;
+    const snapshot: FinancialSnapshot = {
+      totalIncome,
+      fixedCostsTotal,
+      netFree,
+      totalDebt,
+      assetsTotal,
+      monthlyPressure,
+      runwayMonths,
+      intent: userIntent,
+      focus: monthFocus ?? null,
+    };
+    setFinancialSnapshot(snapshot);
+    console.log("DEBUG financialSnapshot", snapshot);
+  };
+
+  useEffect(() => {
+    recalculateFinancialSnapshot();
+  }, [
+    netIncome,
+    fixedCosts,
+    debtsSummary.totalDebt,
+    debtsSummary.totalMinPayment,
+    assetsSummary.totalAssets,
+    assetsSummary.assetsCount,
+    monthFocus,
+    userIntent,
+    runwayMonths,
+  ]);
+
+  const focusLabelMap: Record<MonthFocus, string> = {
+    schulden_afbouwen: "Schulden afbouwen",
+    vermogen_opbouwen: "Vermogen opbouwen",
+    overleven: "Overleven & stabiliseren",
+    experiment: "Experiment",
+    null: "Nog geen focus gekozen",
+  };
+
+  const quickSummary = useMemo(() => {
+    const free = (netIncome ?? 0) - (fixedCosts ?? 0);
+    return {
+      free,
+      month: selectedMonth,
+      focus: focusLabelMap[monthFocus ?? null],
+      status: free >= 0 ? "Onder controle" : "Kwetsbaar",
+    };
+  }, [netIncome, fixedCosts, selectedMonth, monthFocus, focusLabelMap]);
+
+  const intentValid = Boolean(userIntent.primaryGoal || userIntent.mainPressure || userIntent.timeHorizon || userIntent.aiStyle);
+
+  useEffect(() => {
+    setUnlockedSteps(["intent", "fundament", "schulden", "vermogen", "ritme", "focus", "action"]);
+  }, [intentValid, fundamentValid, ritmeValid, focusValid]);
+
+  useEffect(() => {
+    if (focusValid && !unlockedSteps.includes("action")) {
+      setCurrentStep("action");
+    }
+  }, [focusValid, unlockedSteps]);
+
+  const handleStepClick = (step: StepKey) => {
+    if (unlockedSteps.includes(step)) {
+      setCurrentStep(step);
+    }
+  };
+
+  // TAB INTENTIE DATA-BINDING:
+  // Ontvangt: userIntent (useLocalStorage)
+  // Schrijft: setUserIntent (persist), geen lokale state
+  // Gebruikt totals: geen
+  const renderIntent = () => (
+    <div className="space-y-4">
+      <StepIntent value={userIntent} onChange={setUserIntent} />
+    </div>
+  );
+
+  // TAB FUNDAMENT DATA-BINDING:
+  // Ontvangt: netIncome, manualFixedCosts (useLocalStorage), fixedCosts (afgeleid in App), IncomeList/FixedCostsList sommen
+  // Schrijft: setNetIncome, setManualFixedCosts (persist)
+  // Gebruikt totals: netFree (quickSummary.free), fixedCosts
+  const renderFundament = () => (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-200">Hier leg je je basis vast: wat komt er elke maand binnen en wat gaat er zeker uit.</p>
+      <IncomeList onSumChange={(sum) => setNetIncome((prev) => (prev === sum ? prev : sum))} />
+      <FixedCostsList onSumChange={(sum) => setManualFixedCosts((prev) => (prev === sum ? prev : sum))} />
+      <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-slate-100 shadow-sm">
+        <p className="text-sm font-semibold text-slate-50">Over om vrij te besteden</p>
+        <p className="text-xl font-bold text-white">€{((netIncome ?? 0) - (fixedCosts ?? 0)).toFixed(0)}</p>
+        <p className="text-xs text-slate-300">
+          Inkomsten en vaste lasten komen uit de tabellen hierboven. De som van vaste lasten gebruikt de wizard zodra je daar items
+          bevestigt, anders de handmatige lijst.
+        </p>
+      </div>
+    </div>
+  );
+
+  // TAB RITME DATA-BINDING:
+  // Ontvangt: selectedMonth (persist), quickSummary (netFree, status), netIncome/fixedCosts
+  // Schrijft: setSelectedMonth (persist)
+  // Gebruikt totals: netIncome, fixedCosts, netFree
+  const renderRitme = () => {
+    const statusColor = quickSummary.free > 0 ? "text-emerald-500" : "text-red-500";
+    const netFree = quickSummary.free;
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-slate-200">
+          Hier geef je je maand een ritme: kies welke maand je bekijkt en zie hoe je basis uit Fundament uitpakt in je maandbudget.
+        </p>
+        <div className="card-shell p-4 text-slate-900 space-y-2">
+          <label className="block text-sm font-semibold text-slate-800" htmlFor="month-select">
+            Maandbudget (periode)
+          </label>
+          <input
+            id="month-select"
+            type="month"
+            min="2020-01"
+            max="2035-12"
+            list="month-options"
+            className="mt-1 block w-full rounded-lg border border-white/40 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            value={selectedMonth}
+            onChange={(event) => setSelectedMonth(event.target.value as MonthId)}
+          />
+          <datalist id="month-options">
+            {MONTHS.map((month) => (
+              <option key={month.id} value={month.id}>
+                {month.label}
+              </option>
+            ))}
+          </datalist>
+          <div className="text-xs text-slate-600">
+            Maandstatus: <span className={statusColor}>{quickSummary.status}</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-900/70 p-3 text-sm text-slate-50 dark:border-slate-700">
+              <div className="text-xs uppercase tracking-wide text-slate-400">Totale inkomsten</div>
+              <div className="mt-1 text-lg font-semibold">€{Math.round(netIncome ?? 0)}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-900/70 p-3 text-sm text-slate-50 dark:border-slate-700">
+              <div className="text-xs uppercase tracking-wide text-slate-400">Vaste lasten</div>
+              <div className="mt-1 text-lg font-semibold">€{Math.round(fixedCosts ?? 0)}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
+              <div className="text-xs uppercase tracking-wide text-slate-500">Vrij te besteden</div>
+              <div className={"mt-1 text-lg font-semibold " + (netFree < 0 ? "text-red-500" : "text-emerald-500")}>
+                €{Math.round(netFree)}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">Dit is je ruimte in deze maand op basis van Fundament.</div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-slate-100 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-50">Vaste lasten</h3>
+          <p className="mt-1 text-xs text-slate-300">Beheer je terugkerende kosten op basis van banktransacties.</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-white"
+            onClick={() => setIsFixedCostsWizardOpen(true)}
+          >
+            Controleer terugkerende kosten
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // TAB FOCUS DATA-BINDING:
+  // Ontvangt: monthFocus (persist), setMonthFocus, selectedMonth
+  // Schrijft: monthFocus (persist)
+  // Gebruikt totals: geen
+  const renderFocus = () => (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-200">Kies wat deze maand voor jou het belangrijkst is: overleven, aflossen, opbouwen of stabiliseren.</p>
+      <StepFocus value={monthFocus} onChange={setMonthFocus} />
+      <DashboardSummary selectedMonth={selectedMonth} />
+    </div>
+  );
+
+  // TAB ACTIE DATA-BINDING:
+  // Ontvangt: monthFocus (persist), debtsSummary/assetsSummary via ActionZone callbacks
+  // Schrijft: setDebtsSummary, setAssetsSummary, setAflosMode (lokale state in App)
+  // Gebruikt totals: debtsSummary, assetsSummary, aflosMode
+  const renderAction = () => {
+    const focusKeyMap: Record<Exclude<MonthFocus, null>, ActionZoneType> = {
+      schulden_afbouwen: "aflossen",
+      vermogen_opbouwen: "opbouwen",
+      overleven: "overleven",
+      experiment: "stabiliseren",
+    };
+
+    if (!monthFocus) {
+      return (
+        <div className="space-y-4">
+          <div className="card-shell p-4 text-slate-900 space-y-2">
+            <p className="text-sm text-slate-600">Actiepad</p>
+            <h3 className="text-lg font-semibold text-slate-900">Nog geen focus</h3>
+            <p className="text-sm text-slate-700">Maak eerst je focus-keuze in stap 3.</p>
+          </div>
+        </div>
+      );
+    }
+
+    const focusKey = focusKeyMap[monthFocus];
+
+    return (
+      <>
+        <ActionZone
+          type={focusKey as ActionZoneType}
+          onDebtSummary={(s) => setDebtsSummary(s)}
+          onAssetSummary={(s) => setAssetsSummary(s)}
+          aflosMode={aflosMode}
+          setAflosMode={setAflosMode}
+          debtClearMonthsAggressive={debtClearMonthsAggressive}
+        />
+        <StepActie monthFocus={monthFocus} />
+      </>
+    );
+  };
+
+  const renderContent = () => {
+    if (currentStep === "intent") return renderIntent();
+    if (currentStep === "fundament") return renderFundament();
+    if (currentStep === "ritme") return renderRitme();
+    if (currentStep === "focus") return renderFocus();
+    if (currentStep === "action") return renderAction();
+    return null;
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-slate-50">
+      <div className="grid min-h-screen grid-cols-1 gap-4 lg:grid-cols-[220px_1fr_320px]">
+        <aside className="border-r border-white/10 bg-white/10 px-4 py-6 backdrop-blur">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
+          <div className="space-y-2">
+            {steps.map((step) => {
+              const unlocked = unlockedSteps.includes(step.key);
+              const active = currentStep === step.key;
+              return (
+                <button
+                  key={step.key}
+                  type="button"
+                  disabled={!unlocked}
+                  onClick={() => handleStepClick(step.key)}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                    active
+                      ? "bg-white text-slate-900 shadow-md"
+                      : unlocked
+                        ? "bg-white/10 text-slate-200 hover:bg-white/20"
+                        : "cursor-not-allowed bg-white/5 text-slate-500"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{step.label}</span>
+                    <span className="text-[10px]">{active ? "Actief" : unlocked ? "Open" : "Gesloten"}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{step.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-6">
+            <button
+              type="button"
+              className="w-full rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/20"
+              onClick={() => setShowOverview(true)}
+              disabled={!focusValid}
+              title="Toon het totaaloverzicht"
+            >
+              Totaaloverzicht
+            </button>
+          </div>
+        </aside>
+
+        <section className="px-4 py-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Moneylith / Finance OS</p>
+              <h1 className="text-2xl font-semibold text-white">Finance Planner</h1>
+            </div>
+            <div className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">
+              Stap: {steps.find((s) => s.key === currentStep)?.label}
+            </div>
+          </div>
+          <div className="space-y-4">{renderContent()}</div>
+        </section>
+
+        <aside className="border-l border-white/10 bg-white/10 px-4 py-6 backdrop-blur">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">AI gids</h2>
+      <AiAssistantCard
+        selectedMonth={selectedMonth}
+        currentStep={currentStep}
+        selectedFocus={quickSummary.focus}
+        userIntent={userIntent}
+        debtsTotal={debtsSummary.totalDebt}
+        debtsMinPayment={debtsSummary.totalMinPayment}
+        debtsCount={debtsSummary.debtCount}
+        debtClearMonths={debtClearMonths}
+        debtClearMonthsAggressive={debtClearMonthsAggressive}
+            debtClearMonthsBuffered={debtClearMonthsBuffered}
+            aflosMode={aflosMode}
+            bufferMonthlyReserve={bufferMonthlyReserve}
+            bufferTargetMonths={bufferTargetMonths}
+            assetsTotal={assetsSummary.totalAssets}
+            assetsCount={assetsSummary.assetsCount}
+            assetMonthlyContribution={assetMonthlyContribution}
+            assetTarget={assetTarget}
+            assetTargetMonths={assetTargetMonths}
+            fixedCostPressure={fixedCostPressure}
+        runwayMonths={runwayMonths}
+        fixedCosts={fixedCosts}
+      />
+      <div className="mt-3 text-[11px] text-slate-400">
+        Context: stap {currentStep}, maand {selectedMonth}, focus {quickSummary.focus || "-"}
+      </div>
+    </aside>
+  </div>
+
+      {showOverview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
+          <div className="card-shell w-full max-w-3xl p-6 text-slate-900">
+            {/* TOTAALOVERZICHT-INVENTARISATIE:
+                Toont: maand, focus, netto ruimte, schulden/vermogen stats, aflostijden, buffer/asset info, stabiliteit/inkomen/spaardoel/buffer status.
+                Haalt data uit: quickSummary, monthFocus, debtsSummary, assetsSummary, afgeleide tijden, bufferMonthlyReserve, income/fixedCosts. */}
+            <h3 className="text-lg font-semibold text-slate-900">Totaaloverzicht</h3>
+            <p className="text-xs text-slate-600">
+              Maand: {selectedMonth} • Focus: {quickSummary.focus} • Netto ruimte: €{quickSummary.free.toFixed(0)} • Actief pad: {monthFocus ? `${quickSummary.focus} ? Actie` : "Nog geen focus"}
+            </p>
+            <p className="text-xs text-slate-600">
+              Actiemodules: {monthFocus === "schulden_afbouwen"
+                ? `Schulden: ${debtsSummary.debtCount} stuks • Totaal: €${debtsSummary.totalDebt.toFixed(2)} • Min. maandlast: €${debtsSummary.totalMinPayment.toFixed(2)}`
+                : monthFocus === "vermogen_opbouwen"
+                  ? `Vermogen: ${assetsSummary.assetsCount} posten • Totaal: €${assetsSummary.totalAssets.toFixed(2)}`
+                  : "(nog leeg)"}
+            </p>
+            {monthFocus === "schulden_afbouwen" ? (
+              debtClearMonths !== null ? (
+                <p className="text-xs text-slate-600">Geschatte aflostijd: ± {debtClearMonths} maanden (op basis van minimale maandlast)</p>
+              ) : debtsSummary.totalDebt > 0 ? (
+                <p className="text-xs text-slate-600">Geen aflostijd te berekenen (minimale maandlast = €0)</p>
+              ) : null
+            ) : null}
+            {monthFocus === "schulden_afbouwen" && debtClearMonthsAggressive !== null ? (
+              <p className="text-xs text-slate-600">Aflostijd bij maximale ruimte: ± {debtClearMonthsAggressive} maanden (op basis van volledige netto maandruimte)</p>
+            ) : null}
+            {monthFocus === "schulden_afbouwen" && debtClearMonthsBuffered !== null ? (
+              <p className="text-xs text-slate-600">Met buffer-opbouw: ± {debtClearMonthsBuffered} maanden (eerst €{bufferMonthlyReserve} p/m naar buffer)</p>
+            ) : null}
+            {monthFocus === "schulden_afbouwen" ? (
+              <p className="text-xs text-slate-600">
+                Actieve modus: {aflosMode === "minimum" ? "Aflossen op minimum (minimale maandlast)" : "Aflossen op maximale ruimte (volledige netto maandruimte)"}
+              </p>
+            ) : null}
+            {monthFocus === "vermogen_opbouwen" ? (
+              assetMonthlyContribution > 0 ? (
+                <p className="text-xs text-slate-600">Doel €{assetTarget} bereikt over ± {assetTargetMonths} maanden (bij €{assetMonthlyContribution}/mnd)</p>
+              ) : (
+                <p className="text-xs text-slate-600">Geen opbouwtempo berekenbaar (maandelijkse inleg = €0)</p>
+              )
+            ) : null}
+            <div className="mt-3 grid gap-3 text-sm text-slate-800 md:grid-cols-2">
+              <div className="rounded-xl border border-white/30 bg-white/80 p-3 shadow-sm">
+                <p className="text-xs uppercase text-slate-500">Fundament</p>
+                <p>Inkomen: €{(netIncome ?? 0).toFixed(0)}</p>
+                <p>Vaste lasten: €{(fixedCosts ?? 0).toFixed(0)}</p>
+                <p>Vrij: €{quickSummary.free.toFixed(0)}</p>
+              </div>
+              <div className="rounded-xl border border-white/30 bg-white/80 p-3 shadow-sm">
+                <p className="text-xs uppercase text-slate-500">Ritme</p>
+                <p>Maand: {selectedMonth}</p>
+                <p>Status: {quickSummary.status}</p>
+              </div>
+              <div className="rounded-xl border border-white/30 bg-white/80 p-3 shadow-sm">
+                <p className="text-xs uppercase text-slate-500">Focus</p>
+                <p>Keuze: {quickSummary.focus || "Nog niet gekozen"}</p>
+              </div>
+              <div className="rounded-xl border border-white/30 bg-white/80 p-3 shadow-sm">
+                <p className="text-xs uppercase text-slate-500">Stabiliteit</p>
+                <p>Lastendruk: {fixedCostPressure !== null ? `${(fixedCostPressure * 100).toFixed(0)}% van je inkomen naar vaste lasten` : "Niet berekenbaar"}</p>
+                <p>Runway: {runwayMonths !== null ? `${runwayMonths} maanden vaste lasten uit vermogen` : "Geen runway berekenbaar"}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:shadow-md"
+                onClick={() => setShowOverview(false)}
+              >
+                Sluiten
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFixedCostsWizardOpen && (
+        <FixedCostsWizard
+          items={mergedFixedCostItems}
+          onChange={setFixedCostItems}
+          onClose={() => setIsFixedCostsWizardOpen(false)}
+        />
+      )}
+    </main>
+  );
+};
+
+export default App;
+
