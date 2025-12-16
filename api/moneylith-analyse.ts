@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
 import { rateLimit } from "./utils/rateLimit";
 import { verifyTurnstile } from "./utils/verifyTurnstile";
+import { initSentry, Sentry } from "./utils/sentry";
 
 const MODEL = "gpt-4.1-mini";
 
@@ -18,6 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(403).json({ error: "Verificatie mislukt, probeer opnieuw." });
     return;
   }
+
+  initSentry();
 
   const apiKey = process.env.OPENAI_API_KEY;
   const { system, user } = (req.body || {}) as { system?: string; user?: string };
@@ -54,7 +57,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const content = completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
     res.status(200).json({ content });
   } catch (error) {
-    console.error("Moneylith AI error", error);
+    Sentry.captureException(error, {
+      tags: { route: "api/moneylith-analyse" },
+      extra: { message: (error as any)?.message },
+    });
     const fallback =
       "AI call mislukte; gebruik mock analyse.\n" +
       "- Controleer je OPENAI_API_KEY\n" +
