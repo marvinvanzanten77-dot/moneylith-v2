@@ -28,7 +28,7 @@ export function parseConsentCookie(): ConsentValue | null {
 
 function setConsentCookie(val: ConsentValue) {
   if (typeof document === "undefined") return;
-  const isSecure = window.location.protocol === "https:";
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
   const encoded = encodeURIComponent(JSON.stringify(val));
   const parts = [
     `${COOKIE_NAME}=${encoded}`,
