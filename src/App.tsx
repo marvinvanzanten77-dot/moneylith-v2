@@ -991,19 +991,6 @@ const App = () => {
   const variableBuckets = bucketsPersonal.filter((b) => b.type === "variable");
   const potentialFixedPerMonth = fixedBuckets.reduce((sum, b) => sum + b.monthlyAvg, 0);
 
-  console.debug("DEBUG Moneylith - transactions (first 3):", transactions.slice(0, 3));
-  console.debug("DEBUG Moneylith - recurring candidates:", recurringCandidates);
-  console.debug("DEBUG Moneylith snapshot bron:", {
-    incomeSource: derivedIncomeFromTransactions > 0 ? "transactions" : "manual",
-    fixedSource: autoFixedCosts > 0 ? "fixedCostItems" : derivedFixedFromTransactions > 0 ? "transactions" : "manual",
-  });
-  console.debug("DEBUG buckets - income/fixed/variable counts:", {
-    income: incomeBuckets.length,
-    fixed: fixedBuckets.length,
-    variable: variableBuckets.length,
-    potentialFixedPerMonth,
-  });
-
   // SNAPSHOT-INVENTARISATIE (nog NIET herstructureren):
   // - Inkomsten: netIncome uit useLocalStorage("income-netto") + IncomeList-som; total via (netIncome ?? 0)
   // - Vaste lasten: fixedCosts = autoFixedCosts (fixedCostItems) fallback manualFixedCosts (useLocalStorage("fixed-costs")); fixedCostItems komen uit recurringCandidates merge
