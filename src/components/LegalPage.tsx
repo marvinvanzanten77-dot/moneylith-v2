@@ -1,5 +1,6 @@
 import React from "react";
 import { useEffect } from "react";
+import { AnalyticsGate } from "./AnalyticsGate";
 import { CookieSettings } from "./CookieSettings";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
@@ -99,6 +100,8 @@ export function LegalPage({ path }: { path: string }) {
             </a>
           ))}
         </footer>
+
+        <AnalyticsGate />
       </div>
     </div>
   );

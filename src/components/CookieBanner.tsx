@@ -12,7 +12,7 @@ export const CookieBanner: React.FC = () => {
           <div className="space-y-1">
             <p className="font-semibold text-white">Cookies & toestemming</p>
             <p className="text-slate-300">
-              Moneylith gebruikt functionele cookies. Analytics alleen met toestemming.
+              Moneylith gebruikt functionele cookies. Analytics helpt ons verbeteren en wordt alleen ingeschakeld met toestemming.
               <span className="ml-2">
                 <a className="underline hover:text-white" href="/cookies">Cookies</a> ·{" "}
                 <a className="underline hover:text-white" href="/privacy">Privacy</a>

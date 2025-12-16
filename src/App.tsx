@@ -42,6 +42,7 @@ import { useEffect } from "react";
 import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
+import { AnalyticsGate } from "./components/AnalyticsGate";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -1790,6 +1791,7 @@ const App = () => {
         </a>
       </footer>
       <CookieBanner />
+      <AnalyticsGate />
     </main>
   );
 };
