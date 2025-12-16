@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "https://moneylith.nl/:path*",
+      "destination": "https://www.moneylith.nl/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
