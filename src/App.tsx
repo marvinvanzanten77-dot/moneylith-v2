@@ -38,6 +38,7 @@ import type { AiActions } from "./logic/extractActions";
 import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/applyIncomeSuggestion";
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
 import { LegalPage } from "./components/LegalPage";
+import { useEffect } from "react";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -228,6 +229,18 @@ const App = () => {
   if (legalPaths.includes(currentPath)) {
     return <LegalPage path={currentPath} />;
   }
+
+  useEffect(() => {
+    const robots = document.querySelector('meta[name="robots"]');
+    if (robots) {
+      robots.setAttribute("content", "noindex,nofollow");
+    } else {
+      const m = document.createElement("meta");
+      m.name = "robots";
+      m.content = "noindex,nofollow";
+      document.head.appendChild(m);
+    }
+  }, []);
 
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");

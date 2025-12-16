@@ -1,4 +1,5 @@
 import React from "react";
+import { useEffect } from "react";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
 
@@ -46,6 +47,18 @@ const pageOrder: LegalKind[] = ["privacy", "disclaimer", "terms", "cookies"];
 export function LegalPage({ path }: { path: string }) {
   const key = path.replace("/", "") as LegalKind;
   const content = sections[key] ?? sections.privacy;
+
+  useEffect(() => {
+    const robots = document.querySelector('meta[name="robots"]');
+    if (robots) {
+      robots.setAttribute("content", "index,follow");
+    } else {
+      const m = document.createElement("meta");
+      m.name = "robots";
+      m.content = "index,follow";
+      document.head.appendChild(m);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-slate-50">
