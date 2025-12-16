@@ -39,6 +39,7 @@ import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/a
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
 import { LegalPage } from "./components/LegalPage";
 import { useEffect } from "react";
+import { CookieBanner } from "./components/CookieBanner";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -1776,6 +1777,7 @@ const App = () => {
           Cookies
         </a>
       </footer>
+      <CookieBanner />
     </main>
   );
 };

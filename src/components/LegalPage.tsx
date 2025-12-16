@@ -1,5 +1,6 @@
 import React from "react";
 import { useEffect } from "react";
+import { CookieSettings } from "./CookieSettings";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
 
@@ -83,6 +84,12 @@ export function LegalPage({ path }: { path: string }) {
               </ul>
             </section>
           ))}
+
+          {path === "/cookies" && (
+            <section className="pt-4 border-t border-white/10">
+              <CookieSettings />
+            </section>
+          )}
         </div>
 
         <footer className="flex flex-wrap gap-3 text-sm text-slate-300">
