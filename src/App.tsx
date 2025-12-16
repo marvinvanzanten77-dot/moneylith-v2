@@ -37,6 +37,7 @@ import { extractActionsFromContent } from "./logic/extractActions";
 import type { AiActions } from "./logic/extractActions";
 import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/applyIncomeSuggestion";
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
+import { LegalPage } from "./components/LegalPage";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -222,6 +223,12 @@ const ActionZone = ({
 };
 
 const App = () => {
+  const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  if (legalPaths.includes(currentPath)) {
+    return <LegalPage path={currentPath} />;
+  }
+
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
@@ -1738,6 +1745,24 @@ const App = () => {
           onClose={() => setIsFixedCostsWizardOpen(false)}
         />
       )}
+
+      <footer className="mt-6 border-t border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-200 flex flex-wrap gap-3 justify-center">
+        <a href="/privacy" className="hover:text-white underline-offset-4 hover:underline">
+          Privacy
+        </a>
+        <span className="text-slate-500">•</span>
+        <a href="/disclaimer" className="hover:text-white underline-offset-4 hover:underline">
+          Disclaimer
+        </a>
+        <span className="text-slate-500">•</span>
+        <a href="/terms" className="hover:text-white underline-offset-4 hover:underline">
+          Voorwaarden
+        </a>
+        <span className="text-slate-500">•</span>
+        <a href="/cookies" className="hover:text-white underline-offset-4 hover:underline">
+          Cookies
+        </a>
+      </footer>
     </main>
   );
 };
