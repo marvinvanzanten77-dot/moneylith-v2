@@ -235,13 +235,16 @@ const App = () => {
   }
 
   useEffect(() => {
+    const indexablePaths = ["/", ...legalPaths];
+    const isIndexable = typeof window !== "undefined" && indexablePaths.includes(window.location.pathname);
     const robots = document.querySelector('meta[name="robots"]');
+    const value = isIndexable ? "index,follow" : "noindex,nofollow";
     if (robots) {
-      robots.setAttribute("content", "noindex,nofollow");
+      robots.setAttribute("content", value);
     } else {
       const m = document.createElement("meta");
       m.name = "robots";
-      m.content = "noindex,nofollow";
+      m.content = value;
       document.head.appendChild(m);
     }
 
