@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
+import { rateLimit } from "./utils/rateLimit";
 
 const MODEL = "gpt-4.1-mini";
 
@@ -8,6 +9,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
+
+  if (!rateLimit(req, res, { limit: 20, windowMs: 60_000 })) return;
 
   const apiKey = process.env.OPENAI_API_KEY;
   const { system, user } = (req.body || {}) as { system?: string; user?: string };

@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { rateLimit } from "./utils/rateLimit";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -9,6 +10,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  if (!rateLimit(req, res, { limit: 20, windowMs: 60_000 })) return;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     res.status(500).json({ error: "OPENAI_API_KEY ontbreekt op de server" });
@@ -17,21 +20,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { prompt, state } = req.body || {};
 
-  // AI-CONTEXT-INVENTARISATIE:
-  // Sturen nu mee (via state payload vanuit frontend):
-  // - userIntent, monthFocus, allowProactiveSavingsAdvice
-  // - income, fixedCosts, (netFree wordt in frontend getoond)
-  // - debts: total/minPayment/count/aflostijden/mode/buffered
-  // - assets: total/count/monthlyContribution/target/targetMonths
-  // - stability: fixedCostPressure, runwayMonths
-  // Formaat/regels hieronder blijven ongewijzigd.
-
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ error: "prompt ontbreekt" });
     return;
   }
 
-  const formatInstruction = `Gebruik EXACT dit format, zonder extra alinea's: STATUS: ...  GEVOLG IN TIJD: ...  GEVOLG PER MAAND: ...  RISICO-INDICATOR: ...  Regels (schulden): - Leidende tijd: aflosMode == 'minimum' -> debtClearMonths; aflosMode == 'aggressive' -> debtClearMonthsAggressive. - debtClearMonthsBuffered is secundair; noem deze alleen als hij >12 maanden afwijkt van de leidende tijd. - Status (schulden): "stabiel" als aflosMode=='aggressive' en debtClearMonthsAggressive < 48; "kwetsbaar" als aflosMode=='minimum' en debtClearMonths > 60; "onhoudbaar" als debtClearMonths > 120 of netIncome <= 0. Gebruik alleen deze labels. - Gevolg per maand (schulden): bij minimum = ?{debtsMinPayment}; bij aggressive = ?{netIncome}. - Risico-indicator (schulden): "laag" als aggressive <36; "middel" als 36-84; "hoog" als >84. Gebruik alleen deze labels.  Regels (vermogen/opbouwen): - assetTargetMonths is leidend voor tijd (op basis van assetMonthlyContribution en assetTarget). - Als assetTargetMonths === 0 -> doel is bereikt. - Als assetMonthlyContribution === 0 -> geen opbouwtempo. - Status (vermogen): "stabiel" als assetTargetMonths <= 36; "kwetsbaar" als 36 < assetTargetMonths <= 96; "onhoudbaar" als assetTargetMonths > 96 of assetMonthlyContribution === 0. Gebruik alleen deze labels. - Gevolg in tijd (vermogen): assetTargetMonths === 0 -> Vermogensdoel is reeds bereikt; anders ñ {assetTargetMonths} maanden tot eerste vermogensdoel; bij maandinleg 0: Geen opbouwbaar tijdpad berekenbaar. - Gevolg per maand (vermogen): Maandelijkse opbouw: ?{assetMonthlyContribution} (altijd tonen, ook bij 0). - Risico-indicator (vermogen): laag als assetTargetMonths <=36; middel 36-96; hoog >96 of maandinleg 0. Alleen deze drie woorden.  Verboden taal: geen advies/aanraden/doelstelling/motivatie. Alleen feiten en consequenties.`;
+  const formatInstruction = `Gebruik EXACT dit format, zonder extra alinea's: STATUS: ...  GEVOLG IN TIJD: ...  GEVOLG PER MAAND: ...  RISICO-INDICATOR: ...  Regels (schulden): - Leidende tijd: aflosMode == 'minimum' -> debtClearMonths; aflosMode == 'aggressive' -> debtClearMonthsAggressive. - debtClearMonthsBuffered is secundair; noem deze alleen als hij >12 maanden afwijkt van de leidende tijd. - Status (schulden): "stabiel" als aflosMode=='aggressive' en debtClearMonthsAggressive < 48; "kwetsbaar" als aflosMode=='minimum' en debtClearMonths > 60; "onhoudbaar" als debtClearMonths > 120 of netIncome <= 0. Gebruik alleen deze labels. - Gevolg per maand (schulden): bij minimum = ?{debtsMinPayment}; bij aggressive = ?{netIncome}. - Risico-indicator (schulden): "laag" als aggressive <36; "middel" als 36-84; "hoog" als >84. Gebruik alleen deze labels.  Regels (vermogen/opbouwen): - assetTargetMonths is leidend voor tijd (op basis van assetMonthlyContribution en assetTarget). - Als assetTargetMonths === 0 -> doel is bereikt. - Als assetMonthlyContribution === 0 -> geen opbouwtempo. - Status (vermogen): "stabiel" als assetTargetMonths <= 36; "kwetsbaar" als 36 < assetTargetMonths <= 96; "onhoudbaar" als assetTargetMonths > 96 of assetMonthlyContribution === 0. Gebruik alleen deze labels. - Gevolg in tijd (vermogen): assetTargetMonths === 0 -> Vermogensdoel is reeds bereikt; anders Â¤ {assetTargetMonths} maanden tot eerste vermogensdoel; bij maandinleg 0: Geen opbouwbaar tijdpad berekenbaar. - Gevolg per maand (vermogen): Maandelijkse opbouw: ?{assetMonthlyContribution} (altijd tonen, ook bij 0). - Risico-indicator (vermogen): laag als assetTargetMonths <=36; middel 36-96; hoog >96 of maandinleg 0. Alleen deze drie woorden.  Verboden taal: geen advies/aanraden/doelstelling/motivatie. Alleen feiten en consequenties.`;
 
   const contextSummary = typeof state === "object" ? JSON.stringify(state ?? {}) : String(state ?? "");
 
