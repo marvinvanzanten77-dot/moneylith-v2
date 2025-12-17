@@ -12,34 +12,115 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
     title: "Privacyverklaring",
     blocks: [
       {
-        heading: "Wat we verzamelen",
-        bullets: ["TODO: beschrijf welke gegevens we verzamelen", "TODO: leg uit waarom we deze nodig hebben", "TODO: vermeld bewaartermijnen"],
+        heading: "Lokale opslag (browser)",
+        bullets: [
+          "Je gegevens blijven lokaal in je browser (localStorage).",
+          "Moneylith bewaart geen gebruikersdata op een server en er zijn geen accounts.",
+          "Als je je browserdata wist, verdwijnen ook je planner-gegevens.",
+        ],
       },
       {
-        heading: "Jouw rechten",
-        bullets: ["TODO: recht op inzage en correctie", "TODO: recht op verwijdering", "TODO: hoe je contact opneemt"],
+        heading: "AI-verwerking",
+        bullets: [
+          "De backend wordt alleen gebruikt om AI-analyses uit te voeren op jouw verzoek.",
+          "We slaan de inhoud van je AI-input en -output niet op en loggen geen financiële details.",
+          "AI-output is tijdelijk: je kunt deze lokaal exporteren als je dat wilt.",
+        ],
+      },
+      {
+        heading: "Analytics (optioneel)",
+        bullets: [
+          "Analytics is opt-in en alleen bedoeld om de app te verbeteren.",
+          "Geen tracking, geen advertenties, geen profielen.",
+          "We sturen geen financiële inhoud mee in analytics-events.",
+        ],
+      },
+      {
+        heading: "Jouw keuzes",
+        bullets: [
+          "Je bepaalt zelf of analytics aanstaat via het cookie-instellingenpaneel.",
+          "Je kunt je gegevens exporteren als JSON en lokaal bewaren als back-up.",
+          "Vragen over privacy? Mail ons via info@moneylith.nl.",
+        ],
       },
     ],
   },
   disclaimer: {
     title: "Disclaimer",
     blocks: [
-      { heading: "Gebruik op eigen risico", bullets: ["TODO: geen financieel advies", "TODO: wij garanderen geen uitkomsten", "TODO: controleer cijfers altijd zelf"] },
-      { heading: "Aansprakelijkheid", bullets: ["TODO: beperkingen van aansprakelijkheid", "TODO: verwijzingen naar externe bronnen"] },
+      {
+        heading: "Inzicht is geen advies",
+        bullets: [
+          "Moneylith geeft inzicht, maar geen financieel advies.",
+          "Je blijft zelf verantwoordelijk voor alle keuzes en acties.",
+          "Gebruik de output als hulpmiddel, niet als besluit.",
+        ],
+      },
+      {
+        heading: "Geen garanties",
+        bullets: [
+          "We garanderen geen volledigheid of juistheid van AI-output.",
+          "Resultaten kunnen afwijken door ontbrekende of onvolledige data.",
+          "Controleer altijd je cijfers en bronnen.",
+        ],
+      },
     ],
   },
   terms: {
     title: "Voorwaarden (light)",
     blocks: [
-      { heading: "Gebruik van de dienst", bullets: ["TODO: beschrijf waarvoor de dienst bedoeld is", "TODO: wat wel/niet is toegestaan", "TODO: fair use verwachtingen"] },
-      { heading: "Account & gedrag", bullets: ["TODO: verantwoordelijkheid voor eigen gegevens", "TODO: meld misbruik", "TODO: wanneer toegang kan worden ingetrokken"] },
+      {
+        heading: "Gebruik van Moneylith",
+        bullets: [
+          "Moneylith is bedoeld voor persoonlijke financiële reflectie.",
+          "Je data blijft lokaal in je browser; er zijn geen accounts of server-opslag.",
+          "Je bent zelf verantwoordelijk voor het bewaren van een back-up.",
+        ],
+      },
+      {
+        heading: "Fair use",
+        bullets: [
+          "Gebruik de app redelijk en niet voor misbruik of automatisering buiten normaal gebruik.",
+          "AI-calls zijn bedoeld voor jouw eigen analyses, niet voor bulkverwerking van derden.",
+          "Misbruik kan leiden tot beperking of blokkade van toegang.",
+        ],
+      },
+      {
+        heading: "Eigen verantwoordelijkheid",
+        bullets: [
+          "Je beslist zelf welke acties je neemt op basis van de inzichten.",
+          "We zijn niet aansprakelijk voor beslissingen die je maakt.",
+          "Contact voor vragen: info@moneylith.nl.",
+        ],
+      },
     ],
   },
   cookies: {
     title: "Cookies",
     blocks: [
-      { heading: "Welke cookies", bullets: ["TODO: functionele cookies", "TODO: analytische cookies", "TODO: geen/alleen beperkte tracking"] },
-      { heading: "Keuzes", bullets: ["TODO: hoe je cookies kunt beheren", "TODO: hoe je toestemming wijzigt"] },
+      {
+        heading: "Functionele cookies",
+        bullets: [
+          "Nodig voor basisfunctionaliteit en voorkeuren.",
+          "Bewaren o.a. je consent-keuze (cookie: moneylith_consent).",
+          "Geen tracking of advertenties.",
+        ],
+      },
+      {
+        heading: "Analytics (optioneel)",
+        bullets: [
+          "Alleen met jouw toestemming.",
+          "Geanonimiseerd, zonder financiële inhoud.",
+          "Geen profielen, geen advertentienetwerken.",
+        ],
+      },
+      {
+        heading: "Beheer van je keuze",
+        bullets: [
+          "Je kunt analytics altijd aan- of uitzetten via de cookie-instellingen.",
+          "Bij wijzigen passen we de instellingen direct toe.",
+        ],
+      },
     ],
   },
 };

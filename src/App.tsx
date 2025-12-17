@@ -39,7 +39,6 @@ import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/a
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
 import { LegalPage } from "./components/LegalPage";
 import { StatusPage } from "./components/StatusPage";
-import { useEffect } from "react";
 import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
