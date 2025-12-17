@@ -125,12 +125,22 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
         </button>
       </div>
 
-      <div className="mt-3 space-y-2 max-h-[70vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+      <div className="mt-3 space-y-3 max-h-[70vh] overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/60 p-3">
         {messages.length === 0 && <p className="text-slate-500 text-xs">Nog geen AI-gesprek gestart.</p>}
         {messages.map((m, idx) => (
-          <div key={idx} className="text-xs whitespace-pre-line">
-            <span className="mr-2 text-slate-400">{m.role === "user" ? "Jij" : "AI"}</span>
-            <span>{m.content}</span>
+          <div
+            key={idx}
+            className={`rounded-lg border px-3 py-2 text-xs whitespace-pre-line ${
+              m.role === "user"
+                ? "ml-auto border-amber-400/40 bg-amber-500/10 text-amber-50"
+                : "mr-auto border-slate-700 bg-slate-900/70 text-slate-100"
+            }`}
+          >
+            <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-400">
+              <span>{m.role === "user" ? "Jij" : "AI"}</span>
+              <span>{m.role === "user" ? "Vraag" : "Antwoord"}</span>
+            </div>
+            <div className="text-[12px] leading-relaxed">{m.content}</div>
           </div>
         ))}
         <div ref={messagesEndRef} />
