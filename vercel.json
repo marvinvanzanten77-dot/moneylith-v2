@@ -1,7 +1,8 @@
 {
   "redirects": [
     {
-      "source": "https://moneylith.nl/:path*",
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "moneylith.nl" }],
       "destination": "https://www.moneylith.nl/:path*",
       "permanent": true
     },
