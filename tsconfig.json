@@ -11,8 +11,8 @@
     "noEmit": true,
     "strict": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "baseUrl": "."
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "api", "vite.config.ts"]
 }
