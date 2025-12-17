@@ -25,5 +25,15 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/(privacy|disclaimer|terms|cookies|status)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml).*)",
+      "destination": "/index.html"
+    }
   ]
 }
