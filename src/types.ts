@@ -38,6 +38,8 @@ export type SchuldItem = {
   crediteur?: string;
   openBedrag: number;
   minBetaling?: number;
+  saldo?: number;
+  minimaleMaandlast?: number;
   prioriteit?: number;
   notitie?: string;
 };

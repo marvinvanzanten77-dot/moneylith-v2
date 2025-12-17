@@ -13,7 +13,8 @@ export type TabKey =
   | "doelen"
   | "potjes"
   | "vooruitblik"
-  | "totaal";
+  | "totaal"
+  | "inbox";
 
 interface OrchestratorArgs {
   mode: "personal" | "business";
@@ -58,7 +59,7 @@ async function postAnalyse(body: { system: string; user: string; turnstileToken?
 
 export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActions, onRawContent }: OrchestratorArgs) {
   const runAi = useCallback(
-    async ({ tab, system, user, displayUserMessage }: RunAiInput): Promise<string | null> => {
+    async ({ tab, system, user, displayUserMessage, turnstileToken }: RunAiInput): Promise<string | null> => {
       setLoading(true);
       const userContent = displayUserMessage ?? `AI analyse voor: ${tab}`;
       appendAiMessage({ role: "user", content: userContent });
@@ -66,7 +67,7 @@ export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActi
         appendMessage({ role: "user", content: userContent });
       }
       try {
-        const data = await postAnalyse({ system, user });
+        const data = await postAnalyse({ system, user, turnstileToken });
         if (data.error) {
           throw new Error(data.error);
         }

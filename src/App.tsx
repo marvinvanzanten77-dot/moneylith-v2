@@ -14,6 +14,7 @@ import { StepRitme } from "./components/steps/StepRitme";
 import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften } from "./components/steps/StepAfschriften";
 import { StepBackup } from "./components/steps/StepBackup";
+import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { detectRecurringCandidates } from "./utils/recurring";
 import type {
@@ -116,6 +117,7 @@ const personalTabs: TabConfig[] = [
   { key: "vermogen", label: "Vermogen", desc: "Sparen, buffers, bezittingen" },
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
+  { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "afschriften", label: "AI-analyse", desc: "Maandelijkse afschriften" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
@@ -317,6 +319,7 @@ const App = () => {
     "moneylith.business.statements",
     []
   );
+  const [inboxItems, setInboxItems] = useLocalStorage<InboxItem[]>("moneylith.personal.inbox", []);
   const [aiAnalysisDone, setAiAnalysisDone] = useLocalStorage<boolean>("moneylith.personal.aiAnalysisDone", false);
   const [aiAnalysisDoneAt, setAiAnalysisDoneAt] = useLocalStorage<string | null>(
     "moneylith.personal.aiAnalysisDoneAt",
@@ -367,6 +370,161 @@ const App = () => {
   const [bucketOverridesBusiness] = useLocalStorage<Record<string, Partial<MoneylithBucket>>>(
     "moneylith.business.bucket.overrides",
     {}
+  );
+
+  const createId = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+
+  const applyInboxSuggestions = useCallback(
+    (suggestions: InboxSuggestion[]) => {
+      if (!suggestions.length) return;
+      const nextIncome = [...incomeItems];
+      const nextFixedCosts = [...fixedCostManualItems];
+      const nextDebts = [...debts];
+      const nextAssets = [...assets];
+      const nextGoals = [...goals];
+      const nextAccounts = [...accounts];
+      const nextTransactions = [...transactions];
+
+      const defaultAccountId =
+        accounts.find((a) => a.active)?.id ?? accounts[0]?.id ?? null;
+      const toNumber = (val: unknown) => {
+        const num = typeof val === "string" && val.trim() === "" ? NaN : Number(val);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      suggestions.forEach((s) => {
+        const fields = (s.fields ?? {}) as Record<string, any>;
+        switch (s.kind) {
+          case "income_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            nextIncome.push({
+              id: createId(),
+              naam,
+              bedrag,
+              opmerking: fields.opmerking ? String(fields.opmerking) : undefined,
+            });
+            break;
+          }
+          case "fixedcost_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            const dagRaw = toNumber(fields.dagVanMaand ?? 1) ?? 1;
+            const dagVanMaand = Math.min(31, Math.max(1, Math.round(dagRaw)));
+            nextFixedCosts.push({
+              id: createId(),
+              naam,
+              bedrag,
+              dagVanMaand,
+              opmerking: fields.opmerking ? String(fields.opmerking) : undefined,
+            });
+            break;
+          }
+          case "debt_add": {
+            const saldo = toNumber(fields.saldo ?? fields.openBedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.crediteur ?? fields.label ?? "").trim();
+            if (!naam || saldo === null || saldo <= 0) return;
+            const minimaleMaandlast = toNumber(fields.minimaleMaandlast ?? fields.minBetaling) ?? undefined;
+            nextDebts.push({
+              id: createId(),
+              naam,
+              saldo,
+              minimaleMaandlast: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
+              openBedrag: saldo,
+              minBetaling: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
+            });
+            break;
+          }
+          case "asset_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            nextAssets.push({ id: createId(), naam, bedrag });
+            break;
+          }
+          case "goal_add": {
+            const label = String(fields.label ?? fields.naam ?? "").trim();
+            if (!label) return;
+            const targetAmount = toNumber(fields.targetAmount) ?? 0;
+            nextGoals.push({
+              id: createId(),
+              label,
+              type: (fields.type as any) ?? "buffer",
+              targetAmount: targetAmount > 0 ? targetAmount : 0,
+              currentAmount: toNumber(fields.currentAmount) ?? 0,
+              monthlyContribution: Math.max(0, toNumber(fields.monthlyContribution) ?? 0),
+              deadline: fields.deadline ? String(fields.deadline) : undefined,
+              isActive: fields.isActive !== false,
+            });
+            break;
+          }
+          case "account_add": {
+            const name = String(fields.name ?? fields.naam ?? "").trim();
+            if (!name) return;
+            const typeCandidate = String(fields.type ?? "betaalrekening");
+            const type =
+              typeCandidate === "spaarrekening" || typeCandidate === "contant" ? typeCandidate : "betaalrekening";
+            nextAccounts.push({
+              id: createId(),
+              name,
+              type,
+              iban: fields.iban ? String(fields.iban) : undefined,
+              description: fields.description ? String(fields.description) : undefined,
+              active: fields.active !== false,
+            });
+            break;
+          }
+          case "transaction_add": {
+            const description = String(fields.description ?? "").trim();
+            const amount = toNumber(fields.amount);
+            const date = String(fields.date ?? "").trim();
+            if (!description || amount === null || amount === 0 || !date) return;
+            if (Number.isNaN(Date.parse(date))) return;
+            const accountId = fields.accountId ?? defaultAccountId;
+            if (!accountId) return;
+            nextTransactions.push({
+              id: createId(),
+              accountId: String(accountId),
+              date,
+              amount,
+              description,
+              counterparty: fields.counterparty ? String(fields.counterparty) : undefined,
+              category: fields.category ? String(fields.category) : undefined,
+            });
+            break;
+          }
+          default:
+            break;
+        }
+      });
+
+      setIncomeItems(nextIncome);
+      setFixedCostManualItems(nextFixedCosts);
+      setDebts(nextDebts);
+      setAssets(nextAssets);
+      setGoals(nextGoals);
+      setAccounts(nextAccounts);
+      setTransactions(nextTransactions);
+    },
+    [
+      accounts,
+      assets,
+      debts,
+      fixedCostManualItems,
+      goals,
+      incomeItems,
+      setAccounts,
+      setAssets,
+      setDebts,
+      setFixedCostManualItems,
+      setGoals,
+      setIncomeItems,
+      setTransactions,
+      transactions,
+    ]
   );
   const observation = useObserver(mode);
   const activeTabs = useActiveTabs(mode);
@@ -1478,6 +1636,9 @@ const App = () => {
   );
 
   const renderBackup = () => <StepBackup />;
+  const renderInbox = () => (
+    <StepInbox items={inboxItems} onItemsChange={setInboxItems} onApplySuggestions={applyInboxSuggestions} />
+  );
 
   const renderContent = () => {
     const normalizedStep = normalizeStep(currentStep);
@@ -1489,6 +1650,7 @@ const App = () => {
     if (normalizedStep === "schulden") return renderSchulden("personal");
     if (normalizedStep === "verplichtingen") return renderSchulden("business");
     if (normalizedStep === "rekeningen") return renderRekeningen();
+    if (normalizedStep === "inbox") return renderInbox();
     if (normalizedStep === "afschriften") return renderAfschriften();
     if (normalizedStep === "vermogen") return renderVermogen("personal");
     if (normalizedStep === "kapitaal") return renderVermogen("business");
@@ -1570,6 +1732,9 @@ const App = () => {
         break;
       case "rekeningen":
         filled = rekeningenFilled;
+        break;
+      case "inbox":
+        filled = inboxItems.length > 0;
         break;
       case "afschriften":
         filled = afschriftenFilled;

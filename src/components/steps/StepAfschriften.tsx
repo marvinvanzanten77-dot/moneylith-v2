@@ -5,6 +5,7 @@ import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
 import type { TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import type { AiActions } from "../../logic/extractActions";
+import { TurnstileWidget } from "../TurnstileWidget";
 
 interface StepAfschriftenProps {
   accounts: MoneylithAccount[];
@@ -49,6 +50,8 @@ export function StepAfschriften({
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<string | null>(aiAnalysisDone ? "AI-analyse uitgevoerd" : null);
   const [pendingTx, setPendingTx] = useState<MoneylithTransaction[]>([]);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileNonce, setTurnstileNonce] = useState(0);
 
   const { runAi } = useAiOrchestrator({
     mode: "personal",
@@ -232,9 +235,9 @@ export function StepAfschriften({
     }));
   }, [_transactions, aiBuckets]);
 
-  const runAiBuckets = useCallback(async () => {
+  const runAiBuckets = useCallback(async (token?: string) => {
     const spendTxs = (_transactions ?? []).filter((t) => t.amount < 0);
-    if (!spendTxs.length) return;
+    if (!spendTxs.length || !token) return;
     const sample = spendTxs.slice(0, 120).map((t) => {
       const amt = Math.abs(t.amount).toFixed(2);
       return `${t.date} | ${t.description || "onbekend"} | €${amt}`;
@@ -248,7 +251,7 @@ export function StepAfschriften({
       sample.join("\n"),
     ].join("\n\n");
     try {
-      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user });
+      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user, turnstileToken: token });
       if (!result) return;
       const lines = result.split("\n").map((l) => l.trim()).filter(Boolean);
       const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
@@ -314,6 +317,10 @@ export function StepAfschriften({
 
   const runAiAnalysis = async () => {
     if (!hasUploads) return;
+    if (!turnstileToken) {
+      setAiError("Verificatie mislukt, probeer opnieuw.");
+      return;
+    }
     if (!fileContent) {
       setAiError("Geen bestandsinhoud geladen. Upload eerst een bestand (csv/xlsx/pdf).");
       return;
@@ -338,7 +345,7 @@ export function StepAfschriften({
       .filter(Boolean)
       .join("\n\n");
     try {
-      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user });
+      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user, turnstileToken });
       if (!result) {
         setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
         setAiStatus("AI-analyse mislukt");
@@ -348,7 +355,9 @@ export function StepAfschriften({
       const at = new Date().toISOString();
       onAiAnalysisComplete?.({ raw: result, at });
       onBucketsRefresh?.();
-      await runAiBuckets();
+      await runAiBuckets(turnstileToken);
+      setTurnstileToken(null);
+      setTurnstileNonce((prev) => prev + 1);
     } catch (err) {
       console.error(err);
       setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
@@ -652,12 +661,18 @@ export function StepAfschriften({
                 <button
                   type="button"
                   onClick={runAiAnalysis}
-                  disabled={!hasUploads || aiLoading}
+                  disabled={!hasUploads || aiLoading || !turnstileToken}
                   className="rounded-lg bg-purple-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   {aiLoading ? "Analyseren..." : "Analyseer met AI"}
                 </button>
               </div>
+              <TurnstileWidget
+                key={`afschriften-turnstile-${turnstileNonce}`}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
+                onVerify={(token) => setTurnstileToken(token)}
+                theme="dark"
+              />
               {aiError && <p className="text-red-400">{aiError}</p>}
               {aiStatus && <p className="text-slate-300">{aiStatus}</p>}
               {!aiStatus && !aiError && <p className="text-slate-400">Wacht op analyse.</p>}
