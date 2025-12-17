@@ -13,6 +13,7 @@ import { StepVermogen } from "./components/steps/StepVermogen";
 import { StepRitme } from "./components/steps/StepRitme";
 import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften } from "./components/steps/StepAfschriften";
+import { StepBackup } from "./components/steps/StepBackup";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { detectRecurringCandidates } from "./utils/recurring";
 import type {
@@ -117,6 +118,7 @@ const personalTabs: TabConfig[] = [
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
   { key: "afschriften", label: "AI-analyse", desc: "Maandelijkse afschriften" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
+  { key: "backup", label: "Backup", desc: "Export & import van je data" },
 ];
 
 const businessTabs: TabConfig[] = [
@@ -128,6 +130,7 @@ const businessTabs: TabConfig[] = [
   { key: "biz-risico", label: "Risico & Zekerheid", desc: "Kwetsbaarheden en buffers" },
   { key: "biz-doelen", label: "Doelen (zakelijk)", desc: "Focus voor dit kwartaal" },
   { key: "biz-vooruitblik", label: "Vooruitblik (zakelijk)", desc: "Scenario als alles zo blijft" },
+  { key: "biz-backup", label: "Backup", desc: "Export & import van je data" },
 ];
 const useActiveTabs = (mode: Mode) => useMemo(() => (mode === "zakelijk" ? businessTabs : personalTabs), [mode]);
 
@@ -237,6 +240,7 @@ const App = () => {
   if (statusPaths.includes(currentPath)) {
     return <StatusPage />;
   }
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const indexablePaths = ["/", ...legalPaths];
@@ -1473,6 +1477,8 @@ const App = () => {
     />
   );
 
+  const renderBackup = () => <StepBackup />;
+
   const renderContent = () => {
     const normalizedStep = normalizeStep(currentStep);
     const isBusinessView = mode === "zakelijk";
@@ -1490,6 +1496,7 @@ const App = () => {
     if (normalizedStep === "doelen") return renderFocus(isBusinessView ? "business" : "personal");
     if (normalizedStep === "action") return renderAction("personal");
     if (normalizedStep === "vooruitblik") return renderAction(isBusinessView ? "business" : "personal");
+    if (normalizedStep === "backup") return renderBackup();
     return null;
   };
 
@@ -1576,6 +1583,9 @@ const App = () => {
       case "action":
         filled = vooruitblikFilled;
         break;
+      case "backup":
+        filled = false;
+        break;
       default:
         filled = false;
         break;
@@ -1598,7 +1608,17 @@ const App = () => {
             isBusiness ? "border-r border-blue-400/20 bg-blue-950/40" : "border-r border-white/10 bg-white/10"
           }`}
         >
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
+            <button
+              type="button"
+              onClick={() => setShowHelp(true)}
+              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
+              aria-label="Open hulp tips"
+            >
+              Hulp
+            </button>
+          </div>
           <div className="mb-4 flex items-center gap-2">
             <button
               type="button"
@@ -1627,14 +1647,21 @@ const App = () => {
             {activeTabs.map((step) => {
               const unlocked =
                 unlockedSteps.includes(step.key) || unlockedSteps.includes(normalizeStep(step.key));
+              const isBackup = normalizeStep(step.key) === "backup";
               const { active, label } = getStepStatus(step.key);
               const activeClass = active
                 ? isBusiness
-                  ? "bg-gradient-to-r from-blue-500 via-blue-400 to-amber-300 text-slate-950 border border-amber-200 shadow-md"
+                  ? isBackup
+                    ? "bg-gradient-to-r from-emerald-400 via-emerald-300 to-lime-200 text-slate-950 border border-emerald-200 shadow-md"
+                    : "bg-gradient-to-r from-blue-500 via-blue-400 to-amber-300 text-slate-950 border border-amber-200 shadow-md"
+                  : isBackup
+                  ? "bg-emerald-400/90 text-slate-950 border border-emerald-200 shadow-md"
                   : "bg-amber-500/90 text-slate-950 border border-amber-300 shadow-md"
                 : "";
               const inactiveClass = unlocked
-                ? isBusiness
+                ? isBackup
+                  ? "bg-emerald-900/40 text-emerald-100 border border-emerald-400/50 hover:bg-emerald-800/60 hover:border-emerald-200"
+                  : isBusiness
                   ? "bg-blue-950/50 text-blue-100 border border-amber-300/40 hover:bg-blue-900/60 hover:border-amber-200"
                   : "bg-amber-900/30 text-amber-100 border border-amber-700 hover:border-amber-500"
                 : "cursor-not-allowed bg-white/5 text-slate-500 border border-white/10";
@@ -1755,6 +1782,32 @@ const App = () => {
                 Sluiten
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
+          <div className="card-shell w-full max-w-lg p-6 text-slate-900">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Hulp tips</h3>
+                <p className="text-sm text-slate-600">Snelle tips om vlot door Moneylith te gaan.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHelp(false)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
+              >
+                Sluiten
+              </button>
+            </div>
+            <ul className="space-y-2 text-sm text-slate-700">
+              <li>Begin met Intentie en Fundament om je basis vast te leggen.</li>
+              <li>Upload daarna afschriften zodat AI je variabele potjes kan afleiden.</li>
+              <li>Gebruik de Backup tab om je data lokaal te exporteren.</li>
+              <li>Stel je doelen in en gebruik Vooruitblik om je koers te checken.</li>
+            </ul>
           </div>
         </div>
       )}

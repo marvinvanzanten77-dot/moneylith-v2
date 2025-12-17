@@ -5,7 +5,6 @@ import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
 import type { TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import type { AiActions } from "../../logic/extractActions";
-import { BackupCard } from "../BackupCard";
 
 interface StepAfschriftenProps {
   accounts: MoneylithAccount[];
@@ -680,7 +679,6 @@ export function StepAfschriften({
             </div>
           </div>
 
-          <BackupCard />
         </div>
       </div>
     </div>

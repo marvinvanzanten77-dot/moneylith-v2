@@ -247,7 +247,7 @@ export function StepRitme({
             {!isRisk ? (
               <p className="text-xs text-slate-500">
                 {isBusiness
-                  ? "Deze cashflow beÃ¯nvloedt direct de ruimte die je voor je bedrijfsdoelen hebt."
+                  ? "Deze cashflow beinvloedt direct de ruimte die je voor je bedrijfsdoelen hebt."
                   : "Deze potjes concurreren direct met je doelen om je maandruimte."}
               </p>
             ) : null}

@@ -50,12 +50,12 @@ export function StepVooruitblik({
     const items: { label: string; detail: string; highlight: boolean }[] = [];
     items.push({
       label: "Nu",
-      detail: `Vrij: ${formatCurrency(netFree)} Â· Buffer: ${runwayMonths !== null ? `${runwayMonths}m` : "onbekend"}`,
+      detail: `Vrij: ${formatCurrency(netFree)} | Buffer: ${runwayMonths !== null ? `${runwayMonths}m` : "onbekend"}`,
       highlight: true,
     });
     items.push({
       label: "Schuldvrij",
-      detail: monthlyPressure > 0 && debtMonths ? `Â± ${debtMonths} maanden bij huidige maanddruk` : "Geen maandtempo ingesteld",
+      detail: monthlyPressure > 0 && debtMonths ? `+/- ${debtMonths} maanden bij huidige maanddruk` : "Geen maandtempo ingesteld",
       highlight: monthlyPressure > 0 && Boolean(debtMonths) && debtMonths < 36,
     });
     items.push({
@@ -88,7 +88,7 @@ export function StepVooruitblik({
             <h2 className="mb-1 text-sm font-semibold text-slate-50">Schuldvrije projectie</h2>
             <p className="mb-2 text-xs text-slate-400">Op basis van je huidige maanddruk.</p>
             <div className="text-lg font-semibold text-slate-50">
-              {monthlyPressure > 0 ? `Â± ${Math.ceil(totalDebt / monthlyPressure)} maanden` : "Geen maandelijkse aflossing ingesteld"}
+              {monthlyPressure > 0 ? `+/- ${Math.ceil(totalDebt / monthlyPressure)} maanden` : "Geen maandelijkse aflossing ingesteld"}
             </div>
             {monthlyPressure <= 0 && <p className="mt-1 text-xs text-slate-400">Zonder aflosritme blijft je schuldpositie gelijk.</p>}
           </div>

@@ -195,11 +195,11 @@ export function StepFocus({
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-50">{isBusiness ? "EÃ©n actief zakelijk doel" : "EÃ©n actief doel"}</h2>
+                <h2 className="text-lg font-semibold text-slate-50">{isBusiness ? "Een actief zakelijk doel" : "Een actief doel"}</h2>
                 <p className="text-xs text-slate-400">
                   {isBusiness
-                    ? "Je werkt altijd met Ã©Ã©n primair zakelijk focuspunt tegelijk."
-                    : "Kies Ã©Ã©n doel als focus voor deze periode."}
+                    ? "Je werkt altijd met een primair zakelijk focuspunt tegelijk."
+                    : "Kies een doel als focus voor deze periode."}
                 </p>
               </div>
               <span className="text-xs text-slate-400">{activeGoals.length} actief</span>
@@ -353,7 +353,7 @@ export function StepFocus({
             </div>
 
             <div className="text-xs text-slate-300">
-              <p className="mb-1 text-slate-400">{isBusiness ? "Koppelen aan financiÃ«le stromen (optioneel):" : "Koppel aan potjes (optioneel):"}</p>
+              <p className="mb-1 text-slate-400">{isBusiness ? "Koppelen aan financiele stromen (optioneel):" : "Koppel aan potjes (optioneel):"}</p>
               <div className="grid max-h-32 grid-cols-1 gap-1 overflow-auto">
                 {buckets.map((b) => (
                   <label key={b.id} className="flex items-center gap-2">
@@ -368,7 +368,7 @@ export function StepFocus({
                     </span>
                   </label>
                 ))}
-                {buckets.length === 0 && <p className="text-[11px] text-slate-500">Nog geen financiÃ«le stromen beschikbaar.</p>}
+                {buckets.length === 0 && <p className="text-[11px] text-slate-500">Nog geen financiele stromen beschikbaar.</p>}
               </div>
             </div>
 

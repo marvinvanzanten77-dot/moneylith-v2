@@ -67,7 +67,7 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
     ],
   },
   terms: {
-    title: "Voorwaarden (light)",
+    title: "Voorwaarden",
     blocks: [
       {
         heading: "Gebruik van Moneylith",

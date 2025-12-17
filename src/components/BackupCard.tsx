@@ -1,33 +1,10 @@
 import { useState } from "react";
 
-const ALLOWED_PREFIXES = [
-  "moneylith.",
-  "potje-",
-  "schuldenplan-",
-  "income-",
-  "fixed-cost",
-  "buffer-",
-  "user-",
-  "selected-month",
-  "month-focus",
-  "potjes-",
-  "ai-",
-];
+const DENYLIST_PREFIXES = ["sentry", "__sentry", "vercel", "vite", "react-devtools"];
+const DENYLIST_EXACT = ["moneylith_consent"];
 
-const ALLOWED_EXACT = [
-  "moneylith.ai.messages",
-  "schulden-lijst",
-  "potjes-config",
-  "moneylith.personal.aiBuckets",
-  "moneylith.personal.aiAnalysisRaw",
-  "moneylith.personal.aiAnalysisDone",
-  "moneylith.personal.aiAnalysisDoneAt",
-  "moneylith.personal.bucket.overrides",
-  "moneylith.business.bucket.overrides",
-];
-
-const isAllowedKey = (key: string) =>
-  ALLOWED_EXACT.includes(key) || ALLOWED_PREFIXES.some((prefix) => key.startsWith(prefix));
+const isExportableKey = (key: string) =>
+  !DENYLIST_EXACT.includes(key) && !DENYLIST_PREFIXES.some((prefix) => key.startsWith(prefix));
 
 const safeParse = (val: string) => {
   try {
@@ -42,7 +19,7 @@ const collectSnapshot = () => {
   const result: Record<string, unknown> = {};
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
-    if (!key || !isAllowedKey(key)) continue;
+    if (!key || !isExportableKey(key)) continue;
     const val = window.localStorage.getItem(key);
     if (val === null) continue;
     result[key] = safeParse(val);
@@ -51,8 +28,9 @@ const collectSnapshot = () => {
 };
 
 export function BackupCard() {
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
 
   const handleDownload = () => {
@@ -64,8 +42,7 @@ export function BackupCard() {
     a.download = `moneylith-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus("Back-up gedownload.");
-    setError(null);
+    setExportStatus("Back-up gedownload.");
   };
 
   const handleImportText = (text: string) => {
@@ -76,16 +53,16 @@ export function BackupCard() {
         throw new Error("Ongeldig formaat");
       }
       Object.entries(parsed as Record<string, unknown>).forEach(([key, value]) => {
-        if (!isAllowedKey(key)) return;
+        if (!isExportableKey(key)) return;
         window.localStorage.setItem(key, JSON.stringify(value));
       });
-      setStatus("Import voltooid. Pagina wordt ververst...");
-      setError(null);
+      setImportStatus("Import voltooid. Pagina wordt ververst...");
+      setImportError(null);
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
       console.error(err);
-      setError("Import mislukt. Controleer het JSON-bestand.");
-      setStatus(null);
+      setImportError("Import mislukt. Controleer het JSON-bestand.");
+      setImportStatus(null);
     }
   };
 
@@ -101,41 +78,51 @@ export function BackupCard() {
   };
 
   return (
-    <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-100">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-100">
         <div>
-          <h3 className="text-base font-semibold text-slate-50">Back-up & export</h3>
+          <h3 className="text-base font-semibold text-slate-50">Export</h3>
           <p className="text-[11px] text-slate-400">
-            Exporteer je planner-gegevens (lokale opslag) of importeer een eerder gemaakte back-up.
+            Exporteer al je lokale planner-gegevens (persoonlijk + zakelijk, inclusief handmatige invoer).
           </p>
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="rounded-lg bg-white/90 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-white"
+          >
+            Download JSON-back-up
+          </button>
+          <p className="text-[11px] text-slate-400">
+            Geen geheimen of sessies, alleen de lokale planner-data.
+          </p>
+          {exportStatus && <p className="text-[11px] text-emerald-300">{exportStatus}</p>}
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="rounded-lg bg-white/90 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-white"
-        >
-          Download JSON-back-up
-        </button>
-        <label className="flex flex-col gap-1 text-[11px] text-slate-300">
-          Herstel vanuit JSON
-          <input
-            type="file"
-            accept="application/json"
-            className="text-xs text-slate-200"
-            onChange={(e) => handleImportFile(e.target.files?.[0] ?? null)}
-            disabled={importing}
-          />
-        </label>
-        <p className="text-[11px] text-slate-400">
-          Bevat alleen lokale planner-data (rekeningen, afschriften, potjes, AI-notities). Geen geheimen of sessies.
-        </p>
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-100">
+        <div>
+          <h3 className="text-base font-semibold text-slate-50">Import</h3>
+          <p className="text-[11px] text-slate-400">
+            Herstel een eerder gemaakte JSON-back-up. Dit overschrijft je huidige lokale gegevens.
+          </p>
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="flex flex-col gap-1 text-[11px] text-slate-300">
+            Kies JSON-bestand
+            <input
+              type="file"
+              accept="application/json"
+              className="text-xs text-slate-200"
+              onChange={(e) => handleImportFile(e.target.files?.[0] ?? null)}
+              disabled={importing}
+            />
+          </label>
+          {importStatus && <p className="text-[11px] text-emerald-300">{importStatus}</p>}
+          {importError && <p className="text-[11px] text-red-300">{importError}</p>}
+        </div>
       </div>
-
-      {status && <p className="text-[11px] text-emerald-300">{status}</p>}
-      {error && <p className="text-[11px] text-red-300">{error}</p>}
     </div>
   );
 }
