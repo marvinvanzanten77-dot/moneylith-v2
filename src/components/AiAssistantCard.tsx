@@ -3,7 +3,7 @@ import { useAiOrchestrator, type TabKey } from "../hooks/useAiOrchestrator";
 import { analyseObservation } from "../logic/analysis";
 import { buildMoneylithPrompt } from "../logic/aiPrompt";
 import { useObserver } from "../hooks/useObserver";
-import { appendAiMessage, getAiMessages, subscribeToAiMessages } from "../logic/aiMessageBus";
+import { appendAiMessage, clearAiMessages, getAiMessages, subscribeToAiMessages } from "../logic/aiMessageBus";
 import type { AiActions } from "../logic/extractActions";
 import { TurnstileWidget } from "./TurnstileWidget";
 
@@ -36,7 +36,8 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
     setLastActions: setLastAiActions,
     onRawContent: (raw) => {
       try {
-        localStorage.setItem("moneylith.personal.aiAnalysisRaw", raw);
+        const key = mode === "business" ? "moneylith.business.aiAnalysisRaw" : "moneylith.personal.aiAnalysisRaw";
+        localStorage.setItem(key, raw);
       } catch {
         // ignore
       }
@@ -52,19 +53,31 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   }, [lastAiActions, onActionsChange]);
 
   const analysis = useMemo(() => (observation ? analyseObservation(observation, mode) : null), [mode, observation]);
-  const rawContext = useMemo(() => {
-    const src = mode === "business" ? observation.business : observation.personal;
-    return {
-      incomes: src.income,
-      fixed: src.fixedCostManualItems,
-      debts: src.debts,
-      assets: src.assets as any,
-      buckets: src.buckets,
-      transactions: src.transactions,
-      netFree: src.totals.netFree,
-    };
-  }, [mode, observation]);
-  const aiPayload = useMemo(() => (analysis ? buildMoneylithPrompt(analysis, rawContext) : null), [analysis, rawContext]);
+  const toRawContext = (src: ReturnType<typeof useObserver>["personal"]) => ({
+    incomes: src.income,
+    fixed: src.fixedCostManualItems,
+    debts: src.debts,
+    assets: src.assets as any,
+    buckets: src.buckets,
+    transactions: src.transactions,
+    netFree: src.totals.netFree,
+  });
+
+  const primaryRaw = useMemo(
+    () => toRawContext(mode === "business" ? observation.business : observation.personal),
+    [mode, observation],
+  );
+  const secondaryRaw = useMemo(
+    () => toRawContext(mode === "business" ? observation.personal : observation.business),
+    [mode, observation],
+  );
+
+  const aiPayload = useMemo(() => {
+    const extras = secondaryRaw
+      ? [{ label: mode === "business" ? "persoonlijke context (alleen ter info)" : "zakelijke context (alleen ter info)", raw: secondaryRaw }]
+      : undefined;
+    return analysis ? buildMoneylithPrompt(analysis, primaryRaw, extras) : null;
+  }, [analysis, primaryRaw, secondaryRaw, mode]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -112,11 +125,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
           type="button"
           onClick={() => {
             appendAiMessage({ role: "system", content: "[Chat reset]" });
-            try {
-              localStorage.removeItem("moneylith.personal.aiMessages");
-            } catch {
-              /* ignore */
-            }
+            clearAiMessages();
             setMessages([]);
           }}
           className="text-[11px] text-slate-400 hover:text-slate-200 underline"

@@ -16,6 +16,8 @@ export type InboxSuggestion = {
     | "goal_add"
     | "account_add"
     | "transaction_add"
+    | "invoice_add"
+    | "offer_add"
     | "note";
   confidence?: number;
   fields?: Record<string, unknown>;
@@ -132,7 +134,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
       `Bestand: ${item.name}`,
       item.note ? `Notitie: ${item.note}` : "",
       mode === "business"
-        ? "Doel: geef voorstellen die passen bij zakelijke tabs: Strategie/Cashflow, Verplichtingen, Kapitaal, Doelen, Rekeningen, Afschriften."
+        ? "Doel: geef voorstellen die passen bij zakelijke tabs: Strategie/Cashflow, Verplichtingen (facturen/belasting/aanmaning/contract), Kapitaal, Doelen, Rekeningen, Afschriften."
         : "Doel: geef voorstellen die passen bij persoonlijke tabs: Fundament (inkomen/vast), Schulden, Vermogen, Doelen, Rekeningen, Afschriften.",
       "Output: geef een korte samenvatting en daarna een JSON-blok in tags <INBOX_JSON> ... </INBOX_JSON>.",
       "Gebruik geen codeblokken; plaats JSON als platte tekst tussen de tags.",
@@ -145,6 +147,9 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
       '  { "tab": "doelen", "kind": "goal_add", "confidence": 0.6, "fields": { "label": "", "type": "buffer", "targetAmount": 0, "currentAmount": 0, "monthlyContribution": 0, "isActive": true } },',
       '  { "tab": "rekeningen", "kind": "account_add", "confidence": 0.6, "fields": { "name": "", "type": "betaalrekening", "iban": "", "active": true } },',
       '  { "tab": "afschriften", "kind": "transaction_add", "confidence": 0.5, "fields": { "date": "YYYY-MM-DD", "description": "", "amount": 0 } }',
+      mode === "business"
+        ? '  ,{ "tab": "verplichtingen", "kind": "invoice_add", "confidence": 0.7, "fields": { "type": "payable", "creditor": "", "amount": 0, "dueDate": "YYYY-MM-DD", "invoiceNumber": "", "btw": 0 } }'
+        : "",
       "] }",
       "Document inhoud:",
       item.content.slice(0, 12000),
@@ -239,7 +244,11 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Geuploade documenten</h2>
-                <p className="text-xs text-slate-500">AI kan voorstellen doen voor alle persoonlijke tabbladen.</p>
+                <p className="text-xs text-slate-500">
+                  {mode === "business"
+                    ? "AI kan voorstellen doen voor de zakelijke tabbladen."
+                    : "AI kan voorstellen doen voor alle persoonlijke tabbladen."}
+                </p>
               </div>
               <span className="text-[11px] text-slate-500">{items.length} bestand(en)</span>
             </div>

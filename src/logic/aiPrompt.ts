@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "./analysis";
+﻿import type { AnalysisResult } from "./analysis";
 import type {
   IncomeItem,
   FixedCostManualItem,
@@ -22,7 +22,9 @@ type RawContext = {
   netFree?: number;
 };
 
-const formatCurrency = (v: number) => `€${Math.round(v).toLocaleString("nl-NL")}`;
+type ExtraRawContext = { label: string; raw: RawContext };
+
+const formatCurrency = (v: number) => `ƒ,ª${Math.round(v).toLocaleString("nl-NL")}`;
 
 function buildRawSection(raw?: RawContext): string[] {
   if (!raw) return [];
@@ -68,7 +70,11 @@ function buildRawSection(raw?: RawContext): string[] {
   return lines;
 }
 
-export function buildMoneylithPrompt(analysis: AnalysisResult, raw?: RawContext): MoneylithAiPayload {
+export function buildMoneylithPrompt(
+  analysis: AnalysisResult,
+  raw?: RawContext,
+  extras?: ExtraRawContext[],
+): MoneylithAiPayload {
   const { mode, overallLevel, overallScore, tabs } = analysis;
 
   const modeLabel = mode === "personal" ? "persoonlijke financiën" : "zakelijke financiën";
@@ -108,6 +114,16 @@ export function buildMoneylithPrompt(analysis: AnalysisResult, raw?: RawContext)
     lines.push(...rawSection);
   }
 
+  if (extras && extras.length) {
+    extras.forEach((extra) => {
+      const extraSection = buildRawSection(extra.raw);
+      if (!extraSection.length) return;
+      lines.push("");
+      lines.push(`== Extra context (${extra.label}) ==`);
+      lines.push(...extraSection);
+    });
+  }
+
   const user = [
     `Je bent een nuchtere financieel sparringpartner.`,
     `Je reageert in het Nederlands, kort en concreet.`,
@@ -118,7 +134,7 @@ export function buildMoneylithPrompt(analysis: AnalysisResult, raw?: RawContext)
     ``,
     `Op basis hiervan:`,
     `1. Geef in 3 tot 5 bullets wat hier NU het belangrijkste is om op te focussen.`,
-    `2. Geef één kernadvies in maximaal 3 zinnen.`,
+    `2. Geef AcAcn kernadvies in maximaal 3 zinnen.`,
     `3. Als er iets urgent is, noem dat expliciet als "WAARSCHUWING: ...".`,
     `4. Maak onderscheid tussen de korte termijn (0–3 maanden) en middellange termijn (3–24 maanden).`,
     ``,

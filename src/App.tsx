@@ -321,12 +321,25 @@ const App = () => {
     []
   );
   const [inboxItems, setInboxItems] = useLocalStorage<InboxItem[]>("moneylith.personal.inbox", []);
+  const [inboxItemsBusiness, setInboxItemsBusiness] = useLocalStorage<InboxItem[]>("moneylith.business.inbox", []);
   const [aiAnalysisDone, setAiAnalysisDone] = useLocalStorage<boolean>("moneylith.personal.aiAnalysisDone", false);
   const [aiAnalysisDoneAt, setAiAnalysisDoneAt] = useLocalStorage<string | null>(
     "moneylith.personal.aiAnalysisDoneAt",
     null
   );
   const [aiAnalysisRaw, setAiAnalysisRaw] = useLocalStorage<string | null>("moneylith.personal.aiAnalysisRaw", null);
+  const [aiAnalysisDoneBusiness, setAiAnalysisDoneBusiness] = useLocalStorage<boolean>(
+    "moneylith.business.aiAnalysisDone",
+    false
+  );
+  const [aiAnalysisDoneAtBusiness, setAiAnalysisDoneAtBusiness] = useLocalStorage<string | null>(
+    "moneylith.business.aiAnalysisDoneAt",
+    null
+  );
+  const [aiAnalysisRawBusiness, setAiAnalysisRawBusiness] = useLocalStorage<string | null>(
+    "moneylith.business.aiAnalysisRaw",
+    null
+  );
   const [aiActionsPersonal, setAiActionsPersonal] = useState<AiActions | null>(null);
   const [aiActionsBusiness, setAiActionsBusiness] = useState<AiActions | null>(null);
   const aiPrefillSuggestions = useMemo(() => extractPrefillSuggestions(aiAnalysisRaw), [aiAnalysisRaw]);
@@ -497,6 +510,60 @@ const App = () => {
             });
             break;
           }
+          case "invoice_add": {
+            const amount = toNumber(fields.amount ?? fields.saldo ?? fields.total);
+            const name = String(fields.name ?? fields.naam ?? fields.creditor ?? fields.label ?? "").trim();
+            if (!name || amount === null || amount <= 0) return;
+            const dueDate = String(fields.dueDate ?? fields.deadline ?? "").trim();
+            const invoiceNumber = String(fields.invoiceNumber ?? "").trim();
+            const btw = toNumber(fields.btw);
+            const noteParts = [
+              invoiceNumber ? `factuurnr: ${invoiceNumber}` : "",
+              dueDate ? `vervaldatum: ${dueDate}` : "",
+              typeof btw === "number" && btw > 0 ? `btw: ${btw}%` : "",
+            ]
+              .filter(Boolean)
+              .join(" | ");
+            const typeRaw = String(fields.type ?? "payable").toLowerCase();
+            const isReceivable = typeRaw === "receivable" || typeRaw === "ontvangst" || typeRaw === "te ontvangen";
+            if (isReceivable && defaultAccountId) {
+              nextTransactions.push({
+                id: createId(),
+                accountId: String(defaultAccountId),
+                date: dueDate && !Number.isNaN(Date.parse(dueDate)) ? new Date(dueDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                amount: Math.abs(amount),
+                description: name,
+                counterparty: fields.counterparty ? String(fields.counterparty) : undefined,
+                category: "factuur",
+              });
+            } else {
+              nextDebts.push({
+                id: createId(),
+                naam: name,
+                saldo: amount,
+                openBedrag: amount,
+                minimaleMaandlast: undefined,
+                minBetaling: undefined,
+                opmerking: noteParts || undefined,
+              });
+            }
+            break;
+          }
+          case "offer_add": {
+            // Optioneel: sla als notitie op in goals zodat de gebruiker het kan verwerken.
+            const label = String(fields.label ?? fields.name ?? fields.naam ?? "").trim();
+            if (!label) return;
+            nextGoals.push({
+              id: createId(),
+              label,
+              type: "buffer",
+              targetAmount: toNumber(fields.amount) ?? 0,
+              currentAmount: 0,
+              monthlyContribution: 0,
+              isActive: false,
+            });
+            break;
+          }
           default:
             break;
         }
@@ -525,6 +592,199 @@ const App = () => {
       setIncomeItems,
       setTransactions,
       transactions,
+    ]
+  );
+
+  const applyInboxSuggestionsBusiness = useCallback(
+    (suggestions: InboxSuggestion[]) => {
+      if (!suggestions.length) return;
+      const nextIncome = [...incomeItemsBusiness];
+      const nextFixedCosts = [...fixedCostManualItemsBusiness];
+      const nextDebts = [...debtsBusiness];
+      const nextAssets = [...assetsBusiness];
+      const nextGoals = [...goalsBusiness];
+      const nextAccounts = [...accountsBusiness];
+      const nextTransactions = [...transactionsBusiness];
+
+      const defaultAccountId =
+        accountsBusiness.find((a) => a.active)?.id ?? accountsBusiness[0]?.id ?? null;
+      const toNumber = (val: unknown) => {
+        const num = typeof val === "string" && val.trim() === "" ? NaN : Number(val);
+        return Number.isFinite(num) ? num : null;
+      };
+
+      suggestions.forEach((s) => {
+        const fields = (s.fields ?? {}) as Record<string, any>;
+        switch (s.kind) {
+          case "income_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            nextIncome.push({
+              id: createId(),
+              naam,
+              bedrag,
+              opmerking: fields.opmerking ? String(fields.opmerking) : undefined,
+            });
+            break;
+          }
+          case "fixedcost_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            const dagRaw = toNumber(fields.dagVanMaand ?? 1) ?? 1;
+            const dagVanMaand = Math.min(31, Math.max(1, Math.round(dagRaw)));
+            nextFixedCosts.push({
+              id: createId(),
+              naam,
+              bedrag,
+              dagVanMaand,
+              opmerking: fields.opmerking ? String(fields.opmerking) : undefined,
+            });
+            break;
+          }
+          case "debt_add":
+          case "invoice_add": {
+            const saldo = toNumber(fields.saldo ?? fields.openBedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.crediteur ?? fields.label ?? fields.creditor ?? "").trim();
+            if (!naam || saldo === null || saldo <= 0) return;
+            const minimaleMaandlast = toNumber(fields.minimaleMaandlast ?? fields.minBetaling) ?? undefined;
+            const dueDate = String(fields.dueDate ?? fields.deadline ?? "").trim();
+            const invoiceNumber = String(fields.invoiceNumber ?? "").trim();
+            const btw = toNumber(fields.btw);
+            const typeRaw = String(fields.type ?? s.kind === "invoice_add" ? "payable" : "").toLowerCase();
+            const isReceivable = typeRaw === "receivable" || typeRaw === "ontvangst" || typeRaw === "te ontvangen";
+            const noteParts = [
+              invoiceNumber ? `factuurnr: ${invoiceNumber}` : "",
+              dueDate ? `vervaldatum: ${dueDate}` : "",
+              typeof btw === "number" && btw > 0 ? `btw: ${btw}%` : "",
+            ]
+              .filter(Boolean)
+              .join(" | ");
+
+            if (isReceivable && defaultAccountId) {
+              nextTransactions.push({
+                id: createId(),
+                accountId: String(defaultAccountId),
+                date: dueDate && !Number.isNaN(Date.parse(dueDate)) ? new Date(dueDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                amount: Math.abs(saldo),
+                description: naam,
+                counterparty: fields.counterparty ? String(fields.counterparty) : undefined,
+                category: "factuur",
+              });
+            } else {
+              nextDebts.push({
+                id: createId(),
+                naam,
+                saldo,
+                openBedrag: saldo,
+                minimaleMaandlast: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
+                minBetaling: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
+                opmerking: noteParts || undefined,
+              });
+            }
+            break;
+          }
+          case "asset_add": {
+            const bedrag = toNumber(fields.bedrag ?? fields.amount);
+            const naam = String(fields.naam ?? fields.label ?? "").trim();
+            if (!naam || bedrag === null || bedrag <= 0) return;
+            nextAssets.push({ id: createId(), naam, bedrag });
+            break;
+          }
+          case "goal_add": {
+            const label = String(fields.label ?? fields.naam ?? "").trim();
+            if (!label) return;
+            const targetAmount = toNumber(fields.targetAmount) ?? 0;
+            nextGoals.push({
+              id: createId(),
+              label,
+              type: (fields.type as any) ?? "buffer",
+              targetAmount: targetAmount > 0 ? targetAmount : 0,
+              currentAmount: toNumber(fields.currentAmount) ?? 0,
+              monthlyContribution: Math.max(0, toNumber(fields.monthlyContribution) ?? 0),
+              deadline: fields.deadline ? String(fields.deadline) : undefined,
+              isActive: fields.isActive !== false,
+            });
+            break;
+          }
+          case "account_add": {
+            const name = String(fields.name ?? fields.naam ?? "").trim();
+            if (!name) return;
+            const typeCandidate = String(fields.type ?? "betaalrekening");
+            const type =
+              typeCandidate === "spaarrekening" || typeCandidate === "contant" ? typeCandidate : "betaalrekening";
+            nextAccounts.push({
+              id: createId(),
+              name,
+              type,
+              iban: fields.iban ? String(fields.iban) : undefined,
+              description: fields.description ? String(fields.description) : undefined,
+              active: fields.active !== false,
+            });
+            break;
+          }
+          case "transaction_add": {
+            const description = String(fields.description ?? "").trim();
+            const amount = toNumber(fields.amount);
+            const date = String(fields.date ?? "").trim();
+            if (!description || amount === null || amount === 0 || !date) return;
+            if (Number.isNaN(Date.parse(date))) return;
+            const accountId = fields.accountId ?? defaultAccountId;
+            if (!accountId) return;
+            nextTransactions.push({
+              id: createId(),
+              accountId: String(accountId),
+              date,
+              amount,
+              description,
+              counterparty: fields.counterparty ? String(fields.counterparty) : undefined,
+              category: fields.category ? String(fields.category) : undefined,
+            });
+            break;
+          }
+          case "offer_add": {
+            const label = String(fields.label ?? fields.name ?? fields.naam ?? "").trim();
+            if (!label) return;
+            nextGoals.push({
+              id: createId(),
+              label,
+              type: "buffer",
+              targetAmount: toNumber(fields.amount) ?? 0,
+              currentAmount: 0,
+              monthlyContribution: 0,
+              isActive: false,
+            });
+            break;
+          }
+          default:
+            break;
+        }
+      });
+
+      setIncomeItemsBusiness(nextIncome);
+      setFixedCostManualItemsBusiness(nextFixedCosts);
+      setDebtsBusiness(nextDebts);
+      setAssetsBusiness(nextAssets);
+      setGoalsBusiness(nextGoals);
+      setAccountsBusiness(nextAccounts);
+      setTransactionsBusiness(nextTransactions);
+    },
+    [
+      accountsBusiness,
+      assetsBusiness,
+      debtsBusiness,
+      fixedCostManualItemsBusiness,
+      goalsBusiness,
+      incomeItemsBusiness,
+      setAccountsBusiness,
+      setAssetsBusiness,
+      setDebtsBusiness,
+      setFixedCostManualItemsBusiness,
+      setGoalsBusiness,
+      setIncomeItemsBusiness,
+      setTransactionsBusiness,
+      transactionsBusiness,
     ]
   );
   const observation = useObserver(mode);
@@ -634,6 +894,12 @@ const App = () => {
     setAiAnalysisRaw(raw);
   };
 
+  const handleAiAnalysisCompleteBusiness = ({ raw, at }: { raw: string; at: string }) => {
+    setAiAnalysisDoneBusiness(true);
+    setAiAnalysisDoneAtBusiness(at);
+    setAiAnalysisRawBusiness(raw);
+  };
+
   const runFullAiRitme = async () => {
     const system = "Moneylith - bepaal variabele potjes uit afschriften";
     const user = [
@@ -711,6 +977,10 @@ const App = () => {
 
   const deleteStatement = (id: string) => {
     setStatements((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const deleteStatementBusiness = (id: string) => {
+    setStatementsBusiness((prev) => prev.filter((s) => s.id !== id));
   };
 
   const buildHeuristicBuckets = useCallback((netFreeValue: number): MoneylithBucket[] => {
@@ -960,6 +1230,7 @@ const App = () => {
   const activeGoals = mode === "zakelijk" ? goalsBusiness : goals;
   const activeDebtsSummary = mode === "zakelijk" ? debtsSummaryBusiness : debtsSummary;
   const activeAssetsSummary = mode === "zakelijk" ? assetsSummaryBusiness : assetsSummary;
+  const activeInboxItems = mode === "zakelijk" ? inboxItemsBusiness : inboxItems;
 
   const isFundamentValid = (income: number, costs: number) => income > 0 && costs >= 0 && Number.isFinite(income - costs);
 
@@ -1447,6 +1718,13 @@ const App = () => {
             )}
           </div>
         )}
+        {isBusinessVariant && (
+          <div className="rounded-xl border border-amber-200/60 bg-amber-500/10 p-3 text-sm text-amber-50">
+            <p className="text-xs">
+              Cashflow-tip: reserveer voor btw/loonheffing als onderdeel van je vaste lasten; AI kan facturen/aanmaningen herkennen via Inbox.
+            </p>
+          </div>
+        )}
         <IncomeList
           items={incomeItemsSource}
           onItemsChange={setIncomeItemsFn}
@@ -1619,31 +1897,61 @@ const App = () => {
   };
 
 
-  const renderAfschriften = () => (
-    <StepAfschriften
-      accounts={accounts}
-      statements={statements}
-      transactions={transactions}
-      onAddStatement={addStatementMeta}
-      onDeleteStatement={deleteStatement}
-      onUpsertTransaction={updateTransaction}
-      onDeleteTransaction={deleteTransaction}
-      aiAnalysisDone={aiAnalysisDone}
-      aiAnalysisDoneAt={aiAnalysisDoneAt}
-      aiAnalysisRaw={aiAnalysisRaw}
-      onAiAnalysisComplete={handleAiAnalysisComplete}
-      onAiActionsChange={handleAiActionsChange}
-      fixedCostLabels={[
-        ...fixedCostManualItems.map((i) => i.description ?? i.name ?? "").filter(Boolean),
-        ...fixedCostItems.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
-      ]}
-    />
-  );
+  const renderAfschriften = (variant: "personal" | "business" = "personal") => {
+    const isBusinessVariant = variant === "business";
+    const accountsSource = isBusinessVariant ? accountsBusiness : accounts;
+    const statementsSource = isBusinessVariant ? statementsBusiness : statements;
+    const transactionsSource = isBusinessVariant ? transactionsBusiness : transactions;
+    const addStatementFn = isBusinessVariant ? addStatementMetaBusiness : addStatementMeta;
+    const deleteStatementFn = isBusinessVariant ? deleteStatementBusiness : deleteStatement;
+    const upsertTxFn = isBusinessVariant ? updateTransactionBusiness : updateTransaction;
+    const deleteTxFn = isBusinessVariant ? deleteTransactionBusiness : deleteTransaction;
+    const aiDone = isBusinessVariant ? aiAnalysisDoneBusiness : aiAnalysisDone;
+    const aiDoneAt = isBusinessVariant ? aiAnalysisDoneAtBusiness : aiAnalysisDoneAt;
+    const aiRaw = isBusinessVariant ? aiAnalysisRawBusiness : aiAnalysisRaw;
+    const onComplete = isBusinessVariant ? handleAiAnalysisCompleteBusiness : handleAiAnalysisComplete;
+    const fixedLabels = isBusinessVariant
+      ? [
+          ...fixedCostManualItemsBusiness.map((i) => i.description ?? i.name ?? "").filter(Boolean),
+          ...fixedCostItemsBusiness.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
+        ]
+      : [
+          ...fixedCostManualItems.map((i) => i.description ?? i.name ?? "").filter(Boolean),
+          ...fixedCostItems.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
+        ];
+
+    return (
+      <StepAfschriften
+        variant={isBusinessVariant ? "business" : "personal"}
+        storagePrefix={isBusinessVariant ? "moneylith.business" : "moneylith.personal"}
+        accounts={accountsSource}
+        statements={statementsSource}
+        transactions={transactionsSource}
+        onAddStatement={addStatementFn}
+        onDeleteStatement={deleteStatementFn}
+        onUpsertTransaction={upsertTxFn}
+        onDeleteTransaction={deleteTxFn}
+        aiAnalysisDone={aiDone}
+        aiAnalysisDoneAt={aiDoneAt}
+        aiAnalysisRaw={aiRaw}
+        onAiAnalysisComplete={onComplete}
+        onAiActionsChange={handleAiActionsChange}
+        fixedCostLabels={fixedLabels}
+      />
+    );
+  };
 
   const renderBackup = () => <StepBackup />;
   const renderInbox = (variant: "personal" | "business" = "personal") => {
     if (variant === "business") {
-      return <StepInbox mode="business" items={inboxItemsBusiness} onItemsChange={setInboxItemsBusiness} />;
+      return (
+        <StepInbox
+          mode="business"
+          items={inboxItemsBusiness}
+          onItemsChange={setInboxItemsBusiness}
+          onApplySuggestions={applyInboxSuggestionsBusiness}
+        />
+      );
     }
     return <StepInbox items={inboxItems} onItemsChange={setInboxItems} onApplySuggestions={applyInboxSuggestions} />;
   };
@@ -1662,8 +1970,8 @@ const App = () => {
     if (normalizedStep === "biz-rekeningen") return renderRekeningen();
     if (normalizedStep === "inbox") return renderInbox("personal");
     if (normalizedStep === "biz-inbox") return renderInbox("business");
-    if (normalizedStep === "afschriften") return renderAfschriften();
-    if (normalizedStep === "biz-afschriften") return renderAfschriften();
+    if (normalizedStep === "afschriften") return renderAfschriften("personal");
+    if (normalizedStep === "biz-afschriften") return renderAfschriften("business");
     if (normalizedStep === "vermogen") return renderVermogen("personal");
     if (normalizedStep === "kapitaal") return renderVermogen("business");
     if (normalizedStep === "focus") return renderFocus(isBusinessView ? "business" : "personal");
@@ -1746,7 +2054,7 @@ const App = () => {
         filled = rekeningenFilled;
         break;
       case "inbox":
-        filled = inboxItems.length > 0;
+        filled = activeInboxItems.length > 0;
         break;
       case "afschriften":
         filled = afschriftenFilled;

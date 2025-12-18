@@ -22,6 +22,8 @@ interface StepAfschriftenProps {
   onAiActionsChange?: (actions: AiActions | null) => void;
   onBucketsRefresh?: () => void;
   fixedCostLabels?: string[];
+  variant?: "personal" | "business";
+  storagePrefix?: string;
 }
 
 export function StepAfschriften({
@@ -39,7 +41,11 @@ export function StepAfschriften({
   onAiActionsChange,
   onBucketsRefresh,
   fixedCostLabels = [],
+  variant = "personal",
+  storagePrefix,
 }: StepAfschriftenProps) {
+  const bucketPrefix = storagePrefix ?? (variant === "business" ? "moneylith.business" : "moneylith.personal");
+  const bucketStorageKey = `${bucketPrefix}.aiBuckets`;
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? "");
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -54,7 +60,7 @@ export function StepAfschriften({
   const [turnstileNonce, setTurnstileNonce] = useState(0);
 
   const { runAi } = useAiOrchestrator({
-    mode: "personal",
+    mode: variant === "business" ? "business" : "personal",
     appendMessage: appendAiMessage,
     setLoading: setAiLoading,
     setLastActions: onAiActionsChange,
@@ -64,7 +70,7 @@ export function StepAfschriften({
     { id: string; label: string; monthlyAvg: number; count?: number }[]
   >(() => {
     try {
-      const raw = localStorage.getItem("moneylith.personal.aiBuckets");
+      const raw = localStorage.getItem(bucketStorageKey);
       if (raw) return JSON.parse(raw);
     } catch {
       /* ignore */
@@ -273,7 +279,7 @@ export function StepAfschriften({
       if (parsed.length) {
         setAiBuckets(parsed.slice(0, 6));
         try {
-          localStorage.setItem("moneylith.personal.aiBuckets", JSON.stringify(parsed.slice(0, 6)));
+          localStorage.setItem(bucketStorageKey, JSON.stringify(parsed.slice(0, 6)));
         } catch {
           /* ignore */
         }
@@ -281,7 +287,7 @@ export function StepAfschriften({
     } catch (err) {
       console.error("AI bucket analyse mislukt", err);
     }
-  }, [_transactions, runAi]);
+  }, [_transactions, bucketStorageKey, fixedCostLabels, runAi]);
 
   const handleSubmit = () => {
     if (!accountId) return;
@@ -371,12 +377,12 @@ export function StepAfschriften({
     if (parsed.length) {
       setAiBuckets(parsed);
       try {
-        localStorage.setItem("moneylith.personal.aiBuckets", JSON.stringify(parsed));
+        localStorage.setItem(bucketStorageKey, JSON.stringify(parsed));
       } catch {
         /* ignore */
       }
     }
-  }, [aiAnalysisRaw, parseBucketsFromText]);
+  }, [aiAnalysisRaw, bucketStorageKey, parseBucketsFromText]);
 
   // Reset potjes als er geen uploads of analyse zijn (bijv. na F7 clear)
   useEffect(() => {
@@ -384,12 +390,12 @@ export function StepAfschriften({
     if (!hasUploads && !aiAnalysisDone && aiBuckets.length > 0) {
       setAiBuckets([]);
       try {
-        localStorage.removeItem("moneylith.personal.aiBuckets");
+        localStorage.removeItem(bucketStorageKey);
       } catch {
         /* ignore */
       }
     }
-  }, [aiAnalysisDone, aiBuckets.length, statements.length]);
+  }, [aiAnalysisDone, aiBuckets.length, bucketStorageKey, statements.length]);
 
   return (
     <div className="space-y-6">
