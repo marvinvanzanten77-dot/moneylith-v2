@@ -480,10 +480,10 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
                     if (isPdf) {
                       setFileNote("PDF-tekstextractie wordt uitgevoerd...");
                       const data = await file.arrayBuffer();
-                      const pdfjs = await import("pdfjs-dist");
-                      const { getDocument, GlobalWorkerOptions } = pdfjs;
+                      const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
+                      const { getDocument, GlobalWorkerOptions } = pdfjs as any;
                       GlobalWorkerOptions.workerSrc = new URL(
-                        /* @vite-ignore */ "pdfjs-dist/build/pdf.worker.min.js",
+                        /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
                         import.meta.url
                       ).toString();
                       const doc = await getDocument({ data }).promise;
