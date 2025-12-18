@@ -100,7 +100,9 @@ export function StepVermogen({
             </div>
 
             {summary.totalAssets === 0 ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-50">{emptyText}</div>
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 text-sm text-slate-700 shadow-sm">
+                {emptyText}
+              </div>
             ) : null}
 
             <VermogenCard items={assets} onItemsChange={onAssetsChange} onSummaryChange={onAssetSummary} readOnly={isReadOnly} />

@@ -40,6 +40,7 @@ type StepInboxProps = {
   items: InboxItem[];
   onItemsChange: (items: InboxItem[]) => void;
   onApplySuggestions?: (suggestions: InboxSuggestion[]) => void;
+  mode?: "personal" | "business";
 };
 
 const formatBytes = (value: number) => {
@@ -49,7 +50,7 @@ const formatBytes = (value: number) => {
   return `${(kb / 1024).toFixed(1)} MB`;
 };
 
-export function StepInbox({ items, onItemsChange, onApplySuggestions }: StepInboxProps) {
+export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "personal" }: StepInboxProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [fileContent, setFileContent] = useState<string>("");
@@ -61,7 +62,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions }: StepInbo
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
 
   const { runAi } = useAiOrchestrator({
-    mode: "personal",
+    mode,
     appendMessage: appendAiMessage,
     setLoading: () => {},
   });
@@ -126,11 +127,13 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions }: StepInbo
     setBusyId(id);
     setError(null);
     const system =
-      "Moneylith Inbox analyse. Extracteer mogelijke updates voor persoonlijke tabbladen. Geef alleen suggesties die jij als AI redelijk zeker kunt afleiden.";
+      "Moneylith Inbox analyse. Extracteer mogelijke updates voor tabbladen in deze modus. Geef alleen suggesties die jij als AI redelijk zeker kunt afleiden.";
     const user = [
       `Bestand: ${item.name}`,
       item.note ? `Notitie: ${item.note}` : "",
-      "Doel: geef voorstellen die passen bij tabs Fundament (inkomen/vast), Schulden, Vermogen, Doelen, Rekeningen, Afschriften.",
+      mode === "business"
+        ? "Doel: geef voorstellen die passen bij zakelijke tabs: Strategie/Cashflow, Verplichtingen, Kapitaal, Doelen, Rekeningen, Afschriften."
+        : "Doel: geef voorstellen die passen bij persoonlijke tabs: Fundament (inkomen/vast), Schulden, Vermogen, Doelen, Rekeningen, Afschriften.",
       "Output: geef een korte samenvatting en daarna een JSON-blok in tags <INBOX_JSON> ... </INBOX_JSON>.",
       "Gebruik geen codeblokken; plaats JSON als platte tekst tussen de tags.",
       "JSON schema:",
@@ -226,7 +229,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions }: StepInbo
         <h1 className="text-2xl font-semibold text-slate-50">Inbox</h1>
         <p className="text-sm text-slate-300">
           Upload brieven en documenten (PDF, Word, Excel, CSV, JPG/PNG, EML/MSG). AI indexeert wat je kunt bijwerken in
-          je persoonlijke tabs en geeft voorstellen die je zelf bevestigt.
+          je {mode === "business" ? "zakelijke" : "persoonlijke"} tabs en geeft voorstellen die je zelf bevestigt.
         </p>
       </div>
 

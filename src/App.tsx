@@ -125,13 +125,14 @@ const personalTabs: TabConfig[] = [
 
 const businessTabs: TabConfig[] = [
   { key: "biz-strategie", label: "Strategie", desc: "Doel, fase, risico" },
-  { key: "biz-verdienmodel", label: "Verdienmodel", desc: "Inkomstenstromen, platform, abonnementen" },
-  { key: "biz-cashflow", label: "Cashflow", desc: "Inkomend, uitgaand, netto" },
+  { key: "biz-cashflow", label: "Cashflow", desc: "Inkomend, uitgaand, runway" },
   { key: "biz-verplichtingen", label: "Verplichtingen", desc: "Facturen, belastingen, contracten" },
-  { key: "biz-kapitaal", label: "Kapitaal", desc: "Assets, groei, buffer" },
-  { key: "biz-risico", label: "Risico & Zekerheid", desc: "Kwetsbaarheden en buffers" },
+  { key: "biz-kapitaal", label: "Kapitaal/buffer", desc: "Assets, reserves, buffer" },
   { key: "biz-doelen", label: "Doelen (zakelijk)", desc: "Focus voor dit kwartaal" },
-  { key: "biz-vooruitblik", label: "Vooruitblik (zakelijk)", desc: "Scenario als alles zo blijft" },
+  { key: "biz-rekeningen", label: "Rekeningen", desc: "Zakelijke rekeningen" },
+  { key: "biz-inbox", label: "Inbox", desc: "Documenten & brieven" },
+  { key: "biz-afschriften", label: "Afschriften", desc: "AI-analyse" },
+  { key: "biz-vooruitblik", label: "Vooruitblik", desc: "Scenario als alles zo blijft" },
   { key: "biz-backup", label: "Backup", desc: "Export & import van je data" },
 ];
 const useActiveTabs = (mode: Mode) => useMemo(() => (mode === "zakelijk" ? businessTabs : personalTabs), [mode]);
@@ -1320,7 +1321,7 @@ const App = () => {
   // Ontvangt: netIncome, manualFixedCosts (useLocalStorage), fixedCosts (afgeleid in App), IncomeList/FixedCostsList sommen
   // Schrijft: setNetIncome, setManualFixedCosts (persist)
   // Gebruikt totals: netFree (quickSummary.free), fixedCosts
-  const renderFundament = (variant: "personal" | "business" = "personal") => {
+  const renderFundament = (variant: "personal" | "business" = "personal", businessMode?: "cashflow" | "fundament") => {
     const isBusinessVariant = variant === "business";
     const incomeItemsSource = isBusinessVariant ? incomeItemsBusiness : incomeItems;
     const fixedManualSource = isBusinessVariant ? fixedCostManualItemsBusiness : fixedCostManualItems;
@@ -1332,21 +1333,25 @@ const App = () => {
     const setManualFixedFn = isBusinessVariant ? setManualFixedCostsBusiness : setManualFixedCosts;
     const goalsSource = isBusinessVariant ? goalsBusiness : goals;
 
-    const pageTitle = isBusinessVariant ? "Verdienmodel" : "Fundament";
+    const pageTitle = isBusinessVariant
+      ? businessMode === "cashflow"
+        ? "Cashflow"
+        : "Fundament (zakelijk)"
+      : "Fundament";
     const pageIntro = isBusinessVariant
-      ? "Hoe stroomt geld je bedrijf binnen en welke vaste kosten horen bij dit model?"
+      ? "Inkomend vs uitgaand geld, zodat je runway en vaste verplichtingen helder zijn."
       : "Hier leg je je basis vast: wat komt er elke maand binnen en wat gaat er zeker uit.";
     const incomeHeading = isBusinessVariant ? "Inkomstenstromen" : "Inkomensstromen";
-    const incomeSubheading = isBusinessVariant ? "Overzicht van je inkomstenstromen" : "Overzicht van je inkomen";
+    const incomeSubheading = isBusinessVariant ? "Overzicht van je omzet/inkomsten" : "Overzicht van je inkomen";
     const incomeHelp = isBusinessVariant
       ? "Bijvoorbeeld: uren, projecten, licenties, abonnementen, productverkopen."
       : undefined;
     const fixedHeading = isBusinessVariant ? "Vaste bedrijfskosten" : "Vaste lasten";
     const fixedSubheading = isBusinessVariant ? "Overzicht van je vaste bedrijfskosten" : "Overzicht van je vaste lasten";
     const fixedHelp = isBusinessVariant
-      ? "Kosten die bij je verdienmodel horen, ongeacht hoeveel je verkoopt (huur, tools, verzekeringen, platformkosten, etc.)."
+      ? "Kosten die hoe dan ook terugkomen: huur, tools, verzekeringen, platformkosten, belastingen-reservering."
       : undefined;
-    const freeLabel = isBusinessVariant ? "Netto bedrijfsruimte per maand" : "Vrij te besteden per maand";
+    const freeLabel = isBusinessVariant ? "Netto bedrijfsruimte / maand" : "Vrij te besteden per maand";
 
     const incomeValue = isBusinessVariant ? netIncomeBusiness ?? 0 : netIncome ?? 0;
     const fixedValue = isBusinessVariant ? fixedCostsBusiness ?? 0 : fixedCosts ?? 0;
@@ -1636,9 +1641,12 @@ const App = () => {
   );
 
   const renderBackup = () => <StepBackup />;
-  const renderInbox = () => (
-    <StepInbox items={inboxItems} onItemsChange={setInboxItems} onApplySuggestions={applyInboxSuggestions} />
-  );
+  const renderInbox = (variant: "personal" | "business" = "personal") => {
+    if (variant === "business") {
+      return <StepInbox mode="business" items={inboxItemsBusiness} onItemsChange={setInboxItemsBusiness} />;
+    }
+    return <StepInbox items={inboxItems} onItemsChange={setInboxItems} onApplySuggestions={applyInboxSuggestions} />;
+  };
 
   const renderContent = () => {
     const normalizedStep = normalizeStep(currentStep);
@@ -1647,11 +1655,15 @@ const App = () => {
     if (normalizedStep === "strategie") return renderIntent("business");
     if (normalizedStep === "fundament") return renderFundament("personal");
     if (normalizedStep === "verdienmodel") return renderFundament("business");
+    if (normalizedStep === "cashflow") return renderFundament("business", "cashflow");
     if (normalizedStep === "schulden") return renderSchulden("personal");
     if (normalizedStep === "verplichtingen") return renderSchulden("business");
     if (normalizedStep === "rekeningen") return renderRekeningen();
-    if (normalizedStep === "inbox") return renderInbox();
+    if (normalizedStep === "biz-rekeningen") return renderRekeningen();
+    if (normalizedStep === "inbox") return renderInbox("personal");
+    if (normalizedStep === "biz-inbox") return renderInbox("business");
     if (normalizedStep === "afschriften") return renderAfschriften();
+    if (normalizedStep === "biz-afschriften") return renderAfschriften();
     if (normalizedStep === "vermogen") return renderVermogen("personal");
     if (normalizedStep === "kapitaal") return renderVermogen("business");
     if (normalizedStep === "focus") return renderFocus(isBusinessView ? "business" : "personal");
@@ -1701,7 +1713,7 @@ const App = () => {
         filled = fundamentFilled;
         break;
       case "cashflow":
-        filled = ritmeFilled || rekeningenFilled || afschriftenFilled;
+        filled = fundamentFilled || rekeningenFilled || afschriftenFilled;
         break;
       case "verplichtingen":
         filled = schuldenFilled;

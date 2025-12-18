@@ -146,13 +146,21 @@ export function LegalPage({ path }: { path: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-slate-50">
       <div className="mx-auto max-w-4xl px-6 py-10 space-y-8">
-        <header className="space-y-2">
+        <header className="space-y-3">
           <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Moneylith</p>
           <h1 className="text-3xl font-semibold">{content.title}</h1>
           <p className="text-sm text-slate-400">Laatst bijgewerkt: {lastUpdated}</p>
           <p className="text-sm text-slate-300">
             Contact: <a href="mailto:info@moneylith.nl" className="underline hover:text-white">info@moneylith.nl</a>
           </p>
+          <div>
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-100 hover:border-slate-500 hover:bg-slate-800"
+            >
+              ← Terug naar Moneylith app
+            </a>
+          </div>
         </header>
 
         <div className="space-y-5 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-slate-900/30">
