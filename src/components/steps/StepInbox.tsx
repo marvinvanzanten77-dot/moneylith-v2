@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
@@ -110,6 +110,142 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
     setFileContent("");
     setFileNote(null);
   };
+
+  const loadFile = useCallback(
+    async (file: File | null) => {
+      setSelectedFile(file);
+      setFileContent("");
+      setFileNote(null);
+      if (!file) return;
+
+      const lower = file.name.toLowerCase();
+      const isCsvLike =
+        lower.endsWith(".csv") ||
+        lower.endsWith(".txt") ||
+        lower.endsWith(".tsv") ||
+        lower.endsWith(".eml");
+      const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+      const isPdf = lower.endsWith(".pdf");
+      const isImage = lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png");
+      const isMsg = lower.endsWith(".msg");
+      const isDocx = lower.endsWith(".docx");
+      const isDoc = lower.endsWith(".doc");
+
+      const MAX_CHARS = 120_000;
+      const handleText = (raw: string, notePrefix?: string) => {
+        let text = raw ?? "";
+        if (!text) {
+          setFileNote("Inhoud kon niet worden gelezen uit dit bestand.");
+          return;
+        }
+        if (text.length > MAX_CHARS) {
+          setFileNote(
+            `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`
+          );
+          text = text.slice(0, MAX_CHARS);
+        } else if (notePrefix) {
+          setFileNote(notePrefix);
+        }
+        setFileContent(text);
+      };
+
+      try {
+        if (isXlsx) {
+          const data = await file.arrayBuffer();
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.SheetNames[0];
+          const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
+          handleText(csv, "Geconverteerd uit Excel");
+          return;
+        }
+
+        if (isDocx) {
+          const data = await file.arrayBuffer();
+          const mammoth = await import("mammoth");
+          const result = await mammoth.extractRawText({ arrayBuffer: data });
+          handleText(result.value || "", "Geconverteerd uit Word");
+          return;
+        }
+
+        if (isDoc) {
+          setFileNote("DOC-bestand wordt beperkt ondersteund. Gebruik bij voorkeur DOCX.");
+          const raw = await file.text();
+          handleText(raw, "DOC-tekstextractie beperkt");
+          return;
+        }
+
+        if (isPdf) {
+          setFileNote("PDF-tekstextractie wordt uitgevoerd...");
+          const data = await file.arrayBuffer();
+          const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
+          const { getDocument, GlobalWorkerOptions } = pdfjs as any;
+          GlobalWorkerOptions.workerSrc = new URL(
+            /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
+            import.meta.url
+          ).toString();
+          const doc = await getDocument({ data }).promise;
+          const maxPages = Math.min(doc.numPages, 6);
+          let text = "";
+          for (let i = 1; i <= maxPages; i += 1) {
+            const page = await doc.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items
+              .map((item: any) => (item?.str ? String(item.str) : ""))
+              .join(" ");
+            text += `${pageText}\n`;
+          }
+          if (doc.numPages > maxPages) {
+            text += `\n[PDF beperkt tot ${maxPages} pagina's]`;
+          }
+          handleText(text, "PDF-tekstextractie uitgevoerd");
+          return;
+        }
+
+        if (isImage) {
+          setFileNote("OCR wordt uitgevoerd...");
+          const { createWorker } = await import("tesseract.js");
+          const worker = await createWorker();
+          await worker.loadLanguage("eng+nl");
+          await worker.initialize("eng+nl");
+          const result = await worker.recognize(file);
+          await worker.terminate();
+          handleText(result.data.text || "", "OCR via afbeelding");
+          return;
+        }
+
+        if (isMsg) {
+          const raw = await file.text();
+          handleText(raw, "Outlook MSG-bestand (tekstextractie beperkt)");
+          return;
+        }
+
+        if (isCsvLike) {
+          const raw = await file.text();
+          handleText(raw);
+          return;
+        }
+
+        setFileNote("Bestandstype wordt nog niet ondersteund voor analyse.");
+      } catch (err) {
+        console.error(err);
+        setFileNote("Lezen van het bestand is mislukt.");
+      }
+    },
+    []
+  );
+
+  const handleFileList = useCallback(
+    async (files: FileList | File[] | null | undefined) => {
+      const list = Array.from(files ?? []);
+      if (!list.length) return;
+      if (list.length > 1) {
+        setFileNote(`Meerdere bestanden geselecteerd; alleen het eerste wordt geladen (${list[0].name}).`);
+      }
+      await loadFile(list[0]);
+    },
+    [loadFile]
+  );
 
   const handleDelete = (id: string) => {
     onItemsChange(items.filter((item) => item.id !== id));

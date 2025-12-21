@@ -102,8 +102,8 @@ export function StepAfschriften({
     [fixedCostLabels]
   );
 
-  const detectBankLabel = useCallback(() => {
-    const haystack = `${fileName} ${fileContent}`.toLowerCase();
+  const detectBankLabel = useCallback((name?: string, content?: string) => {
+    const haystack = `${name || fileName} ${content || fileContent}`.toLowerCase();
     const accountName = accounts.find((a) => a.id === accountId)?.name || "";
     if (haystack.includes("bunq")) return "bunq";
     if (haystack.includes("rabobank") || haystack.includes("rabo")) return "rabo";
@@ -291,31 +291,30 @@ export function StepAfschriften({
 
   const handleSubmit = () => {
     if (!accountId) return;
-    const exists = statements.some((s) => s.accountId === accountId && s.month === month && s.year === year);
-    if (exists) {
-      const ok = window.confirm("Voor deze rekening en maand bestaat al een afschrift. Wil je deze overschrijven?");
-      if (!ok) return;
-    }
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const bankLabel = detectBankLabel();
-    const extMatch = fileName.match(/(\.[a-zA-Z0-9]+)$/);
-    const ext = extMatch ? extMatch[1] : ".csv";
-    const safeMonth = String(month).padStart(2, "0");
-    const generatedName = `${bankLabel}-${year}-${safeMonth}${ext}`;
-    const meta: AccountStatementMeta = {
-      id,
-      accountId,
-      month,
-      year,
-      fileName: generatedName || fileName || undefined,
-      uploadedAt: new Date().toISOString(),
-    };
-    onAddStatement(meta);
+    const filesToAdd = selectedFiles.length ? selectedFiles : fileName ? [new File([], fileName)] : [];
+    filesToAdd.forEach((file) => {
+      const extMatch = file.name.match(/(\.[a-zA-Z0-9]+)$/);
+      const ext = extMatch ? extMatch[1] : ".csv";
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const bankLabel = detectBankLabel(file.name, fileContent);
+      const safeMonth = String(month).padStart(2, "0");
+      const generatedName = `${bankLabel}-${year}-${safeMonth}${ext}`;
+      const meta: AccountStatementMeta = {
+        id,
+        accountId,
+        month,
+        year,
+        fileName: generatedName || file.name || fileName || undefined,
+        uploadedAt: new Date().toISOString(),
+      };
+      onAddStatement(meta);
+    });
     if (pendingTx.length > 0 && _onUpsertTransaction) {
       pendingTx.forEach((tx) => _onUpsertTransaction(tx));
       setPendingTx([]);
     }
     setFileName("");
+    setSelectedFiles([]);
   };
 
   const activeAccountOptions = accounts.filter((a) => a.active && a.type === "betaalrekening");
@@ -325,10 +324,6 @@ export function StepAfschriften({
     if (!hasUploads) return;
     if (!turnstileToken) {
       setAiError("Verificatie mislukt, probeer opnieuw.");
-      return;
-    }
-    if (!fileContent) {
-      setAiError("Geen bestandsinhoud geladen. Upload eerst een bestand (csv/xlsx/pdf).");
       return;
     }
     setAiError(null);
@@ -564,91 +559,12 @@ export function StepAfschriften({
             <label className="text-xs text-slate-300">
               Bestand
               <input
-                type="file"
-                accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  setFileName(file?.name ?? "");
-                  setFileContent("");
-                  setFileNote(null);
-                  if (!file) return;
-
-                  const MAX_CHARS = 200_000;
-
-                  const handleText = (raw: string, notePrefix?: string) => {
-                    let text = raw ?? "";
-                    if (!text || text.length === 0) {
-                      setFileNote("Inhoud kon niet worden gelezen uit dit bestand.");
-                      setFileContent("");
-                      return;
-                    }
-                    if (text.length > MAX_CHARS) {
-                      setFileNote(
-                        `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`
-                      );
-                      text = text.slice(0, MAX_CHARS);
-                    } else {
-                      setFileNote(
-                        `${notePrefix ? `${notePrefix}. ` : ""}Bestandsgrootte: ${text.length} tekens.`
-                      );
-                    }
-                    setFileContent(text);
-                  };
-
-                  const lower = file.name.toLowerCase();
-                  const isCsvLike = lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt");
-                  const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
-                  const isPdf = lower.endsWith(".pdf");
-
-                  try {
-                    if (isXlsx) {
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        try {
-                          const data = ev.target?.result as ArrayBuffer;
-                          const XLSX = await import("xlsx");
-                          const workbook = XLSX.read(data, { type: "array" });
-                          const firstSheet = workbook.SheetNames[0];
-                          const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
-                          handleText(csv, "Geconverteerd uit Excel");
-                        } catch (err) {
-                          console.error("XLSX parsing failed", err);
-                          setFileNote("Lezen van het Excel-bestand is mislukt.");
-                          setFileContent("");
-                        }
-                      };
-                      reader.onerror = () => {
-                        setFileContent("");
-                        setFileNote("Lezen van het bestand is mislukt.");
-                      };
-                      reader.readAsArrayBuffer(file);
-                    } else if (isCsvLike || isPdf) {
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const text = (ev.target?.result as string | undefined) ?? "";
-                        handleText(text, isPdf ? "PDF wordt beperkt ondersteund; tekstextractie kan onvolledig zijn" : undefined);
-                        if (!isPdf) {
-                          const parsed = parseTransactionsFromCsv();
-                          if (parsed.length > 0) {
-                            setPendingTx(parsed);
-                          }
-                        }
-                      };
-                      reader.onerror = () => {
-                        setFileContent("");
-                        setFileNote("Lezen van het bestand is mislukt.");
-                      };
-                      reader.readAsText(file);
-                    } else {
-                      setFileNote("Bestandstype wordt nog niet ondersteund voor analyse.");
-                      setFileContent("");
-                    }
-                  } catch (err) {
-                    console.error(err);
-                    setFileContent("");
-                    setFileNote("Lezen van het bestand is mislukt.");
-                  }
-                }}
+                  type="file"
+                  accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
+                  multiple
+                  onChange={async (e) => {
+                    await handleFileList(e.target.files);
+                  }}
                 className="mt-1 w-full text-xs text-slate-200"
               />
             </label>
@@ -667,7 +583,7 @@ export function StepAfschriften({
                 <button
                   type="button"
                   onClick={runAiAnalysis}
-                  disabled={!hasUploads || aiLoading || !turnstileToken}
+              disabled={!hasUploads || aiLoading}
                   className="rounded-lg bg-purple-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   {aiLoading ? "Analyseren..." : "Analyseer met AI"}
