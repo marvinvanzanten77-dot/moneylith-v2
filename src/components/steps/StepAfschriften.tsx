@@ -50,6 +50,7 @@ export function StepAfschriften({
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [fileName, setFileName] = useState<string>("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileContent, setFileContent] = useState<string>("");
   const [fileNote, setFileNote] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -124,9 +125,11 @@ export function StepAfschriften({
     }
   }, [aiAnalysisDone]);
 
-  const parseTransactionsFromCsv = useCallback((): MoneylithTransaction[] => {
-    if (!fileContent || !accountId) return [];
-    const lines = fileContent
+  const parseTransactionsFromCsv = useCallback(
+    (content?: string): MoneylithTransaction[] => {
+      const source = content ?? fileContent;
+      if (!source || !accountId) return [];
+      const lines = source
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
@@ -151,7 +154,7 @@ export function StepAfschriften({
       return parsed;
     };
 
-    return dataLines
+      return dataLines
       .map((line, idx) => {
         const cells = parseLine(line);
         const get = (i: number | undefined, fallbackIdx?: number) => {
@@ -173,8 +176,10 @@ export function StepAfschriften({
           category: null,
         } as MoneylithTransaction;
       })
-      .filter(Boolean) as MoneylithTransaction[];
-  }, [accountId, fileContent]);
+        .filter(Boolean) as MoneylithTransaction[];
+    },
+    [accountId, fileContent]
+  );
 
   const statementsByAccount = useMemo(() => {
     const map = new Map<string, AccountStatementMeta[]>();
@@ -317,15 +322,86 @@ export function StepAfschriften({
     setSelectedFiles([]);
   };
 
+  const handleFileList = useCallback(
+    async (files: FileList | File[] | null | undefined) => {
+      const list = Array.from(files ?? []);
+      setSelectedFiles(list);
+      setPendingTx([]);
+      if (!list.length) {
+        setFileName("");
+        setFileContent("");
+        setFileNote(null);
+        return;
+      }
+      const file = list[0];
+      setFileName(file.name);
+      setFileNote(null);
+      setFileContent("");
+
+      const MAX_CHARS = 200_000;
+      const handleText = (raw: string, notePrefix?: string) => {
+        let text = raw ?? "";
+        if (!text || text.length === 0) {
+          setFileNote("Inhoud kon niet worden gelezen uit dit bestand.");
+          setFileContent("");
+          return;
+        }
+        if (text.length > MAX_CHARS) {
+          setFileNote(
+            `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`
+          );
+          text = text.slice(0, MAX_CHARS);
+        } else if (notePrefix) {
+          setFileNote(notePrefix);
+        }
+        setFileContent(text);
+        const parsed = parseTransactionsFromCsv(text);
+        if (parsed.length > 0) setPendingTx(parsed);
+      };
+
+      const lower = file.name.toLowerCase();
+      const isCsvLike = lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt");
+      const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+      const isPdf = lower.endsWith(".pdf");
+
+      try {
+        if (isXlsx) {
+          const data = await file.arrayBuffer();
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.SheetNames[0];
+          const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
+          handleText(csv, "Geconverteerd uit Excel");
+          return;
+        }
+
+        if (isCsvLike) {
+          const text = await file.text();
+          handleText(text);
+          return;
+        }
+
+        if (isPdf) {
+          const text = await file.text();
+          handleText(text, "PDF (tekstextractie beperkt)");
+          return;
+        }
+
+        setFileNote("Bestandstype wordt nog niet ondersteund voor analyse.");
+      } catch (err) {
+        console.error(err);
+        setFileContent("");
+        setFileNote("Lezen van het bestand is mislukt.");
+      }
+    },
+    [parseTransactionsFromCsv]
+  );
+
   const activeAccountOptions = accounts.filter((a) => a.active && a.type === "betaalrekening");
   const hasUploads = statements.length > 0;
 
   const runAiAnalysis = async () => {
     if (!hasUploads) return;
-    if (!turnstileToken) {
-      setAiError("Verificatie mislukt, probeer opnieuw.");
-      return;
-    }
     setAiError(null);
     setAiStatus("AI-analyse wordt uitgevoerd...");
     const system = "Moneylith analyse van bankafschriften";
@@ -559,12 +635,12 @@ export function StepAfschriften({
             <label className="text-xs text-slate-300">
               Bestand
               <input
-                  type="file"
-                  accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
-                  multiple
-                  onChange={async (e) => {
-                    await handleFileList(e.target.files);
-                  }}
+                type="file"
+                accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
+                multiple
+                onChange={async (e) => {
+                  await handleFileList(e.target.files);
+                }}
                 className="mt-1 w-full text-xs text-slate-200"
               />
             </label>
