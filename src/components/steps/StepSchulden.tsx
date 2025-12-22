@@ -4,6 +4,11 @@ import type { FinancialSnapshot } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
 import { buildDebtsPatchesFromActions, canApplyDebtsSuggestions } from "../../logic/applyDebtsSuggestions";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
+import { useAiOrchestrator, type TabKey } from "../../hooks/useAiOrchestrator";
+import { appendAiMessage } from "../../logic/aiMessageBus";
+import { TurnstileWidget } from "../TurnstileWidget";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { useMemo } from "react";
 
 interface StepSchuldenProps {
   onDebtSummary: (s: { totalDebt: number; totalMinPayment: number; debtCount: number }) => void;
@@ -48,6 +53,42 @@ export function StepSchulden({
   const [pendingFileName, setPendingFileName] = useLocalStorage<string | null>(pendingNameKey, null);
   const [pendingRows, setPendingRows] = useLocalStorage<SchuldItem[]>(pendingRowsKey, []);
   const applyCheck = canApplyDebtsSuggestions({ mode, actions, currentDebts: debts });
+  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "list");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileNonce, setTurnstileNonce] = useState(0);
+  const turnstileOptional =
+    import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+  type StrategyKey = "snowball" | "balanced" | "avalanche";
+  type StrategyCard = {
+    key: StrategyKey;
+    title: string;
+    summary: string;
+    pros: string[];
+    cons: string[];
+    recommended?: boolean;
+  };
+  const [strategies, setStrategies] = useLocalStorage<StrategyCard[]>(
+    `moneylith.${variant}.debts.strategies`,
+    []
+  );
+  const [selectedStrategy, setSelectedStrategy] = useLocalStorage<StrategyKey | null>(
+    `moneylith.${variant}.debts.selectedStrategy`,
+    null
+  );
+  const [aiNotes, setAiNotes] = useLocalStorage<Record<string, string>>(
+    `moneylith.${variant}.debts.aiNotes`,
+    {}
+  );
+
+  const { runAi } = useAiOrchestrator({
+    mode,
+    appendMessage: appendAiMessage,
+    setLoading: setAiLoading,
+    setLastActions: () => {},
+  });
 
   const pressureLine =
     totalDebt > 0 && totalMinPayment > 0
@@ -66,6 +107,19 @@ export function StepSchulden({
     variant === "business"
       ? "Zakelijke schulden, contracten en regelingen die hoe dan ook betaald moeten worden."
       : "Zie in één oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
+
+  const donutData = useMemo(() => {
+    const paid = 0; // geen tracking van afbetaald, placeholder 0
+    const remaining = totalDebt;
+    const monthly = totalMinPayment > 0 ? totalMinPayment : 0;
+    return {
+      main: [
+        { name: "Resterend", value: remaining },
+        { name: "Afgelost", value: paid },
+      ],
+      monthly,
+    };
+  }, [totalDebt, totalMinPayment]);
 
   const createId = () =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -175,137 +229,382 @@ export function StepSchulden({
     onDebtsChange?.(patches);
   };
 
+  const runAiStrategies = async () => {
+    if (isReadOnly) return;
+    if (!turnstileOptional && !turnstileToken) {
+      setAiError("Verificatie mislukt, probeer opnieuw.");
+      return;
+    }
+    setAiError(null);
+    setAiLoading(true);
+    const system = "Moneylith schuldenanalyse. Geef exact 3 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein).";
+    const debtsList = debts
+      .map(
+        (d, idx) =>
+          `${idx + 1}. ${d.naam || "schuld"} | saldo: €${d.saldo ?? 0} | maanddruk: €${d.minimaleMaandlast ?? 0} | afschrijfdag: ${
+            d.afschrijfDag ?? 0
+          }`,
+      )
+      .join("\n");
+    const user = [
+      "Genereer 3 strategieën met velden: key (snowball|balanced|avalanche), title, summary, pros[], cons[], recommended (bool).",
+      "Alleen JSON, geen tekst buiten JSON. Root: { strategies: Strategy[] }. max 3 items.",
+      "Gebruik beknopte NL tekst.",
+      "Schuldenlijst:",
+      debtsList || "Geen schulden opgegeven",
+    ].join("\n");
+    try {
+      const result = await runAi({
+        tab: "schulden" as TabKey,
+        system,
+        user,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+      });
+      if (!result) {
+        setAiError("AI-analyse mislukt.");
+        return;
+      }
+      // try parse JSON
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(result);
+      } catch {
+        // probeer simpele extract
+        const start = result.indexOf("{");
+        const end = result.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+          parsed = JSON.parse(result.slice(start, end + 1));
+        }
+      }
+      const list: StrategyCard[] =
+        parsed?.strategies?.map((s: any) => ({
+          key: s.key as StrategyKey,
+          title: s.title || "",
+          summary: s.summary || "",
+          pros: Array.isArray(s.pros) ? s.pros : [],
+          cons: Array.isArray(s.cons) ? s.cons : [],
+          recommended: !!s.recommended,
+        })) ?? [];
+      if (list.length) {
+        setStrategies(list.slice(0, 3));
+        const rec = list.find((s) => s.recommended) ?? list[0];
+        setSelectedStrategy(rec?.key ?? null);
+      } else {
+        setAiError("Geen strategieën gevonden.");
+      }
+    } catch (err) {
+      console.error(err);
+      setAiError("AI-analyse mislukt.");
+    } finally {
+      setAiLoading(false);
+      setTurnstileToken(null);
+      setTurnstileNonce((n) => n + 1);
+    }
+  };
+
+  const applyStrategyToDebts = (strategy: StrategyCard) => {
+    if (isReadOnly) return;
+    setSelectedStrategy(strategy.key);
+    const noteMap: Record<string, string> = {};
+    const withAi = debts.map((d) => {
+      const factor =
+        strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
+      const min = Math.max(0, (d.minimaleMaandlast ?? 0) * factor);
+      const note = `Strategie ${strategy.title}: focus op ${strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "mix"} schulden.`;
+      noteMap[d.id] = note;
+      return { ...d, minimaleMaandlast: Math.round(min), aiOpmerking: note };
+    });
+    onDebtsChange?.(withAi);
+    setAiNotes(noteMap);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="mb-6 flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-slate-50">{title}</h1>
-        <p className="text-sm text-slate-400">{subtitle}</p>
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-50">{title}</h1>
+          <p className="text-sm text-slate-400">{subtitle}</p>
+        </div>
+        <div className="flex gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setView("list")}
+            className={`rounded-full px-3 py-1 font-semibold ${
+              view === "list" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300"
+            }`}
+          >
+            Lijstweergave
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("analysis")}
+            className={`rounded-full px-3 py-1 font-semibold ${
+              view === "analysis" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300"
+            }`}
+          >
+            Analyse & Visualisatie
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2 flex flex-col gap-4">
-          <div className="card-shell p-5 text-slate-900">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {variant === "business" ? "Je zakelijke verplichtingen" : "Je schulden"}
-                </h2>
-                <p className="text-sm text-slate-600">
-                  {variant === "business"
-                    ? "Overzicht van leningen, belastingregelingen, leases en andere vaste verplichtingen. Dit bepaalt je minimale maanddruk."
-                    : "Breng al je schulden in kaart en zie meteen de impact."}
-                </p>
+      {view === "list" && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2 flex flex-col gap-4">
+            <div className="card-shell p-5 text-slate-900">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {variant === "business" ? "Je zakelijke verplichtingen" : "Je schulden"}
+                  </h2>
+                  <p className="text-sm text-slate-600">
+                    {variant === "business"
+                      ? "Overzicht van leningen, belastingregelingen, leases en andere vaste verplichtingen. Dit bepaalt je minimale maanddruk."
+                      : "Breng al je schulden in kaart en zie meteen de impact."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {applyCheck.ok && !isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={handleApplyAiDebts}
+                      className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-amber-400"
+                    >
+                      Neem AI-suggesties over
+                    </button>
+                  )}
+                  <span className="text-xs text-slate-500">Totaal: {debtCount} stuks</span>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                {applyCheck.ok && !isReadOnly && (
+              <SchuldenkaartCard
+                items={debts.map((d) => ({
+                  ...d,
+                  aiOpmerking: d.aiOpmerking ?? aiNotes[d.id],
+                }))}
+                onChange={(next) => {
+                  if (isReadOnly) return;
+                  (onDebtsChange ?? (() => {}))(next);
+                }}
+                onSummaryChange={onDebtSummary}
+                variant={variant}
+                readOnly={isReadOnly}
+              />
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-4 text-sm text-slate-800">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span>Totaal schuld</span>
+                    <span className="font-semibold">{formatCurrency(totalDebt)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Maanddruk (minimaal)</span>
+                    <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Vrije ruimte na schulden</span>
+                    <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Tijd tot nul bij huidig tempo</span>
+                    <span className="font-semibold">
+                      {monthsToClear ? `${monthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
+                    </span>
+                  </div>
+                </div>
+                {psychologicalLine ? <p className="mt-3 text-xs text-slate-600">{psychologicalLine}</p> : null}
+              </div>
+            </div>
+
+            {variant === "personal" && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-200">
+                <h3 className="text-lg font-semibold text-slate-50">Bulk-upload schulden</h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Upload een CSV (kolommen: naam, bedrag, maandbedrag). Klik daarna op "Bestand uploaden" om ze toe te voegen.
+                </p>
+                <div className="mt-3">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:font-semibold file:text-slate-900"
+                    onChange={handleUpload}
+                    disabled={isReadOnly}
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleApplyAiDebts}
-                    className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-amber-400"
+                    onClick={handleApplyUpload}
+                    disabled={uploadButtonDisabled}
+                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-emerald-950 disabled:opacity-50"
                   >
-                    Neem AI-suggesties over
+                    Bestand uploaden
                   </button>
-                )}
-                <span className="text-xs text-slate-500">Totaal: {debtCount} stuks</span>
+                  {pendingFileName && (
+                    <span className="text-[11px] text-slate-300">
+                      {pendingFileName} ({pendingRows.length} regel{pendingRows.length === 1 ? "" : "s"})
+                    </span>
+                  )}
+                </div>
+                {uploadStatus && <p className="mt-2 text-xs text-amber-200">{uploadStatus}</p>}
+                {uploadError && <p className="mt-1 text-xs text-red-300">{uploadError}</p>}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-slate-50">
+            <h2 className="text-lg font-semibold text-slate-50">Schulddruk op je maand</h2>
+            <p className="mt-1 text-xs text-slate-400">Samenvatting van je totale schuld en minimale maandelijkse druk.</p>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Totaal schuld</span>
+                <span className="font-semibold">{formatCurrency(totalDebt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Maanddruk (minimaal)</span>
+                <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Vrije ruimte na schulden</span>
+                <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tijd tot nul bij huidig tempo</span>
+                <span className="font-semibold">
+                  {monthsToClear ? `${monthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
+                </span>
               </div>
             </div>
-            <SchuldenkaartCard
-              items={debts}
-              onChange={(next) => {
-                if (isReadOnly) return;
-                (onDebtsChange ?? (() => {}))(next);
-              }}
-              onSummaryChange={onDebtSummary}
-              variant={variant}
-              readOnly={isReadOnly}
-            />
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-4 text-sm text-slate-800">
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Totaal schuld</span>
-                  <span className="font-semibold">{formatCurrency(totalDebt)}</span>
+            {pressureLine ? <p className="mt-3 text-xs text-slate-400">{pressureLine}</p> : null}
+          </div>
+        </div>
+      )}
+
+      {view === "analysis" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">AI-analyse</h3>
+                  <p className="text-xs text-slate-400">Genereer 3 strategieën en kies er één.</p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Maanddruk (minimaal)</span>
-                  <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Vrije ruimte na schulden</span>
-                  <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Tijd tot nul bij huidig tempo</span>
-                  <span className="font-semibold">
-                    {monthsToClear ? `${monthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
-                  </span>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    type="button"
+                    onClick={runAiStrategies}
+                    disabled={aiLoading}
+                    className="rounded-lg bg-purple-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {aiLoading ? "Analyseren..." : "Analyseer schulden"}
+                  </button>
+                  <TurnstileWidget
+                    key={`debts-turnstile-${turnstileNonce}`}
+                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    theme="dark"
+                  />
                 </div>
               </div>
-              {psychologicalLine ? <p className="mt-3 text-xs text-slate-600">{psychologicalLine}</p> : null}
+              {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {strategies.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => applyStrategyToDebts(s)}
+                    className={`rounded-xl border p-3 text-left text-xs transition ${
+                      selectedStrategy === s.key
+                        ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
+                        : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
+                    } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-100">{s.title}</span>
+                      {s.recommended && (
+                        <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-950">
+                          Aanbevolen
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-slate-200">{s.summary}</p>
+                    <div className="mt-2 space-y-1 text-slate-300">
+                      <div>
+                        <span className="font-semibold text-emerald-400">+ Pro's:</span>
+                        <ul className="ml-3 list-disc">
+                          {s.pros.map((p, idx) => (
+                            <li key={idx}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-red-300">- Con's:</span>
+                        <ul className="ml-3 list-disc">
+                          {s.cons.map((c, idx) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {!strategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
+              </div>
             </div>
           </div>
 
-          {variant === "personal" && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-200">
-              <h3 className="text-lg font-semibold text-slate-50">Bulk-upload schulden</h3>
-              <p className="mt-1 text-xs text-slate-400">
-                Upload een CSV (kolommen: naam, bedrag, maandbedrag). Klik daarna op "Bestand uploaden" om ze toe te voegen.
-              </p>
-              <div className="mt-3">
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:font-semibold file:text-slate-900"
-                  onChange={handleUpload}
-                  disabled={isReadOnly}
-                />
+          <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-slate-50">
+            <h3 className="text-lg font-semibold">Visualisatie</h3>
+            <p className="text-xs text-slate-400">Totaal vs. maanddruk</p>
+            <div className="h-56">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    dataKey="value"
+                    data={donutData.main}
+                    innerRadius={50}
+                    outerRadius={70}
+                    paddingAngle={3}
+                  >
+                    {donutData.main.map((_, idx) => (
+                      <Cell key={idx} fill={idx === 0 ? "#f97316" : "#1d4ed8"} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: "#0f172a", border: "1px solid #334155", color: "#e2e8f0" }}
+                    itemStyle={{ color: "#e2e8f0" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            {donutData.monthly > 0 && (
+              <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200">
+                <div className="flex items-center justify-between">
+                  <span>Maanddruk</span>
+                  <span className="font-semibold">{formatCurrency(donutData.monthly)}</span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
+                  <div
+                    className="h-2 rounded-full bg-amber-400"
+                    style={{ width: "70%" }}
+                  />
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleApplyUpload}
-                  disabled={uploadButtonDisabled}
-                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-emerald-950 disabled:opacity-50"
-                >
-                  Bestand uploaden
-                </button>
-                {pendingFileName && (
-                  <span className="text-[11px] text-slate-300">
-                    {pendingFileName} ({pendingRows.length} regel{pendingRows.length === 1 ? "" : "s"})
-                  </span>
-                )}
+            )}
+            <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200 space-y-1">
+              <div className="flex justify-between">
+                <span>Schulden</span>
+                <span className="font-semibold">{formatCurrency(totalDebt)}</span>
               </div>
-              {uploadStatus && <p className="mt-2 text-xs text-amber-200">{uploadStatus}</p>}
-              {uploadError && <p className="mt-1 text-xs text-red-300">{uploadError}</p>}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-slate-50">
-          <h2 className="text-lg font-semibold text-slate-50">Schulddruk op je maand</h2>
-          <p className="mt-1 text-xs text-slate-400">Samenvatting van je totale schuld en minimale maandelijkse druk.</p>
-          <div className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Totaal schuld</span>
-              <span className="font-semibold">{formatCurrency(totalDebt)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Maanddruk (minimaal)</span>
-              <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Vrije ruimte na schulden</span>
-              <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tijd tot nul bij huidig tempo</span>
-              <span className="font-semibold">
-                {monthsToClear ? `${monthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
-              </span>
+              <div className="flex justify-between">
+                <span>Maanddruk</span>
+                <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Vrij na schulden</span>
+                <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+              </div>
             </div>
           </div>
-          {pressureLine ? <p className="mt-3 text-xs text-slate-400">{pressureLine}</p> : null}
         </div>
-      </div>
+      )}
     </div>
   );
 }

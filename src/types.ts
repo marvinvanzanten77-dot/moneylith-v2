@@ -42,6 +42,9 @@ export type SchuldItem = {
   minimaleMaandlast?: number;
   prioriteit?: number;
   notitie?: string;
+  gebruikerOpmerking?: string;
+  aiOpmerking?: string;
+  afschrijfDag?: number; // 0-31 (0 = geen vaste dag)
 };
 
 export type Transaction = {

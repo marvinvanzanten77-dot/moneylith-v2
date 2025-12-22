@@ -11,6 +11,9 @@ export type SchuldItem = {
   naam: string;
   saldo: number;
   minimaleMaandlast?: number;
+  afschrijfDag?: number;
+  gebruikerOpmerking?: string;
+  aiOpmerking?: string;
 };
 
 type SchuldenkaartCardProps = {
@@ -138,6 +141,43 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                   readOnly={isReadOnly}
                 />
               </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-600">Afschrijvingsdag (0-31)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={31}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={Number.isFinite(item.afschrijfDag ?? NaN) ? item.afschrijfDag : ""}
+                  onChange={(e) =>
+                    updateItem(item.id, {
+                      afschrijfDag:
+                        e.target.value === ""
+                          ? undefined
+                          : Math.max(0, Math.min(31, parseInt(e.target.value, 10) || 0)),
+                    })
+                  }
+                  placeholder="0 = geen vaste dag"
+                  readOnly={isReadOnly}
+                />
+              </label>
+              <label className="flex flex-col gap-1 md:col-span-2">
+                <span className="text-xs font-semibold text-slate-600">Opmerking (gebruiker)</span>
+                <textarea
+                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  value={item.gebruikerOpmerking ?? ""}
+                  onChange={(e) => updateItem(item.id, { gebruikerOpmerking: e.target.value })}
+                  placeholder="Eigen notitie of context"
+                  readOnly={isReadOnly}
+                  rows={2}
+                />
+              </label>
+              {item.aiOpmerking && (
+                <div className="md:col-span-2 rounded-md bg-slate-50 border border-purple-100 p-2 text-xs text-slate-700">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-purple-600">AI opmerking</div>
+                  <div className="whitespace-pre-line">{item.aiOpmerking}</div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end">
               <button
