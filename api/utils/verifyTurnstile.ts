@@ -8,11 +8,7 @@ export async function verifyTurnstile(req: VercelRequest): Promise<boolean> {
   if (!token) return false;
 
   try {
-    const fetchImpl =
-      // @ts-expect-error node-fetch fallback
-      (typeof fetch !== "undefined" && fetch) || (await import("node-fetch")).default;
-
-    const resp = await fetchImpl("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    const resp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`,
