@@ -707,7 +707,9 @@ export function StepAfschriften({
               {fileName && (
                 <p className="text-[11px] text-slate-500">
                   Bestand geladen: {fileName} (
-                  {fileContent ? "inhoud beschikbaar" : "inhoud onbekend of niet leesbaar"})
+                  {filePayloads.some((p) => p.content && p.content.length > 0)
+                    ? "inhoud beschikbaar"
+                    : "inhoud onbekend of niet leesbaar"})
                 </p>
               )}
               {fileNote && (
