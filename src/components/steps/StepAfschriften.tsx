@@ -300,7 +300,8 @@ export function StepAfschriften({
 
   const handleSubmit = () => {
     if (!accountId || filePayloads.length === 0) return;
-    filePayloads.forEach((payload) => {
+    const payloads = [...filePayloads];
+    payloads.forEach((payload) => {
       const extMatch = payload.name.match(/(\.[a-zA-Z0-9]+)$/);
       const ext = extMatch ? extMatch[1] : ".csv";
       const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
