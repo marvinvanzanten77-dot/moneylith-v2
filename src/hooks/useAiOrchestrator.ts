@@ -62,9 +62,13 @@ export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActi
     async ({ tab, system, user, displayUserMessage, turnstileToken }: RunAiInput): Promise<string | null> => {
       setLoading(true);
       const userContent = displayUserMessage ?? `AI analyse voor: ${tab}`;
-      appendAiMessage({ role: "user", content: userContent });
-      if (appendMessage !== appendAiMessage) {
-        appendMessage({ role: "user", content: userContent });
+      // Voor schulden-analyse willen we geen chat spam; suppressUserMessage=true kan hiervoor gebruikt worden.
+      const suppressUserMessage = tab === "schulden" && displayUserMessage === undefined;
+      if (!suppressUserMessage) {
+        appendAiMessage({ role: "user", content: userContent });
+        if (appendMessage !== appendAiMessage) {
+          appendMessage({ role: "user", content: userContent });
+        }
       }
       try {
         const data = await postAnalyse({ system, user, turnstileToken });
@@ -77,19 +81,23 @@ export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActi
         // verwijder eventuele markdown-codeblokken voor leesbaarheid
         const strippedContent = cleanedContent.replace(/```[\s\S]*?```/g, "").trim() || cleanedContent;
         if (setLastActions) setLastActions(actions ?? null);
-        appendAiMessage({ role: "assistant", content: strippedContent });
-        if (appendMessage !== appendAiMessage) {
-          appendMessage({ role: "assistant", content: strippedContent });
+        if (!suppressUserMessage) {
+          appendAiMessage({ role: "assistant", content: strippedContent });
+          if (appendMessage !== appendAiMessage) {
+            appendMessage({ role: "assistant", content: strippedContent });
+          }
         }
         return strippedContent;
       } catch (err: any) {
         const errorMsg = `AI-analyse mislukt: ${err?.message || "onbekende fout"}`;
-        appendAiMessage({ role: "assistant", content: errorMsg });
-        if (appendMessage !== appendAiMessage) {
-          appendMessage({
-            role: "assistant",
-            content: errorMsg,
-          });
+        if (!suppressUserMessage) {
+          appendAiMessage({ role: "assistant", content: errorMsg });
+          if (appendMessage !== appendAiMessage) {
+            appendMessage({
+              role: "assistant",
+              content: errorMsg,
+            });
+          }
         }
         if (setLastActions) setLastActions(null);
         return null;
