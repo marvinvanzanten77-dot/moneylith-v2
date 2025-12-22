@@ -73,38 +73,38 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
   const maandLabel = variant === "business" ? "Maandelijkse betaling" : "Maanddruk (minimaal)";
 
   return (
-    <div className="card-shell p-4 text-slate-900 space-y-3">
+    <div className="card-shell p-3 text-slate-900 space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-600">{variant === "business" ? "Verplichtingenkaart" : "Schuldenkaart"}</p>
-          <h3 className="text-lg font-semibold text-slate-900">
+          <p className="text-xs text-slate-600">{variant === "business" ? "Verplichtingenkaart" : "Schuldenkaart"}</p>
+          <h3 className="text-base font-semibold text-slate-900">
             {variant === "business" ? "Overzicht van je verplichtingen" : "Overzicht van je schulden"}
           </h3>
         </div>
         <button
           type="button"
           onClick={addItem}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm hover:shadow"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm hover:shadow"
           disabled={isReadOnly}
         >
           {variant === "business" ? "+ Nieuwe verplichting" : "+ Nieuwe schuld"}
         </button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {items.length === 0 && (
           <p className="rounded-lg border border-slate-300 bg-white/80 p-3 text-sm text-slate-600">
             {variant === "business" ? "Nog geen zakelijke verplichtingen toegevoegd." : "Nog geen schulden toegevoegd."}
           </p>
         )}
         {items.map((item) => (
-          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 text-sm text-slate-800">
+          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 text-xs text-slate-800">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Naam</span>
+                <span className="text-[11px] font-semibold text-slate-600">Naam</span>
                 <input
                   type="text"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={item.naam}
                   onChange={(e) => updateItem(item.id, { naam: e.target.value })}
                   placeholder={variant === "business" ? "Bijv. zakelijke lening ING, BTW-regeling" : "Bijv. DUO"}
@@ -112,12 +112,12 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">{restbedragLabel}</span>
+                <span className="text-[11px] font-semibold text-slate-600">{restbedragLabel}</span>
                 <input
                   type="number"
                   min={0}
                   step={0.01}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={Number.isFinite(item.saldo) ? item.saldo : ""}
                   onChange={(e) => updateItem(item.id, { saldo: parseFloat(e.target.value) || 0 })}
                   placeholder="0"
@@ -125,12 +125,12 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">{maandLabel}</span>
+                <span className="text-[11px] font-semibold text-slate-600">{maandLabel}</span>
                 <input
                   type="number"
                   min={0}
                   step={0.01}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={Number.isFinite(item.minimaleMaandlast ?? NaN) ? item.minimaleMaandlast : ""}
                   onChange={(e) =>
                     updateItem(item.id, {
@@ -142,12 +142,12 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-slate-600">Afschrijvingsdag (0-31)</span>
+                <span className="text-[11px] font-semibold text-slate-600">Afschrijvingsdag (0-31)</span>
                 <input
                   type="number"
                   min={0}
                   max={31}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={Number.isFinite(item.afschrijfDag ?? NaN) ? item.afschrijfDag : ""}
                   onChange={(e) =>
                     updateItem(item.id, {
@@ -162,9 +162,9 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                 />
               </label>
               <label className="flex flex-col gap-1 md:col-span-2">
-                <span className="text-xs font-semibold text-slate-600">Opmerking (gebruiker)</span>
+                <span className="text-[11px] font-semibold text-slate-600">Opmerking (gebruiker)</span>
                 <textarea
-                  className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={item.gebruikerOpmerking ?? ""}
                   onChange={(e) => updateItem(item.id, { gebruikerOpmerking: e.target.value })}
                   placeholder="Eigen notitie of context"
@@ -173,7 +173,7 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                 />
               </label>
               {item.aiOpmerking && (
-                <div className="md:col-span-2 rounded-md bg-slate-50 border border-purple-100 p-2 text-xs text-slate-700">
+                <div className="md:col-span-2 rounded-md bg-slate-50 border border-purple-100 p-2 text-[11px] text-slate-700">
                   <div className="mb-1 text-[10px] uppercase tracking-wide text-purple-600">AI opmerking</div>
                   <div className="whitespace-pre-line">{item.aiOpmerking}</div>
                 </div>
@@ -183,7 +183,7 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
               <button
                 type="button"
                 onClick={() => removeItem(item.id)}
-                className="text-xs font-semibold text-red-600 hover:underline"
+                className="text-[11px] font-semibold text-red-600 hover:underline"
                 disabled={isReadOnly}
               >
                 Verwijderen
@@ -193,7 +193,7 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
         ))}
       </div>
 
-      <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
+      <div className="rounded-lg bg-white/80 p-2.5 text-xs text-slate-800 shadow-inner">
         <p>Totaal openstaand: {formatCurrency(totalSaldo)}</p>
         <p>Aantal schulden: {items.length}</p>
         <p>Som maanddruk (minimaal): {formatCurrency(totalMinLasten)}</p>

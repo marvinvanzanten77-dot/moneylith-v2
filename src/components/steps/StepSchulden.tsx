@@ -362,8 +362,8 @@ export function StepSchulden({
 
       {view === "list" && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 flex flex-col gap-4">
-            <div className="card-shell p-5 text-slate-900">
+          <div className="xl:col-span-2 flex flex-col gap-3">
+            <div className="card-shell p-4 text-slate-900">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">
