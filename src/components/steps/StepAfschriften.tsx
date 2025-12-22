@@ -49,9 +49,8 @@ export function StepAfschriften({
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? "");
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [filePayloads, setFilePayloads] = useState<{ name: string; content: string; note?: string }[]>([]);
   const [fileName, setFileName] = useState<string>("");
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileContent, setFileContent] = useState<string>("");
   const [fileNote, setFileNote] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -105,21 +104,24 @@ export function StepAfschriften({
     [fixedCostLabels]
   );
 
-  const detectBankLabel = useCallback((name?: string, content?: string) => {
-    const haystack = `${name || fileName} ${content || fileContent}`.toLowerCase();
-    const accountName = accounts.find((a) => a.id === accountId)?.name || "";
-    if (haystack.includes("bunq")) return "bunq";
-    if (haystack.includes("rabobank") || haystack.includes("rabo")) return "rabo";
-    if (haystack.includes("ing")) return "ing";
-    if (haystack.includes("abn")) return "abn";
-    if (haystack.includes("sns")) return "sns";
-    if (haystack.includes("asnbank") || haystack.includes("asn")) return "asn";
-    if (accountName) {
-      const first = accountName.split(/\s+/)[0].toLowerCase();
-      if (first.length) return first;
-    }
-    return "bank";
-  }, [accountId, accounts, fileContent, fileName]);
+  const detectBankLabel = useCallback(
+    (name?: string, content?: string) => {
+      const haystack = `${name || fileName} ${content || ""}`.toLowerCase();
+      const accountName = accounts.find((a) => a.id === accountId)?.name || "";
+      if (haystack.includes("bunq")) return "bunq";
+      if (haystack.includes("rabobank") || haystack.includes("rabo")) return "rabo";
+      if (haystack.includes("ing")) return "ing";
+      if (haystack.includes("abn")) return "abn";
+      if (haystack.includes("sns")) return "sns";
+      if (haystack.includes("asnbank") || haystack.includes("asn")) return "asn";
+      if (accountName) {
+        const first = accountName.split(/\s+/)[0].toLowerCase();
+        if (first.length) return first;
+      }
+      return "bank";
+    },
+    [accountId, accounts, fileName]
+  );
 
   useEffect(() => {
     if (aiAnalysisDone) {
@@ -129,7 +131,7 @@ export function StepAfschriften({
 
   const parseTransactionsFromCsv = useCallback(
     (content?: string): MoneylithTransaction[] => {
-      const source = content ?? fileContent;
+      const source = content ?? "";
       if (!source || !accountId) return [];
       const lines = source
       .split(/\r?\n/)
@@ -180,7 +182,7 @@ export function StepAfschriften({
       })
         .filter(Boolean) as MoneylithTransaction[];
     },
-    [accountId, fileContent]
+    [accountId]
   );
 
   const statementsByAccount = useMemo(() => {
@@ -297,13 +299,12 @@ export function StepAfschriften({
   }, [_transactions, bucketStorageKey, fixedCostLabels, runAi]);
 
   const handleSubmit = () => {
-    if (!accountId) return;
-    const filesToAdd = selectedFiles.length ? selectedFiles : fileName ? [new File([], fileName)] : [];
-    filesToAdd.forEach((file) => {
-      const extMatch = file.name.match(/(\.[a-zA-Z0-9]+)$/);
+    if (!accountId || filePayloads.length === 0) return;
+    filePayloads.forEach((payload) => {
+      const extMatch = payload.name.match(/(\.[a-zA-Z0-9]+)$/);
       const ext = extMatch ? extMatch[1] : ".csv";
       const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const bankLabel = detectBankLabel(file.name, fileContent);
+      const bankLabel = detectBankLabel(payload.name, payload.content);
       const safeMonth = String(month).padStart(2, "0");
       const generatedName = `${bankLabel}-${year}-${safeMonth}${ext}`;
       const meta: AccountStatementMeta = {
@@ -311,7 +312,7 @@ export function StepAfschriften({
         accountId,
         month,
         year,
-        fileName: generatedName || file.name || fileName || undefined,
+        fileName: generatedName || payload.name || fileName || undefined,
         uploadedAt: new Date().toISOString(),
       };
       onAddStatement(meta);
@@ -321,80 +322,95 @@ export function StepAfschriften({
       setPendingTx([]);
     }
     setFileName("");
-    setSelectedFiles([]);
+    setFileNote(null);
+    setFilePayloads([]);
   };
 
   const handleFileList = useCallback(
     async (files: FileList | File[] | null | undefined) => {
       const list = Array.from(files ?? []);
-      setSelectedFiles(list);
       setPendingTx([]);
-      if (!list.length) {
-        setFileName("");
-        setFileContent("");
-        setFileNote(null);
-        return;
-      }
-      const file = list[0];
-      setFileName(file.name);
+      setFilePayloads([]);
+      setFileName("");
       setFileNote(null);
-      setFileContent("");
+      if (!list.length) return;
 
       const MAX_CHARS = 200_000;
-      const handleText = (raw: string, notePrefix?: string) => {
-        let text = raw ?? "";
-        if (!text || text.length === 0) {
-          setFileNote("Inhoud kon niet worden gelezen uit dit bestand.");
-          setFileContent("");
-          return;
+      const payloads: { name: string; content: string; note?: string }[] = [];
+      const allTx: MoneylithTransaction[] = [];
+
+      const loadOne = async (file: File) => {
+        const lower = file.name.toLowerCase();
+        const isCsvLike = lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt");
+        const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+        const isPdf = lower.endsWith(".pdf");
+
+        const handleText = (raw: string, notePrefix?: string) => {
+          let text = raw ?? "";
+          if (!text) {
+            payloads.push({ name: file.name, content: "", note: "Inhoud kon niet worden gelezen uit dit bestand." });
+            return;
+          }
+          if (text.length > MAX_CHARS) {
+            payloads.push({
+              name: file.name,
+              content: text.slice(0, MAX_CHARS),
+              note: `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`,
+            });
+          } else {
+            payloads.push({ name: file.name, content: text, note: notePrefix });
+          }
+          const parsed = parseTransactionsFromCsv(text);
+          if (parsed.length > 0) {
+            allTx.push(...parsed);
+          }
+        };
+
+        try {
+          if (isXlsx) {
+            const data = await file.arrayBuffer();
+            const XLSX = await import("xlsx");
+            const workbook = XLSX.read(data, { type: "array" });
+            const firstSheet = workbook.SheetNames[0];
+            const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
+            handleText(csv, "Geconverteerd uit Excel");
+            return;
+          }
+
+          if (isCsvLike) {
+            const text = await file.text();
+            handleText(text);
+            return;
+          }
+
+          if (isPdf) {
+            const text = await file.text();
+            handleText(text, "PDF (tekstextractie beperkt)");
+            return;
+          }
+
+          payloads.push({ name: file.name, content: "", note: "Bestandstype wordt nog niet ondersteund voor analyse." });
+        } catch (err) {
+          console.error(err);
+          payloads.push({ name: file.name, content: "", note: "Lezen van het bestand is mislukt." });
         }
-        if (text.length > MAX_CHARS) {
-          setFileNote(
-            `${notePrefix ? `${notePrefix}. ` : ""}Bestand is groot (${text.length} tekens); alleen de eerste ${MAX_CHARS} tekens worden geanalyseerd.`
-          );
-          text = text.slice(0, MAX_CHARS);
-        } else if (notePrefix) {
-          setFileNote(notePrefix);
-        }
-        setFileContent(text);
-        const parsed = parseTransactionsFromCsv(text);
-        if (parsed.length > 0) setPendingTx(parsed);
       };
 
-      const lower = file.name.toLowerCase();
-      const isCsvLike = lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt");
-      const isXlsx = lower.endsWith(".xlsx") || lower.endsWith(".xls");
-      const isPdf = lower.endsWith(".pdf");
-
-      try {
-        if (isXlsx) {
-          const data = await file.arrayBuffer();
-          const XLSX = await import("xlsx");
-          const workbook = XLSX.read(data, { type: "array" });
-          const firstSheet = workbook.SheetNames[0];
-          const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheet]);
-          handleText(csv, "Geconverteerd uit Excel");
-          return;
-        }
-
-        if (isCsvLike) {
-          const text = await file.text();
-          handleText(text);
-          return;
-        }
-
-        if (isPdf) {
-          const text = await file.text();
-          handleText(text, "PDF (tekstextractie beperkt)");
-          return;
-        }
-
-        setFileNote("Bestandstype wordt nog niet ondersteund voor analyse.");
-      } catch (err) {
-        console.error(err);
-        setFileContent("");
-        setFileNote("Lezen van het bestand is mislukt.");
+      for (const f of list) {
+        // eslint-disable-next-line no-await-in-loop
+        await loadOne(f);
       }
+
+      setFilePayloads(payloads);
+      if (payloads.length === 1) {
+        setFileName(payloads[0].name);
+        setFileNote(payloads[0].note ?? null);
+      } else {
+        setFileName(`${payloads.length} bestanden geselecteerd`);
+        const notes = payloads.map((p) => p.note).filter(Boolean);
+        setFileNote(notes.length ? notes.join("; ") : null);
+      }
+      if (allTx.length > 0) setPendingTx(allTx);
     },
     [parseTransactionsFromCsv]
   );
@@ -411,19 +427,22 @@ export function StepAfschriften({
     setAiError(null);
     setAiStatus("AI-analyse wordt uitgevoerd...");
     const system = "Moneylith analyse van bankafschriften";
-    const snippet = fileContent.slice(0, 10000);
+    const combinedText = filePayloads
+      .map((p) => p.content.slice(0, 3000))
+      .join("\n---\n")
+      .slice(0, 10000);
     const fixedList =
       fixedCostLabels && fixedCostLabels.length
         ? `Vaste lasten (uitsluiten uit potjes): ${fixedCostLabels.join(", ")}`
         : "";
     const user = [
       "Analyseer mijn geuploade afschrift(en) en geef een korte samenvatting.",
-      `Bestand: ${fileName || "onbekend"}`,
+      `Bestand(en): ${fileName || "onbekend"}`,
       fileNote ? `Opmerking: ${fileNote}` : "",
       "Maak daarnaast een lijst van variabele uitgavenpotjes (max 6). Per regel: <label>: €<bedrag/maand> (afronden), laat vaste lasten zoals huur/hypotheek/energie/zorgverzekering achterwege.",
       fixedList,
       "Inhoud (eerste deel):",
-      snippet || "[Geen inhoud beschikbaar]",
+      combinedText || "[Geen inhoud beschikbaar]",
     ]
       .filter(Boolean)
       .join("\n\n");
