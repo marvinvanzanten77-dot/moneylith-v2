@@ -53,7 +53,7 @@ export function StepSchulden({
   const [pendingFileName, setPendingFileName] = useLocalStorage<string | null>(pendingNameKey, null);
   const [pendingRows, setPendingRows] = useLocalStorage<SchuldItem[]>(pendingRowsKey, []);
   const applyCheck = canApplyDebtsSuggestions({ mode, actions, currentDebts: debts });
-  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "list");
+  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "analysis");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -237,7 +237,8 @@ export function StepSchulden({
     }
     setAiError(null);
     setAiLoading(true);
-    const system = "Moneylith schuldenanalyse. Geef exact 3 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein).";
+    const system =
+      "Moneylith schuldenanalyse. Geef exact 3 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein).";
     const debtsList = debts
       .map(
         (d, idx) =>
@@ -248,8 +249,8 @@ export function StepSchulden({
       .join("\n");
     const user = [
       "Genereer 3 strategieën met velden: key (snowball|balanced|avalanche), title, summary, pros[], cons[], recommended (bool).",
-      "Alleen JSON, geen tekst buiten JSON. Root: { strategies: Strategy[] }. max 3 items.",
-      "Gebruik beknopte NL tekst.",
+      "Eerst een korte NL-samenvatting in mensentaal. Daarna alleen JSON tussen <STRAT_JSON> ... </STRAT_JSON> tags. Root: { strategies: Strategy[] }.",
+      "Gebruik beknopte NL tekst; geen codeblokken.",
       "Schuldenlijst:",
       debtsList || "Geen schulden opgegeven",
     ].join("\n");
@@ -267,14 +268,12 @@ export function StepSchulden({
       // try parse JSON
       let parsed: any = null;
       try {
-        parsed = JSON.parse(result);
+        const start = result.indexOf("<STRAT_JSON>");
+        const end = result.indexOf("</STRAT_JSON>");
+        const jsonPart = start >= 0 && end > start ? result.slice(start + "<STRAT_JSON>".length, end) : result;
+        parsed = JSON.parse(jsonPart);
       } catch {
-        // probeer simpele extract
-        const start = result.indexOf("{");
-        const end = result.lastIndexOf("}");
-        if (start >= 0 && end > start) {
-          parsed = JSON.parse(result.slice(start, end + 1));
-        }
+        parsed = null;
       }
       const list: StrategyCard[] =
         parsed?.strategies?.map((s: any) => ({
@@ -289,6 +288,10 @@ export function StepSchulden({
         setStrategies(list.slice(0, 3));
         const rec = list.find((s) => s.recommended) ?? list[0];
         setSelectedStrategy(rec?.key ?? null);
+        appendAiMessage({
+          role: "assistant",
+          content: `Strategieën gegenereerd. ${rec ? `Aanbevolen: ${rec.title}.` : ""} Klik een strategie om maanddruk in te vullen.`,
+        });
       } else {
         setAiError("Geen strategieën gevonden.");
       }
@@ -307,12 +310,18 @@ export function StepSchulden({
     setSelectedStrategy(strategy.key);
     const noteMap: Record<string, string> = {};
     const withAi = debts.map((d) => {
-      const factor =
-        strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
-      const min = Math.max(0, (d.minimaleMaandlast ?? 0) * factor);
-      const note = `Strategie ${strategy.title}: focus op ${strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "mix"} schulden.`;
+      const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
+      const current = d.minimaleMaandlast ?? 0;
+      const min = current > 0 ? current : Math.max(0, current * factor || 0);
+      const note = `Strategie ${strategy.title}: focus op ${
+        strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "mix"
+      } schulden.`;
       noteMap[d.id] = note;
-      return { ...d, minimaleMaandlast: Math.round(min), aiOpmerking: note };
+      return {
+        ...d,
+        minimaleMaandlast: Math.round(min),
+        aiOpmerking: note,
+      };
     });
     onDebtsChange?.(withAi);
     setAiNotes(noteMap);
@@ -329,8 +338,10 @@ export function StepSchulden({
           <button
             type="button"
             onClick={() => setView("list")}
-            className={`rounded-full px-3 py-1 font-semibold ${
-              view === "list" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300"
+            className={`rounded-full px-3 py-1.5 font-semibold shadow ${
+              view === "list"
+                ? "bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 shadow-amber-500/50"
+                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
             }`}
           >
             Lijstweergave
@@ -338,11 +349,13 @@ export function StepSchulden({
           <button
             type="button"
             onClick={() => setView("analysis")}
-            className={`rounded-full px-3 py-1 font-semibold ${
-              view === "analysis" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300"
+            className={`rounded-full px-3 py-1.5 font-semibold shadow ${
+              view === "analysis"
+                ? "bg-gradient-to-r from-indigo-400 to-purple-500 text-slate-900 shadow-purple-500/50"
+                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
             }`}
           >
-            Analyse & Visualisatie
+            Analyse
           </button>
         </div>
       </div>
@@ -484,7 +497,9 @@ export function StepSchulden({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">AI-analyse</h3>
-                  <p className="text-xs text-slate-400">Genereer 3 strategieën en kies er één.</p>
+                  <p className="text-xs text-slate-400">
+                    Genereer 3 strategieën en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <button
