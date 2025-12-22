@@ -33,7 +33,6 @@ interface RunAiInput {
 }
 
 async function postAnalyse(body: { system: string; user: string; turnstileToken?: string }) {
-  // Probeer eerst de bekende serverless route met koppelteken, val dan terug op de variant zonder
   // Only use the known backend route; the old hyphenated path caused 404 noise in Vite dev.
   const endpoints = ["/api/moneylith/analyse"];
   let lastError: Error | null = null;
@@ -44,10 +43,11 @@ async function postAnalyse(body: { system: string; user: string; turnstileToken?
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const json = (await resp.json().catch(() => ({}))) as { content?: string; error?: string };
       if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+        return { error: json?.error || `HTTP ${resp.status}` };
       }
-      return (await resp.json()) as { content?: string; error?: string };
+      return json;
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
       // probeer volgende endpoint

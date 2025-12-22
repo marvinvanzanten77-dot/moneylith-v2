@@ -59,6 +59,8 @@ export function StepAfschriften({
   const [pendingTx, setPendingTx] = useState<MoneylithTransaction[]>([]);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileNonce, setTurnstileNonce] = useState(0);
+  const turnstileOptional =
+    import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
   const { runAi } = useAiOrchestrator({
     mode: variant === "business" ? "business" : "personal",
@@ -402,6 +404,10 @@ export function StepAfschriften({
 
   const runAiAnalysis = async () => {
     if (!hasUploads) return;
+    if (!turnstileOptional && !turnstileToken) {
+      setAiError("Verificatie mislukt, probeer opnieuw.");
+      return;
+    }
     setAiError(null);
     setAiStatus("AI-analyse wordt uitgevoerd...");
     const system = "Moneylith analyse van bankafschriften";
@@ -422,7 +428,12 @@ export function StepAfschriften({
       .filter(Boolean)
       .join("\n\n");
     try {
-      const result = await runAi({ tab: "ai-analyse" as TabKey, system, user, turnstileToken });
+      const result = await runAi({
+        tab: "ai-analyse" as TabKey,
+        system,
+        user,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+      });
       if (!result) {
         setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
         setAiStatus("AI-analyse mislukt");
@@ -432,7 +443,7 @@ export function StepAfschriften({
       const at = new Date().toISOString();
       onAiAnalysisComplete?.({ raw: result, at });
       onBucketsRefresh?.();
-      await runAiBuckets(turnstileToken);
+      await runAiBuckets(turnstileOptional ? undefined : turnstileToken);
       setTurnstileToken(null);
       setTurnstileNonce((prev) => prev + 1);
     } catch (err) {

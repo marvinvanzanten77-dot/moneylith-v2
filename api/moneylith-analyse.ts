@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const ok = await verifyTurnstile(req);
     if (!ok) {
-      res.status(403).json({ error: "Verificatie mislukt, probeer opnieuw." });
+      res.status(200).json({ error: "Verificatie mislukt, probeer opnieuw." });
       auditLog({
         ts: new Date().toISOString(),
         route: "api/moneylith-analyse",
@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const apiKey = process.env.OPENAI_API_KEY;
     const { system, user } = (req.body || {}) as { system?: string; user?: string };
     if (!system || !user) {
-      res.status(400).json({ error: "Missing system/user payload" });
+      res.status(200).json({ error: "Ontbrekende payload (system/user)." });
       return;
     }
 

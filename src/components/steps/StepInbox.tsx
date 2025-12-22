@@ -258,7 +258,9 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
       setError("Geen leesbare inhoud gevonden. Upload een tekstbestand of CSV/XLSX.");
       return;
     }
-    if (!turnstileToken) {
+    const turnstileOptional =
+      import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!turnstileToken && !turnstileOptional) {
       setError("Verificatie mislukt, probeer opnieuw.");
       return;
     }
@@ -298,7 +300,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
         system,
         user,
         displayUserMessage: "Analyseer Inbox document",
-        turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken,
       });
       if (!result) throw new Error("AI-analyse mislukt");
       const parsed = parseSuggestions(result);

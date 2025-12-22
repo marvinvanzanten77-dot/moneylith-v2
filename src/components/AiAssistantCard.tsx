@@ -21,6 +21,8 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   const [lastAiActions, setLastAiActions] = useState<AiActions | null>(actions ?? null);
   const [chatInput, setChatInput] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileOptional =
+    import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
   const [messages, setMessages] = useState(getAiMessages());
 
@@ -86,7 +88,11 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   }, [messages]);
 
   const handleChatSend = async () => {
-    if (!aiPayload || !chatInput.trim() || !turnstileToken) {
+    if (!aiPayload || !chatInput.trim()) {
+      setAiError("Geen vraag ingevuld.");
+      return;
+    }
+    if (!turnstileOptional && !turnstileToken) {
       setAiError("Verificatie mislukt, probeer opnieuw.");
       return;
     }
@@ -98,7 +104,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
         system: aiPayload.system,
         user: `${aiPayload.user}\n\nVraag: ${question}`,
         displayUserMessage: question,
-        turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken,
       });
       if (result) {
         setAiError(null);
@@ -180,7 +186,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
         <button
           type="button"
           onClick={handleChatSend}
-          disabled={!aiPayload || aiLoading || !chatInput.trim() || !turnstileToken}
+          disabled={!aiPayload || aiLoading || !chatInput.trim() || (!turnstileOptional && !turnstileToken)}
           className="rounded-lg bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 disabled:opacity-50"
         >
           {aiLoading ? "Bezig..." : "Stel vraag"}
