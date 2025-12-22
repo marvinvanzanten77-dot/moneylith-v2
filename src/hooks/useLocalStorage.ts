@@ -24,6 +24,14 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: Up
 
   const setStoredValue = (nextValue: Updater<T>) => {
     const valueToStore = typeof nextValue === "function" ? (nextValue as (prev: T) => T)(value) : nextValue;
+    try {
+      // voorkom eindeloze renders bij identieke waarde
+      if (JSON.stringify(valueToStore) === JSON.stringify(value)) {
+        return;
+      }
+    } catch {
+      /* ignore equality check errors */
+    }
     setValue(valueToStore);
     try {
       if (typeof window !== "undefined") {
