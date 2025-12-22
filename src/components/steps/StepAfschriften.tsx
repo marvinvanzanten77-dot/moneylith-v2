@@ -322,9 +322,7 @@ export function StepAfschriften({
       pendingTx.forEach((tx) => _onUpsertTransaction(tx));
       setPendingTx([]);
     }
-    setFileName("");
-    setFileNote(null);
-    setFilePayloads([]);
+    // Bewaar filePayloads zodat AI analyse direct de inhoud kan gebruiken voor patronen
   };
 
   const handleFileList = useCallback(
