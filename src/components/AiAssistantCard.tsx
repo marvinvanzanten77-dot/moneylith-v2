@@ -47,12 +47,19 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
   });
 
   useEffect(() => {
-    setLastAiActions(actions ?? null);
-  }, [mode, actions]);
+    const next = actions ?? null;
+    // Alleen bij daadwerkelijke wijziging om render-loops te voorkomen
+    if (JSON.stringify(next) !== JSON.stringify(lastAiActions)) {
+      setLastAiActions(next);
+    }
+  }, [mode, actions, lastAiActions]);
 
   useEffect(() => {
-    if (onActionsChange) onActionsChange(lastAiActions);
-  }, [lastAiActions, onActionsChange]);
+    if (!onActionsChange) return;
+    onActionsChange(lastAiActions);
+    // onActionsChange is stabiel in App; afhankelijkheid bewust beperkt
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastAiActions]);
 
   const analysis = useMemo(() => (observation ? analyseObservation(observation, mode) : null), [mode, observation]);
   const toRawContext = (src: ReturnType<typeof useObserver>["personal"]) => ({
