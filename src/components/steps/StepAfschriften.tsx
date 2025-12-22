@@ -501,7 +501,7 @@ export function StepAfschriften({
   return (
     <div className="space-y-6">
       <div className="mb-6 flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-slate-50">AI-analyse</h1>
+        <h1 className="text-2xl font-semibold text-slate-50">Patronen</h1>
         <p className="text-sm text-slate-400">
           Upload hier je bankafschriften (bij voorkeur van de laatste 3 maanden). Dit wordt lokaal gebruikt voor
           uitgavenpatronen.

@@ -117,7 +117,7 @@ const personalTabs: TabConfig[] = [
   { key: "vermogen", label: "Vermogen", desc: "Sparen, buffers, bezittingen" },
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
-  { key: "afschriften", label: "AI-analyse", desc: "Maandelijkse afschriften" },
+  { key: "afschriften", label: "Patronen", desc: "Maandelijkse afschriften" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
