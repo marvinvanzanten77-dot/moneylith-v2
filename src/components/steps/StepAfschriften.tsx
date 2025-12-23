@@ -99,7 +99,7 @@ export function StepAfschriften({
           monthlyAvg: Math.round(num),
         });
       });
-      return parsed.slice(0, 6);
+      return parsed.slice(0, 9);
     },
     [fixedCostLabels]
   );
@@ -566,7 +566,7 @@ export function StepAfschriften({
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Potjes uit afschriften</h2>
-                <p className="text-xs text-slate-500">Max 6 categorieën, automatisch gegroepeerd.</p>
+                <p className="text-xs text-slate-500">Max 9 categorieën, automatisch gegroepeerd.</p>
               </div>
               <span className="text-[11px] text-slate-500">{buckets.length} potje(n)</span>
             </div>
