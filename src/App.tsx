@@ -1848,9 +1848,14 @@ const App = () => {
     );
   };
 
-  const renderRekeningen = () => (
-    <StepRekeningen accounts={accounts} onSaveAccount={addOrUpdateAccount} onDeleteAccount={deleteAccount} />
-  );
+  const renderRekeningen = (variant: "personal" | "business" = "personal") => {
+    const isBusinessVariant = variant === "business";
+    const accountsSource = isBusinessVariant ? accountsBusiness : accounts;
+    const saveFn = isBusinessVariant ? addOrUpdateAccountBusiness : addOrUpdateAccount;
+    const deleteFn = isBusinessVariant ? deleteAccountBusiness : deleteAccount;
+
+    return <StepRekeningen accounts={accountsSource} onSaveAccount={saveFn} onDeleteAccount={deleteFn} />;
+  };
 
   const renderVermogen = (variant: "personal" | "business" = "personal") => {
     const isBusinessVariant = variant === "business";
@@ -1966,8 +1971,8 @@ const App = () => {
     if (normalizedStep === "cashflow") return renderFundament("business", "cashflow");
     if (normalizedStep === "schulden") return renderSchulden("personal");
     if (normalizedStep === "verplichtingen") return renderSchulden("business");
-    if (normalizedStep === "rekeningen") return renderRekeningen();
-    if (normalizedStep === "biz-rekeningen") return renderRekeningen();
+    if (normalizedStep === "rekeningen") return renderRekeningen("personal");
+    if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
     if (normalizedStep === "inbox") return renderInbox("personal");
     if (normalizedStep === "biz-inbox") return renderInbox("business");
     if (normalizedStep === "afschriften") return renderAfschriften("personal");
