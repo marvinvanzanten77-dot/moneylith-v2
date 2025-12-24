@@ -510,6 +510,9 @@ export function StepAfschriften({
         </p>
         <p className="text-xs text-slate-500">Tip: begin met de laatste 3 maanden. Voeg elke maand een nieuw afschrift toe.</p>
         <p className="text-xs text-slate-500">Afschriften laten zien wat je echt doet met geld - niet wat je van plan was.</p>
+        <p className="text-[11px] text-slate-500">
+          Stap 1: Afschriften toevoegen · Stap 2: Analyseer met AI · AI overschrijft je eigen data niet, maar vult potjes aan.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

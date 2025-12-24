@@ -333,6 +333,9 @@ export function StepSchulden({
         <div>
           <h1 className="text-2xl font-semibold text-slate-50">{title}</h1>
           <p className="text-sm text-slate-400">{subtitle}</p>
+          <p className="text-[11px] text-slate-500">
+            AI leest je ingevoerde schulden mee en vult alleen voorstellen aan; je eigen waarden blijven staan.
+          </p>
         </div>
         <div className="flex gap-2 text-xs">
           <button
@@ -500,6 +503,7 @@ export function StepSchulden({
                   <p className="text-xs text-slate-400">
                     Genereer 3 strategieën en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
                   </p>
+                  <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <button
