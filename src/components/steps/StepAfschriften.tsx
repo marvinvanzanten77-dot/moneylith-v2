@@ -513,6 +513,14 @@ export function StepAfschriften({
         <p className="text-[11px] text-slate-500">
           Stap 1: Afschriften toevoegen · Stap 2: Analyseer met AI · AI overschrijft je eigen data niet, maar vult potjes aan.
         </p>
+        <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+          <span className="rounded-full bg-slate-800 px-2 py-0.5">Uploads: {statements.length}</span>
+          {aiAnalysisDoneAt && (
+            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+              Laatste analyse: {new Date(aiAnalysisDoneAt).toLocaleDateString()}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">

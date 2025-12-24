@@ -327,6 +327,14 @@ export function StepSchulden({
     setAiNotes(noteMap);
   };
 
+  const clearAiNotes = () => {
+    if (isReadOnly) return;
+    setSelectedStrategy(null);
+    setAiNotes({});
+    const reset = debts.map((d) => ({ ...d, aiOpmerking: undefined }));
+    onDebtsChange?.(reset);
+  };
+
   return (
     <div className="space-y-6">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -337,7 +345,7 @@ export function StepSchulden({
             AI leest je ingevoerde schulden mee en vult alleen voorstellen aan; je eigen waarden blijven staan.
           </p>
         </div>
-        <div className="flex gap-2 text-xs">
+        <div className="flex flex-col items-end gap-2 text-xs">
           <button
             type="button"
             onClick={() => setView("list")}
@@ -360,6 +368,21 @@ export function StepSchulden({
           >
             Analyse
           </button>
+          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+            <span>Strategie:</span>
+            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-amber-200">
+              {selectedStrategy ? selectedStrategy : "geen"}
+            </span>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={clearAiNotes}
+                className="underline text-slate-300 hover:text-white"
+              >
+                Wis AI-opmerkingen
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
