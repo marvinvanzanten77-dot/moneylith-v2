@@ -82,6 +82,8 @@ export function StepSchulden({
     `moneylith.${variant}.debts.aiNotes`,
     {}
   );
+  const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
+  const [undoVisible, setUndoVisible] = useState(false);
 
   const { runAi } = useAiOrchestrator({
     mode,
@@ -309,6 +311,7 @@ export function StepSchulden({
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
     const noteMap: Record<string, string> = {};
+    setLastSnapshot(debts);
     const withAi = debts.map((d) => {
       const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
       const current = d.minimaleMaandlast ?? 0;
@@ -325,6 +328,8 @@ export function StepSchulden({
     });
     onDebtsChange?.(withAi);
     setAiNotes(noteMap);
+    setUndoVisible(true);
+    setTimeout(() => setUndoVisible(false), 10000);
   };
 
   const clearAiNotes = () => {
@@ -333,6 +338,16 @@ export function StepSchulden({
     setAiNotes({});
     const reset = debts.map((d) => ({ ...d, aiOpmerking: undefined }));
     onDebtsChange?.(reset);
+  };
+
+  const undoAiApply = () => {
+    if (isReadOnly) return;
+    if (lastSnapshot) {
+      onDebtsChange?.(lastSnapshot);
+      setSelectedStrategy(null);
+      setAiNotes({});
+      setUndoVisible(false);
+    }
   };
 
   return (
@@ -380,6 +395,21 @@ export function StepSchulden({
                 className="underline text-slate-300 hover:text-white"
               >
                 Wis AI-opmerkingen
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+            <span className="rounded-full bg-slate-800 px-2 py-0.5">Schulden: {debts.length}</span>
+            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+              Laatste analyse: {strategies.length ? "aanwezig" : "nog niet"}
+            </span>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={runAiStrategies}
+                className="rounded-full bg-amber-500 px-2 py-0.5 font-semibold text-slate-900"
+              >
+                Analyseer opnieuw
               </button>
             )}
           </div>
@@ -547,17 +577,18 @@ export function StepSchulden({
               </div>
               {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
               <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {strategies.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => applyStrategyToDebts(s)}
-                    className={`rounded-xl border p-3 text-left text-xs transition ${
-                      selectedStrategy === s.key
-                        ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
-                        : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
-                    } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
-                  >
+          {strategies.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => applyStrategyToDebts(s)}
+              className={`rounded-xl border p-3 text-left text-xs transition ${
+                selectedStrategy === s.key
+                  ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
+                  : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
+              } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
+              title="AI vult alleen aan; jouw invoer blijft staan."
+            >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-slate-100">{s.title}</span>
                       {s.recommended && (

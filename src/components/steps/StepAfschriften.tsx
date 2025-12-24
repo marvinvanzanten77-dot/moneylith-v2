@@ -574,11 +574,11 @@ export function StepAfschriften({
           )}
 
           <div className="card-shell p-5 text-slate-900">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Potjes uit afschriften</h2>
-                <p className="text-xs text-slate-500">Max 9 categorieën, automatisch gegroepeerd.</p>
-              </div>
+              <div className="mb-2 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Potjes uit afschriften</h2>
+                  <p className="text-xs text-slate-500">Max 9 categorieën, automatisch gegroepeerd.</p>
+                </div>
               <span className="text-[11px] text-slate-500">{buckets.length} potje(n)</span>
             </div>
             {buckets.length === 0 ? (
@@ -595,6 +595,7 @@ export function StepAfschriften({
                       <div
                         key={b.id}
                         className={`relative overflow-hidden rounded-xl border border-white/60 bg-white/85 p-3 shadow-lg shadow-slate-900/10 backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${accent}`}
+                        title="AI vult potjes aan; jouw eigen data blijft staan."
                       >
                         <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/30 via-transparent to-white/10" />
                         <div className="flex items-start justify-between relative">
