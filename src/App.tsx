@@ -276,6 +276,8 @@ const App = () => {
     ...personalTabs.map((t) => t.key),
     ...businessTabs.map((t) => t.key),
   ]);
+  const [helpMode, setHelpMode] = useState(false);
+  const [helpTooltip, setHelpTooltip] = useState<{ label: string; desc: string; x: number; y: number } | null>(null);
   const [selectedMonth, setSelectedMonth] = useLocalStorage<MonthId>("selected-month", "2025-12");
   const [monthFocus, setMonthFocus] = useLocalStorage<MonthFocus>("month-focus", null);
   const [showOverview, setShowOverview] = useState(false);
@@ -293,6 +295,23 @@ const App = () => {
     "moneylith.business.fixedCosts",
     []
   );
+  useEffect(() => {
+    try {
+      document.body.style.cursor = helpMode ? "help" : "";
+    } catch {
+      /* ignore */
+    }
+    if (!helpMode) {
+      setHelpTooltip(null);
+    }
+    return () => {
+      try {
+        document.body.style.cursor = "";
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [helpMode]);
   const [debtsSummary, setDebtsSummary] = useState<DebtSummary>({ totalDebt: 0, totalMinPayment: 0, debtCount: 0 });
   const [debtsSummaryBusiness, setDebtsSummaryBusiness] = useState<DebtSummary>({
     totalDebt: 0,
@@ -2105,11 +2124,13 @@ const App = () => {
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
             <button
               type="button"
-              onClick={() => setShowHelp(true)}
+              onClick={() => {
+                setHelpMode((prev) => !prev);
+              }}
               className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
               aria-label="Open hulp tips"
             >
-              Hulp
+              {helpMode ? "Hulp uit" : "Hulp"}
             </button>
           </div>
           <div className="mb-4 flex items-center gap-2">
@@ -2164,6 +2185,17 @@ const App = () => {
                   type="button"
                   disabled={!unlocked}
                   onClick={() => handleStepClick(step.key)}
+                  onMouseEnter={(e) => {
+                    if (!helpMode) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHelpTooltip({
+                      label: step.label,
+                      desc: step.desc,
+                      x: rect.right + 8,
+                      y: rect.top,
+                    });
+                  }}
+                  onMouseLeave={() => setHelpTooltip(null)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${activeClass || inactiveClass}`}
                 >
           <div className="flex items-center justify-between">
@@ -2178,7 +2210,7 @@ const App = () => {
 </aside>
 
         <section className="px-4 py-6">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Moneylith / Finance OS</p>
               <h1 className="text-2xl font-semibold text-white">Finance Planner</h1>
@@ -2227,6 +2259,15 @@ const App = () => {
       />
     </aside>
   </div>
+      {helpTooltip && helpMode && (
+        <div
+          className="pointer-events-none fixed z-[99] max-w-xs rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-lg"
+          style={{ top: helpTooltip.y, left: helpTooltip.x }}
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">{helpTooltip.label}</div>
+          <div className="text-amber-900">{helpTooltip.desc}</div>
+        </div>
+      )}
 
       {showOverview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
