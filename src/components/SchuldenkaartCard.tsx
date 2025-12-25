@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { formatCurrency } from "../utils/format";
+import { parseDateNlToIso } from "../utils/date";
 
 type SchuldenSummary = {
   totalDebt: number;
@@ -157,24 +158,34 @@ export const SchuldenkaartCard = ({
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-slate-600">Afschrijvingsdag (0-31)</span>
+                <span className="text-[11px] font-semibold text-slate-600">Afschrijvingsdag (0-31 of datum)</span>
                 <input
-                  type="number"
-                  min={0}
-                  max={31}
+                  type="text"
+                  inputMode="numeric"
                   className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                   value={Number.isFinite(item.afschrijfDag ?? NaN) ? item.afschrijfDag : ""}
-                  onChange={(e) =>
-                    updateItem(item.id, {
-                      afschrijfDag:
-                        e.target.value === ""
-                          ? undefined
-                          : Math.max(0, Math.min(31, parseInt(e.target.value, 10) || 0)),
-                    })
-                  }
-                  placeholder="0 = geen vaste dag"
+                  onChange={(e) => {
+                    if (isReadOnly) return;
+                    const raw = e.target.value.trim();
+                    if (!raw) {
+                      updateItem(item.id, { afschrijfDag: undefined });
+                      return;
+                    }
+                    const num = parseInt(raw, 10);
+                    if (!Number.isNaN(num) && num >= 0 && num <= 31) {
+                      updateItem(item.id, { afschrijfDag: num });
+                      return;
+                    }
+                    const parsed = parseDateNlToIso(raw);
+                    if (parsed) {
+                      const day = new Date(parsed).getDate();
+                      updateItem(item.id, { afschrijfDag: day });
+                    }
+                  }}
+                  placeholder="bijv. 27 of 15-04-2026"
                   readOnly={isReadOnly}
                 />
+                <span className="text-[10px] text-slate-500">Je kunt een dagnummer of een datum (DD-MM-JJJJ) invullen; we slaan alleen de dag op.</span>
               </label>
               <label className="flex flex-col gap-1 md:col-span-2">
                 <span className="text-[11px] font-semibold text-slate-600">Opmerking (gebruiker)</span>
