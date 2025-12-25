@@ -45,7 +45,7 @@ import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
 import { AnalyticsGate } from "./components/AnalyticsGate";
-import LogoFull from "../logo/ChatGPT_Image_Dec_21__2025__01_47_34_PM-removebg-preview.png";
+import LogoFull from "../logo/ChatGPT Image Dec 21, 2025, 01_47_34 PM.png";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -2354,8 +2354,8 @@ const App = () => {
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/80 backdrop-blur">
           <div className="card-shell max-w-3xl w-full p-8 text-slate-900">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <img src={LogoFull} alt="Moneylith logo" className="h-16 w-auto drop-shadow-lg" />
+              <div className="flex items-center gap-4">
+                <img src={LogoFull} alt="Moneylith logo" className="h-24 w-auto drop-shadow-xl" />
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">Welkom bij Moneylith</h2>
                   <p className="text-sm text-slate-600">
