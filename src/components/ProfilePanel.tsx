@@ -38,11 +38,13 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
       .then((items) => {
         if (cancelled) return;
         setProfiles(items);
+        console.info("[profile] loaded profiles", items.length);
       })
       .catch(() => {
         if (cancelled) return;
         setProfiles([]);
         setLoadError("Profielen laden niet. Ververs de pagina of schakel uit/aan als IndexedDB geblokkeerd is.");
+        console.warn("[profile] failed to load profiles");
       })
       .finally(() => {
         if (cancelled) return;
@@ -133,8 +135,8 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
   const isDefault = currentUserId === getDefaultUserId();
 
   const content = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
-      <div className="card-shell w-full max-w-3xl p-6 text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur" role="dialog" aria-modal="true">
+      <div className="card-shell w-full max-w-3xl p-6 text-slate-900" aria-label="Profielbeheer">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Profielen</h3>
@@ -273,5 +275,13 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
     </div>
   );
 
-  return typeof document !== "undefined" ? createPortal(content, document.body) : content;
+  try {
+    if (typeof document !== "undefined") {
+      return createPortal(content, document.body);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[profile] portal fallback", err);
+  }
+  return content;
 };
