@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { formatCurrency } from "../utils/format";
 
 type SchuldenSummary = {
   totalDebt: number;
@@ -36,14 +37,6 @@ type SchuldenkaartCardProps = {
 };
 
 const createId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value || 0);
 
 export const SchuldenkaartCard = ({
   items,

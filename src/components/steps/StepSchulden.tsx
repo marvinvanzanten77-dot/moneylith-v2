@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SchuldenkaartCard, type SchuldItem } from "../SchuldenkaartCard";
 import type { FinancialSnapshot } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
@@ -9,6 +9,7 @@ import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useMemo } from "react";
+import { formatCurrency } from "../../utils/format";
 
 interface StepSchuldenProps {
   onDebtSummary: (s: { totalDebt: number; totalMinPayment: number; debtCount: number }) => void;
