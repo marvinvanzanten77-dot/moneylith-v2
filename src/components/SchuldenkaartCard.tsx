@@ -22,6 +22,17 @@ type SchuldenkaartCardProps = {
   onSummaryChange?: (summary: SchuldenSummary) => void;
   variant?: "personal" | "business";
   readOnly?: boolean;
+  proposals?: Record<
+    string,
+    {
+      minPayment: number;
+      monthsToClear: number | null;
+      note: string;
+      strategyKey?: string;
+    }
+  >;
+  onAcceptProposal?: (id: string) => void;
+  onRejectProposal?: (id: string) => void;
 };
 
 const createId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -34,7 +45,16 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value || 0);
 
-export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = "personal", readOnly = false }: SchuldenkaartCardProps) => {
+export const SchuldenkaartCard = ({
+  items,
+  onChange,
+  onSummaryChange,
+  variant = "personal",
+  readOnly = false,
+  proposals,
+  onAcceptProposal,
+  onRejectProposal,
+}: SchuldenkaartCardProps) => {
   const isReadOnly = readOnly === true;
 
   useEffect(() => {
@@ -97,7 +117,9 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
             {variant === "business" ? "Nog geen zakelijke verplichtingen toegevoegd." : "Nog geen schulden toegevoegd."}
           </p>
         )}
-        {items.map((item) => (
+        {items.map((item) => {
+          const proposal = proposals?.[item.id];
+          return (
           <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
             <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 text-xs text-slate-800">
               <label className="flex flex-col gap-1">
@@ -178,6 +200,39 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
                   <div className="whitespace-pre-line">{item.aiOpmerking}</div>
                 </div>
               )}
+              {proposal && !isReadOnly && (
+                <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">
+                      AI voorstel {proposal.strategyKey ? `(${proposal.strategyKey})` : ""}
+                    </span>
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                      {formatCurrency(proposal.minPayment)}
+                    </span>
+                  </div>
+                  <div>
+                    Bij dit tempo is deze schuld ongeveer{" "}
+                    {proposal.monthsToClear ? `${proposal.monthsToClear} maanden` : "onbekend aantal maanden"} aanwezig.
+                  </div>
+                  <div className="text-slate-800">{proposal.note}</div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => onAcceptProposal?.(item.id)}
+                      className="rounded-md bg-emerald-500 px-3 py-1 text-[11px] font-semibold text-emerald-950 hover:bg-emerald-400"
+                    >
+                      Accepteer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRejectProposal?.(item.id)}
+                      className="rounded-md border border-amber-300 px-3 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                    >
+                      Verberg
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end">
               <button
@@ -190,7 +245,7 @@ export const SchuldenkaartCard = ({ items, onChange, onSummaryChange, variant = 
               </button>
             </div>
           </div>
-        ))}
+        );})}
       </div>
 
       <div className="rounded-lg bg-white/80 p-2.5 text-xs text-slate-800 shadow-inner">

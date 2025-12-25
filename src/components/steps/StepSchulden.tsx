@@ -84,6 +84,17 @@ export function StepSchulden({
   );
   const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
   const [undoVisible, setUndoVisible] = useState(false);
+  const [strategyProposals, setStrategyProposals] = useState<
+    Record<
+      string,
+      {
+        minPayment: number;
+        monthsToClear: number | null;
+        note: string;
+        strategyKey?: StrategyKey;
+      }
+    >
+  >({});
 
   const { runAi } = useAiOrchestrator({
     mode,
@@ -310,32 +321,58 @@ export function StepSchulden({
   const applyStrategyToDebts = (strategy: StrategyCard) => {
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
-    const noteMap: Record<string, string> = {};
     setLastSnapshot(debts);
-    const withAi = debts.map((d) => {
+    const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
+    debts.forEach((d) => {
+      const base =
+        typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0
+          ? d.minimaleMaandlast
+          : Math.max(25, Math.round((d.saldo || 0) / 24) || 0);
       const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
-      const current = d.minimaleMaandlast ?? 0;
-      const min = current > 0 ? current : Math.max(0, current * factor || 0);
-      const note = `Strategie ${strategy.title}: focus op ${
-        strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "mix"
-      } schulden.`;
-      noteMap[d.id] = note;
-      return {
-        ...d,
-        minimaleMaandlast: Math.round(min),
-        aiOpmerking: note,
+      const minPayment = Math.max(1, Math.round(base * factor));
+      const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+      proposals[d.id] = {
+        minPayment,
+        monthsToClear,
+        note: `Strategie ${strategy.title}: focus op ${strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"} schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+        strategyKey: strategy.key,
       };
     });
-    onDebtsChange?.(withAi);
-    setAiNotes(noteMap);
-    setUndoVisible(true);
-    setTimeout(() => setUndoVisible(false), 10000);
+    setStrategyProposals(proposals);
+    setView("list");
+  };
+
+  const applyProposalToDebt = (debtId: string) => {
+    if (isReadOnly) return;
+    const proposal = strategyProposals[debtId];
+    if (!proposal) return;
+    const nextDebts = debts.map((d) =>
+      d.id === debtId
+        ? { ...d, minimaleMaandlast: proposal.minPayment, aiOpmerking: proposal.note }
+        : d
+    );
+    onDebtsChange?.(nextDebts);
+    setAiNotes((prev) => ({ ...prev, [debtId]: proposal.note }));
+    setStrategyProposals((prev) => {
+      const next = { ...prev };
+      delete next[debtId];
+      return next;
+    });
+  };
+
+  const rejectProposalForDebt = (debtId: string) => {
+    setStrategyProposals((prev) => {
+      const next = { ...prev };
+      delete next[debtId];
+      return next;
+    });
   };
 
   const clearAiNotes = () => {
     if (isReadOnly) return;
     setSelectedStrategy(null);
     setAiNotes({});
+    setStrategyProposals({});
     const reset = debts.map((d) => ({ ...d, aiOpmerking: undefined }));
     onDebtsChange?.(reset);
   };
@@ -413,6 +450,11 @@ export function StepSchulden({
               </button>
             )}
           </div>
+          {Object.keys(strategyProposals).length > 0 && (
+            <div className="text-[11px] text-amber-200">
+              AI-voorstellen staan klaar. Je vindt ze in de lijstweergave per schuld en kunt ze per stuk accepteren.
+            </div>
+          )}
         </div>
       </div>
 
@@ -445,7 +487,7 @@ export function StepSchulden({
                 </div>
               </div>
               <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieA«n, donut
+                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieën, donut
                 en AI-opmerkingen; terug naar lijst om bedragen te bewerken.
               </div>
               <SchuldenkaartCard
@@ -453,6 +495,9 @@ export function StepSchulden({
                   ...d,
                   aiOpmerking: d.aiOpmerking ?? aiNotes[d.id],
                 }))}
+                proposals={strategyProposals}
+                onAcceptProposal={applyProposalToDebt}
+                onRejectProposal={rejectProposalForDebt}
                 onChange={(next) => {
                   if (isReadOnly) return;
                   (onDebtsChange ?? (() => {}))(next);
