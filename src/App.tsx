@@ -2104,6 +2104,26 @@ const App = () => {
     const label = active ? "Actief" : filled ? "Ingevuld" : "Nog te doen";
     return { active, filled, label };
   };
+  const helpCopy: Record<string, string> = {
+    intent: "Bepaal je richting: kies strategie, waar de druk zit, tijdpad en hoe AI je mag aanspreken.",
+    fundament: "Vul inkomen en vaste lasten in; dit bepaalt je vrije ruimte en betrouwbaarheid van AI-adviezen.",
+    schulden: "Voer schulden/verplichtingen in, maanddruk en afschrijfdag. Analyseer later voor strategieën.",
+    vermogen: "Voeg vermogen/buffers toe om runway en financiële veerkracht te zien.",
+    focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
+    rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
+    afschriften: "Upload bankafschriften (CSV/XLSX/PDF). AI haalt patronen/potjes uit je uitgaven.",
+    inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
+    action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
+    backup: "Exporteer of importeer je data lokaal (geen cloud).",
+    verplichtingen: "Zakelijke verplichtingen en regelingen; houd de maandlasten en looptijden bij.",
+    "biz-afschriften": "Upload zakelijke afschriften; AI haalt patronen uit je zakelijke uitgaven.",
+    "biz-rekeningen": "Beheer je zakelijke rekeningen; actieve rekeningen tellen mee voor uploads/analyse.",
+    "biz-inbox": "Zakelijke documenten en taken om nog te verwerken.",
+    "biz-strategie": "Zakelijke strategie: fase, risico's en doelen.",
+    "biz-cashflow": "Inkomend/uitgaand geld, runway en cashflow voor je bedrijf.",
+    "biz-kapitaal": "Zakelijk kapitaal/buffer en reserves; inzicht in financiële veerkracht.",
+    "biz-vooruitblik": "Scenario als je niets verandert; zicht op risico’s en kansen.",
+  };
 
   return (
     <main
@@ -2187,9 +2207,10 @@ const App = () => {
                   onMouseEnter={(e) => {
                     if (!helpMode) return;
                     const rect = e.currentTarget.getBoundingClientRect();
+                    const norm = normalizeStep(step.key);
                     setHelpTooltip({
                       label: step.label,
-                      desc: step.desc,
+                      desc: helpCopy[norm] || step.desc,
                       x: rect.right + 8,
                       y: rect.top,
                     });
@@ -2201,7 +2222,7 @@ const App = () => {
             <span className="font-semibold">{step.label}</span>
             <span className="text-[10px]">{unlocked ? label : "Nog te doen"}</span>
           </div>
-          <p className="text-[11px] text-slate-400">{step.desc}</p>
+          <p className={`text-[11px] ${active ? "text-slate-900" : "text-slate-400"}`}>{step.desc}</p>
         </button>
       );
     })}
