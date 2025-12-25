@@ -2192,14 +2192,7 @@ const App = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  try {
-                    console.info("[profile] open panel");
-                  } catch {
-                    /* ignore */
-                  }
-                  setShowProfile(true);
-                }}
+                onClick={() => setShowProfile(true)}
                 className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-100 hover:border-white/40"
                 title="Wissel tussen lokale profielen"
               >
