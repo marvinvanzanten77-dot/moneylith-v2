@@ -228,7 +228,7 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
               <input type="checkbox" checked={isPrimary} onChange={(e) => setIsPrimary(e.target.checked)} /> Primair
             </label>
             <p className="text-[11px] text-slate-700">
-              De primaire rekening wordt gebruikt als standaardbron voor analyse. Er kan maar een rekening primair zijn.
+              De primaire rekening is alleen de standaardselectie; alle actieve rekeningen tellen mee in analyse en afschriften.
             </p>
             <button
               type="button"
