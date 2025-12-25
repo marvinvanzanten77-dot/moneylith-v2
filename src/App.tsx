@@ -45,9 +45,7 @@ import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
 import { AnalyticsGate } from "./components/AnalyticsGate";
-import { ProfilePanel } from "./components/ProfilePanel";
-import { useCurrentUser } from "./state/userContext";
-import { runStorageSafetyChecks } from "./utils/safetyChecks";
+import { UserProvider } from "./state/userContext";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -240,15 +238,21 @@ const App = () => {
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
   const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-  const { profile: activeProfile, id: currentUserId } = useCurrentUser();
   if (legalPaths.includes(currentPath)) {
-    return <LegalPage path={currentPath} />;
+    return (
+      <UserProvider>
+        <LegalPage path={currentPath} />
+      </UserProvider>
+    );
   }
   if (statusPaths.includes(currentPath)) {
-    return <StatusPage />;
+    return (
+      <UserProvider>
+        <StatusPage />
+      </UserProvider>
+    );
   }
   const [showHelp, setShowHelp] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     const indexablePaths = ["/", ...legalPaths];
@@ -273,7 +277,6 @@ const App = () => {
     } else if (import.meta.env.MODE === "development") {
       console.debug("[analytics] consent missing/false, skip analytics");
     }
-    runStorageSafetyChecks();
   }, []);
 
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
@@ -2094,6 +2097,7 @@ const App = () => {
   };
 
   return (
+    <UserProvider>
     <main
       className={`min-h-screen text-slate-50 ${
         isBusiness
@@ -2184,27 +2188,17 @@ const App = () => {
 </aside>
 
         <section className="px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Moneylith / Finance OS</p>
               <h1 className="text-2xl font-semibold text-white">Finance Planner</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowProfile(true)}
-                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-100 hover:border-white/40"
-                title="Wissel tussen lokale profielen"
-              >
-                Profiel: {activeProfile?.username || currentUserId || "local-default"}
-              </button>
-              <div
-                className={`rounded-full px-3 py-1 text-xs ${
-                  isBusiness ? "bg-blue-500/20 text-amber-100" : "bg-amber-500/20 text-amber-100"
-                }`}
-              >
-                Stap: {activeTabs.find((s) => s.key === currentStep)?.label}
-              </div>
+            <div
+              className={`rounded-full px-3 py-1 text-xs ${
+                isBusiness ? "bg-blue-500/20 text-amber-100" : "bg-amber-500/20 text-amber-100"
+              }`}
+            >
+              Stap: {activeTabs.find((s) => s.key === currentStep)?.label}
             </div>
           </div>
           <div className="space-y-4">{renderContent()}</div>
@@ -2243,8 +2237,6 @@ const App = () => {
       />
     </aside>
   </div>
-
-      <ProfilePanel open={showProfile} onClose={() => setShowProfile(false)} />
 
       {showOverview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
@@ -2355,6 +2347,7 @@ const App = () => {
       <CookieBanner />
       <AnalyticsGate />
     </main>
+    </UserProvider>
   );
 };
 
