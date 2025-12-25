@@ -243,7 +243,6 @@ const App = () => {
   if (statusPaths.includes(currentPath)) {
     return <StatusPage />;
   }
-  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const indexablePaths = ["/", ...legalPaths];
