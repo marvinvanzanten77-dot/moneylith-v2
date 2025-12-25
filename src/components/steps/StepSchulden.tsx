@@ -53,7 +53,7 @@ export function StepSchulden({
   const [pendingFileName, setPendingFileName] = useLocalStorage<string | null>(pendingNameKey, null);
   const [pendingRows, setPendingRows] = useLocalStorage<SchuldItem[]>(pendingRowsKey, []);
   const applyCheck = canApplyDebtsSuggestions({ mode, actions, currentDebts: debts });
-  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "analysis");
+  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "list");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -443,6 +443,10 @@ export function StepSchulden({
                   )}
                   <span className="text-xs text-slate-500">Totaal: {debtCount} stuks</span>
                 </div>
+              </div>
+              <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieA«n, donut
+                en AI-opmerkingen; terug naar lijst om bedragen te bewerken.
               </div>
               <SchuldenkaartCard
                 items={debts.map((d) => ({
