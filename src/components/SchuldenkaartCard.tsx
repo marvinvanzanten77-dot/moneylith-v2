@@ -119,6 +119,27 @@ export const SchuldenkaartCard = ({
         )}
         {items.map((item) => {
           const proposal = proposals?.[item.id];
+          const proposalColors =
+            proposal?.strategyKey === "avalanche"
+              ? {
+                  border: "border-indigo-200",
+                  bg: "bg-indigo-50",
+                  badge: "bg-indigo-200 text-indigo-900",
+                  reject: "border-indigo-200 text-indigo-900",
+                }
+              : proposal?.strategyKey === "balanced"
+              ? {
+                  border: "border-emerald-200",
+                  bg: "bg-emerald-50",
+                  badge: "bg-emerald-200 text-emerald-900",
+                  reject: "border-emerald-300 text-emerald-900",
+                }
+              : {
+                  border: "border-amber-200",
+                  bg: "bg-amber-50",
+                  badge: "bg-amber-200 text-amber-900",
+                  reject: "border-amber-300 text-amber-900",
+                };
           return (
           <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
             <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 text-xs text-slate-800">
@@ -201,12 +222,12 @@ export const SchuldenkaartCard = ({
                 </div>
               )}
               {proposal && !isReadOnly && (
-                <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900 space-y-1">
+                <div className={`md:col-span-2 rounded-md border ${proposalColors.border} ${proposalColors.bg} p-2 text-[11px] text-slate-900 space-y-1`}>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">
                       AI voorstel {proposal.strategyKey ? `(${proposal.strategyKey})` : ""}
                     </span>
-                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${proposalColors.badge}`}>
                       {formatCurrency(proposal.minPayment)}
                     </span>
                   </div>
@@ -226,7 +247,7 @@ export const SchuldenkaartCard = ({
                     <button
                       type="button"
                       onClick={() => onRejectProposal?.(item.id)}
-                      className="rounded-md border border-amber-300 px-3 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                      className={`rounded-md border px-3 py-1 text-[11px] font-semibold hover:bg-white/60 ${proposalColors.reject}`}
                     >
                       Verberg
                     </button>

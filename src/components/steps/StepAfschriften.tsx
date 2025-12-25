@@ -84,7 +84,8 @@ export function StepAfschriften({
 
   const parseBucketsFromText = useCallback(
     (raw: string) => {
-      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
+    const baseBlocklist = ["huur", "hypotheek", "energie", "zorg", "zorgverzekering", "schuld", "lening", "lease", "vast", "verzekering", "brandstof"];
+    const blocklist = [...baseBlocklist, ...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
       const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
       lines.forEach((l, idx) => {
@@ -102,7 +103,7 @@ export function StepAfschriften({
           monthlyAvg: Math.round(num),
         });
       });
-      const max = Math.min(9, Math.max(6, parsed.length));
+      const max = parsed.length > 6 ? Math.min(9, parsed.length) : parsed.length;
       return parsed.slice(0, max);
     },
     [excludeLabels, fixedCostLabels]
@@ -217,7 +218,8 @@ export function StepAfschriften({
       });
       if (!spendTxs.length) return [];
 
-      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
+      const baseBlocklist = ["huur", "hypotheek", "energie", "zorg", "zorgverzekering", "schuld", "lening", "lease", "vast", "verzekering", "brandstof"];
+      const blocklist = [...baseBlocklist, ...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       const map = new Map<string, { total: number; count: number }>();
       spendTxs.forEach((t) => {
         const key = (t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
@@ -244,7 +246,7 @@ export function StepAfschriften({
         }))
         .filter((b) => b.monthlyAvg > 0)
         .sort((a, b) => b.monthlyAvg - a.monthlyAvg);
-      const max = Math.min(9, Math.max(6, computed.length));
+      const max = computed.length > 6 ? Math.min(9, computed.length) : computed.length;
       const trimmed = computed.slice(0, max);
       if (trimmed.length) return trimmed;
     }
@@ -267,7 +269,7 @@ export function StepAfschriften({
     });
     const system = "Moneylith - categoriseer variabele uitgaven in max 6 potjes. Vermijd vaste lasten (huur, hypotheek, energie, zorgverzekering).";
     const user = [
-      "Je krijgt een lijst uitgaven (negatieve bedragen). Groepeer in maximaal 6 categorieën en geef per categorie een maandgemiddelde (EUR, afgerond).",
+      "Je krijgt een lijst uitgaven (negatieve bedragen). Groepeer in maximaal 6 categorieen en geef per categorie een maandgemiddelde (EUR, afgerond).",
       "Formaat per regel: <label>: €<bedrag>",
       "Gebruik alleen variabele uitgaven; sla vaste lasten over.",
       "Data:",
@@ -278,7 +280,8 @@ export function StepAfschriften({
       if (!result) return;
       const lines = result.split("\n").map((l) => l.trim()).filter(Boolean);
       const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
-      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
+      const baseBlocklist = ["huur", "hypotheek", "energie", "zorg", "zorgverzekering", "schuld", "lening", "lease", "vast", "verzekering", "brandstof"];
+      const blocklist = [...baseBlocklist, ...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       lines.forEach((l, idx) => {
         const m = l.match(/^[-*\d.\)]*\s*([^:]+):\s*€?\s*([\d.,]+)/i);
         if (!m) return;
@@ -295,10 +298,11 @@ export function StepAfschriften({
         });
       });
       if (parsed.length) {
-        const max = Math.min(9, Math.max(6, parsed.length));
-        setAiBuckets(parsed.slice(0, max));
+        const max = parsed.length > 6 ? Math.min(9, parsed.length) : parsed.length;
+        const trimmed = parsed.slice(0, max);
+        setAiBuckets(trimmed);
         try {
-          localStorage.setItem(bucketStorageKey, JSON.stringify(parsed.slice(0, max)));
+          localStorage.setItem(bucketStorageKey, JSON.stringify(trimmed));
         } catch {
           /* ignore */
         }
@@ -424,7 +428,18 @@ export function StepAfschriften({
     [parseTransactionsFromCsv]
   );
 
-  const activeAccountOptions = accounts.filter((a) => a.active && a.type === "betaalrekening");
+  const activeAccountOptions = accounts.filter((a) => a.active);
+
+  useEffect(() => {
+    const activeIds = activeAccountOptions.map((a) => a.id);
+    if (activeIds.length === 0) {
+      setAccountId("");
+      return;
+    }
+    if (!accountId || !activeIds.includes(accountId)) {
+      setAccountId(activeIds[0]);
+    }
+  }, [accountId, activeAccountOptions]);
   const hasUploads = statements.length > 0;
 
   const runAiAnalysis = async () => {
@@ -587,7 +602,7 @@ export function StepAfschriften({
               <div className="mb-2 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Potjes uit afschriften</h2>
-                  <p className="text-xs text-slate-500">Max 9 categorieën, automatisch gegroepeerd.</p>
+                  <p className="text-xs text-slate-500">Max 9 categorieen, automatisch gegroepeerd.</p>
                 </div>
               <span className="text-[11px] text-slate-500">{buckets.length} potje(n)</span>
             </div>

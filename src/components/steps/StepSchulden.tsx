@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SchuldenkaartCard, type SchuldItem } from "../SchuldenkaartCard";
 import type { FinancialSnapshot } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
@@ -8,7 +8,6 @@ import { useAiOrchestrator, type TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { useMemo } from "react";
 
 interface StepSchuldenProps {
   onDebtSummary: (s: { totalDebt: number; totalMinPayment: number; debtCount: number }) => void;
@@ -102,6 +101,12 @@ export function StepSchulden({
     setLoading: setAiLoading,
     setLastActions: () => {},
   });
+
+  useEffect(() => {
+    if (view !== "list" && strategies.length === 0) {
+      setView("list");
+    }
+  }, [strategies.length, view, setView]);
 
   const pressureLine =
     totalDebt > 0 && totalMinPayment > 0
@@ -318,23 +323,49 @@ export function StepSchulden({
     }
   };
 
+  
   const applyStrategyToDebts = (strategy: StrategyCard) => {
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
     setLastSnapshot(debts);
+    const ordered = [...debts].sort((a, b) => {
+      const saldoA = a.saldo || 0;
+      const saldoB = b.saldo || 0;
+      if (strategy.key === "snowball") return saldoA - saldoB;
+      if (strategy.key === "avalanche") return saldoB - saldoA;
+      return (a.afschrijfDag ?? 0) - (b.afschrijfDag ?? 0);
+    });
+    const baseFor = (d: SchuldItem) => {
+      if (typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0) return d.minimaleMaandlast;
+      const divisor = strategy.key === "avalanche" ? 18 : strategy.key === "snowball" ? 24 : 21;
+      return Math.max(25, Math.round((d.saldo || 0) / divisor) || 0);
+    };
+    const baseline = ordered.reduce((sum, d) => sum + baseFor(d), 0);
+    const budgetMultiplier = strategy.key === "avalanche" ? 1.25 : strategy.key === "snowball" ? 1.15 : 1.1;
     const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
-    debts.forEach((d) => {
-      const base =
-        typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0
-          ? d.minimaleMaandlast
-          : Math.max(25, Math.round((d.saldo || 0) / 24) || 0);
-      const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
-      const minPayment = Math.max(1, Math.round(base * factor));
+    ordered.forEach((d, idx) => {
+      const base = baseFor(d);
+      const priorityWeight =
+        strategy.key === "balanced"
+          ? 0.5
+          : strategy.key === "snowball"
+          ? (ordered.length - idx) / ordered.length
+          : (idx + 1) / ordered.length;
+      const focusRoom = Math.max(0, baseline * budgetMultiplier - base * ordered.length);
+      const extra = Math.round(focusRoom * priorityWeight * 0.4);
+      const minPayment = Math.max(1, Math.round(base + extra));
       const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+      const label = d.naam || "deze schuld";
+      const nuance =
+        strategy.key === "snowball"
+          ? "start met de kleinste bedragen en rol vrijgekomen ruimte door"
+          : strategy.key === "avalanche"
+          ? "pak eerst de grootste druk aan"
+          : "spreid de last evenwichtiger";
       proposals[d.id] = {
         minPayment,
         monthsToClear,
-        note: `Strategie ${strategy.title}: focus op ${strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"} schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+        note: `Voor ${label} past ${strategy.title} (${nuance}). Betaal ${formatCurrency(minPayment)} per maand; dan is dit over ${monthsToClear ?? "?"} maand(en) klaar en kan dit bedrag doorrollen.`,
         strategyKey: strategy.key,
       };
     });
