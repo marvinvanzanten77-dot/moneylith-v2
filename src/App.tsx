@@ -1924,6 +1924,8 @@ const App = () => {
           ...fixedCostManualItems.map((i) => i.description ?? i.name ?? "").filter(Boolean),
           ...fixedCostItems.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
         ];
+    const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
+    const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
     return (
       <StepAfschriften
@@ -1942,6 +1944,7 @@ const App = () => {
         onAiAnalysisComplete={onComplete}
         onAiActionsChange={handleAiActionsChange}
         fixedCostLabels={fixedLabels}
+        excludeLabels={excludeLabels}
       />
     );
   };

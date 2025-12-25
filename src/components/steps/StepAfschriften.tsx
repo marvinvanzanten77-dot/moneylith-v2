@@ -24,6 +24,7 @@ interface StepAfschriftenProps {
   fixedCostLabels?: string[];
   variant?: "personal" | "business";
   storagePrefix?: string;
+  excludeLabels?: string[];
 }
 
 export function StepAfschriften({
@@ -43,6 +44,7 @@ export function StepAfschriften({
   fixedCostLabels = [],
   variant = "personal",
   storagePrefix,
+  excludeLabels = [],
 }: StepAfschriftenProps) {
   const bucketPrefix = storagePrefix ?? (variant === "business" ? "moneylith.business" : "moneylith.personal");
   const bucketStorageKey = `${bucketPrefix}.aiBuckets`;
@@ -82,7 +84,7 @@ export function StepAfschriften({
 
   const parseBucketsFromText = useCallback(
     (raw: string) => {
-      const fixedLower = fixedCostLabels.map((f) => f.toLowerCase());
+      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
       const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
       lines.forEach((l, idx) => {
@@ -91,17 +93,19 @@ export function StepAfschriften({
         const label = m[1].trim();
         const num = parseFloat(m[2].replace(/\./g, "").replace(",", "."));
         if (!Number.isFinite(num)) return;
-        const isFixed = fixedLower.some((f) => f && label.toLowerCase().includes(f));
-        if (isFixed) return;
+        const lower = label.toLowerCase();
+        const isBlocked = blocklist.some((f) => f && lower.includes(f));
+        if (isBlocked) return;
         parsed.push({
           id: `ai-bucket-${idx}-${label.toLowerCase().replace(/\s+/g, "-").slice(0, 40)}`,
           label,
           monthlyAvg: Math.round(num),
         });
       });
-      return parsed.slice(0, 9);
+      const max = Math.min(9, Math.max(6, parsed.length));
+      return parsed.slice(0, max);
     },
-    [fixedCostLabels]
+    [excludeLabels, fixedCostLabels]
   );
 
   const detectBankLabel = useCallback(
@@ -213,9 +217,12 @@ export function StepAfschriften({
       });
       if (!spendTxs.length) return [];
 
+      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       const map = new Map<string, { total: number; count: number }>();
       spendTxs.forEach((t) => {
         const key = (t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
+        const isBlocked = blocklist.some((f) => f && key.includes(f));
+        if (isBlocked) return;
         const entry = map.get(key) ?? { total: 0, count: 0 };
         entry.total += Math.abs(t.amount);
         entry.count += 1;
@@ -236,9 +243,10 @@ export function StepAfschriften({
           count: info.count,
         }))
         .filter((b) => b.monthlyAvg > 0)
-        .sort((a, b) => b.monthlyAvg - a.monthlyAvg)
-        .slice(0, 6);
-      if (computed.length) return computed;
+        .sort((a, b) => b.monthlyAvg - a.monthlyAvg);
+      const max = Math.min(9, Math.max(6, computed.length));
+      const trimmed = computed.slice(0, max);
+      if (trimmed.length) return trimmed;
     }
 
     // Lege placeholders (alleen visuals) als fallback
@@ -248,7 +256,7 @@ export function StepAfschriften({
       monthlyAvg: 0,
       count: 0,
     }));
-  }, [_transactions, aiBuckets]);
+  }, [_transactions, aiBuckets, excludeLabels, fixedCostLabels]);
 
   const runAiBuckets = useCallback(async (token?: string) => {
     const spendTxs = (_transactions ?? []).filter((t) => t.amount < 0);
@@ -270,15 +278,16 @@ export function StepAfschriften({
       if (!result) return;
       const lines = result.split("\n").map((l) => l.trim()).filter(Boolean);
       const parsed: { id: string; label: string; monthlyAvg: number; count?: number }[] = [];
-      const fixedLower = fixedCostLabels.map((f) => f.toLowerCase());
+      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
       lines.forEach((l, idx) => {
         const m = l.match(/^[-*\d.\)]*\s*([^:]+):\s*€?\s*([\d.,]+)/i);
         if (!m) return;
         const label = m[1].trim();
         const num = parseFloat(m[2].replace(/\./g, "").replace(",", "."));
         if (!Number.isFinite(num)) return;
-        const isFixed = fixedLower.some((f) => f && label.toLowerCase().includes(f));
-        if (isFixed) return;
+        const lower = label.toLowerCase();
+        const isBlocked = blocklist.some((f) => f && lower.includes(f));
+        if (isBlocked) return;
         parsed.push({
           id: `ai-bucket-${idx}-${label.toLowerCase().replace(/\s+/g, "-").slice(0, 40)}`,
           label,
@@ -286,9 +295,10 @@ export function StepAfschriften({
         });
       });
       if (parsed.length) {
-        setAiBuckets(parsed.slice(0, 6));
+        const max = Math.min(9, Math.max(6, parsed.length));
+        setAiBuckets(parsed.slice(0, max));
         try {
-          localStorage.setItem(bucketStorageKey, JSON.stringify(parsed.slice(0, 6)));
+          localStorage.setItem(bucketStorageKey, JSON.stringify(parsed.slice(0, max)));
         } catch {
           /* ignore */
         }
@@ -296,7 +306,7 @@ export function StepAfschriften({
     } catch (err) {
       console.error("AI bucket analyse mislukt", err);
     }
-  }, [_transactions, bucketStorageKey, fixedCostLabels, runAi]);
+  }, [_transactions, bucketStorageKey, excludeLabels, fixedCostLabels, runAi]);
 
   const handleSubmit = () => {
     if (!accountId || filePayloads.length === 0) return;
