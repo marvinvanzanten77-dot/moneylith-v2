@@ -10,8 +10,6 @@ type ProfilePanelProps = {
 export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
   const { id: currentUserId, profile, setActiveProfile } = useCurrentUser();
   const [profiles, setProfiles] = useState<ProfileRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
@@ -25,26 +23,7 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(null);
-    listProfiles()
-      .then((items) => {
-        if (cancelled) return;
-        setProfiles(items);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setProfiles([]);
-        setLoadError("Profielen laden niet. Ververs de pagina of schakel uit/aan als IndexedDB geblokkeerd is.");
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    listProfiles().then(setProfiles).catch(() => setProfiles([]));
   }, [open]);
 
   const sortedProfiles = useMemo(() => {
@@ -154,8 +133,6 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
               <h4 className="text-sm font-semibold text-slate-900">Inloggen / wisselen</h4>
               <span className="text-[11px] text-slate-500">{sortedProfiles.length} profielen</span>
             </div>
-            {loading && <p className="text-[11px] text-slate-500">Profielen laden…</p>}
-            {loadError && <p className="text-[11px] text-red-600">{loadError}</p>}
             <label className="text-xs text-slate-700">
               Profiel
               <select
