@@ -173,6 +173,7 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
             </button>
             <p className="text-[11px] text-slate-500">
               Bij uitloggen blijft je data staan; je keert terug naar het standaardprofiel zonder wachtwoord.
+              Gebruik de Backup/export-tab om je data als JSON te bewaren of later te herstellen.
             </p>
           </form>
 
