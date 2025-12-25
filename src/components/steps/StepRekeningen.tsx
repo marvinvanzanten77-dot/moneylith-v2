@@ -18,6 +18,8 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
   const [active, setActive] = useState(true);
   const [description, setDescription] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
+  const [ibanError, setIbanError] = useState<string | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const accountToEdit = useMemo(() => accounts.find((a) => a.id === editingId), [accounts, editingId]);
 
@@ -30,17 +32,31 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
     setActive(accountToEdit.active);
     setDescription(accountToEdit.description ?? "");
     setIsPrimary(accountToEdit.isPrimary ?? false);
+    setIbanError(null);
+    setAmountError(null);
   }, [accountToEdit]);
+
+  const validateIban = (value: string) => {
+    if (!value) return null;
+    const compact = value.replace(/\s+/g, "").toUpperCase();
+    const pattern = /^[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7,}$/;
+    return pattern.test(compact) ? null : "Geen geldige IBAN-notatie.";
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) return;
+    const ibanValidation = validateIban(iban.trim());
+    setIbanError(ibanValidation);
+    const numericAmount = typeof startBalance === "number" && Number.isFinite(startBalance) ? startBalance : undefined;
+    setAmountError(null);
+    if (ibanValidation) return;
     const id = editingId ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     onSaveAccount({
       id,
       name: name.trim(),
       type,
       iban: iban.trim() || undefined,
-      startBalance,
+      startBalance: numericAmount,
       active,
       description: description.trim() || undefined,
       isPrimary,
@@ -191,9 +207,12 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
               <input
                 value={iban}
                 onChange={(e) => setIban(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-500 caret-slate-900"
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-500 caret-slate-900 ${
+                  ibanError ? "border-red-400" : "border-slate-300"
+                }`}
                 placeholder="NL..."
               />
+              {ibanError && <p className="text-[11px] text-red-600">{ibanError}</p>}
             </label>
             <label className="text-xs text-slate-800">
               Beschrijving (optioneel)
@@ -207,15 +226,30 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
             <label className="text-xs text-slate-800">
               Startsaldo (optioneel)
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9.,]*"
                 value={startBalance ?? ""}
-                onChange={(e) => setStartBalance(e.target.value === "" ? undefined : Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-500 caret-slate-900"
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9.,-]/g, "");
+                  const normalized = raw.replace(",", ".");
+                  const num = normalized === "" ? undefined : Number(normalized);
+                  if (normalized && Number.isNaN(num)) {
+                    setAmountError("Alleen getallen toegestaan.");
+                  } else {
+                    setAmountError(null);
+                  }
+                  setStartBalance(num);
+                }}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 placeholder-slate-500 caret-slate-900 ${
+                  amountError ? "border-red-400" : "border-slate-300"
+                }`}
               />
               <p className="mt-1 text-[11px] text-slate-700">
                 Dit is het saldo bij de start van je planning. Dit beinvloedt je beginvermogen en buffer. Spaarrekeningen met
                 startsaldo tellen als vermogen; voer dit niet dubbel in bij "Vermogen".
               </p>
+              {amountError && <p className="text-[11px] text-red-600">{amountError}</p>}
             </label>
             <label className="inline-flex items-center gap-2 text-xs text-slate-800">
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Actief

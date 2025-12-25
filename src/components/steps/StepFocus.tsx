@@ -106,6 +106,16 @@ export function StepFocus({
   const handleSubmit = () => {
     if (isReadOnly) return;
     if (!formState.label.trim()) return;
+    let deadlineIso: string | undefined = undefined;
+    if (deadlineInput.trim()) {
+      const parsed = parseDateNlToIso(deadlineInput);
+      if (!parsed) {
+        setDeadlineValid(false);
+        return;
+      }
+      deadlineIso = parsed;
+      setDeadlineValid(true);
+    }
 
     if (formState.isActive) {
       goals.forEach((g) => {
@@ -122,7 +132,7 @@ export function StepFocus({
         targetAmount: formState.targetAmount,
         currentAmount: formState.currentAmount,
         monthlyContribution: formState.monthlyContribution,
-        deadline: formState.deadline,
+        deadline: deadlineIso ?? formState.deadline,
         linkedBucketIds: formState.linkedBucketIds,
         isActive: formState.isActive,
       });
@@ -133,7 +143,7 @@ export function StepFocus({
         targetAmount: formState.targetAmount,
         currentAmount: formState.currentAmount,
         monthlyContribution: formState.monthlyContribution,
-        deadline: formState.deadline,
+        deadline: deadlineIso ?? undefined,
         linkedBucketIds: formState.linkedBucketIds,
         isActive: formState.isActive,
       });
@@ -332,14 +342,23 @@ export function StepFocus({
               />
             </label>
             <label className="text-xs text-slate-300">
-              Deadline (optioneel)
+              Deadline (optioneel, DD-MM-YYYY)
               <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
-                value={formState.deadline}
-                onChange={(e) => setFormState((p) => ({ ...p, deadline: e.target.value }))}
+                type="text"
+                inputMode="numeric"
+                pattern="\\d{1,2}-\\d{1,2}-\\d{4}"
+                className={`mt-1 w-full rounded-lg border bg-slate-900/80 px-3 py-2 text-sm ${
+                  deadlineValid ? "border-slate-700" : "border-red-400"
+                }`}
+                value={deadlineInput}
+                onChange={(e) => {
+                  setDeadlineInput(e.target.value);
+                  setDeadlineValid(!e.target.value || !!parseDateNlToIso(e.target.value));
+                }}
+                placeholder="bijv. 15-04-2026"
                 disabled={isReadOnly}
               />
+              {!deadlineValid && <p className="mt-1 text-[11px] text-red-300">Gebruik DD-MM-JJJJ, bijv. 15-04-2026.</p>}
             </label>
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <input
