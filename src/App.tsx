@@ -45,6 +45,7 @@ import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
 import { AnalyticsGate } from "./components/AnalyticsGate";
+import { UserProvider } from "./state/userContext";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -238,10 +239,18 @@ const App = () => {
   const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
   if (legalPaths.includes(currentPath)) {
-    return <LegalPage path={currentPath} />;
+    return (
+      <UserProvider>
+        <LegalPage path={currentPath} />
+      </UserProvider>
+    );
   }
   if (statusPaths.includes(currentPath)) {
-    return <StatusPage />;
+    return (
+      <UserProvider>
+        <StatusPage />
+      </UserProvider>
+    );
   }
   const [showHelp, setShowHelp] = useState(false);
 
@@ -2088,6 +2097,7 @@ const App = () => {
   };
 
   return (
+    <UserProvider>
     <main
       className={`min-h-screen text-slate-50 ${
         isBusiness
@@ -2337,6 +2347,7 @@ const App = () => {
       <CookieBanner />
       <AnalyticsGate />
     </main>
+    </UserProvider>
   );
 };
 
