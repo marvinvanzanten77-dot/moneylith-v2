@@ -45,6 +45,7 @@ import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
 import { AnalyticsGate } from "./components/AnalyticsGate";
+import LogoFull from "../logo/ChatGPT_Image_Dec_21__2025__01_47_34_PM-removebg-preview.png";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -277,6 +278,7 @@ const App = () => {
   ]);
   const [helpMode, setHelpMode] = useState(false);
   const [helpTooltip, setHelpTooltip] = useState<{ label: string; desc: string; x: number; y: number } | null>(null);
+  const [introSeen, setIntroSeen] = useLocalStorage<boolean>("moneylith.intro.seen", false);
   const [selectedMonth, setSelectedMonth] = useLocalStorage<MonthId>("selected-month", "2025-12");
   const [monthFocus, setMonthFocus] = useLocalStorage<MonthFocus>("month-focus", null);
   const [showOverview, setShowOverview] = useState(false);
@@ -2346,6 +2348,49 @@ const App = () => {
           onChange={setFixedCostItems}
           onClose={() => setIsFixedCostsWizardOpen(false)}
         />
+      )}
+
+      {!introSeen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/80 backdrop-blur">
+          <div className="card-shell max-w-3xl w-full p-8 text-slate-900">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <img src={LogoFull} alt="Moneylith logo" className="h-16 w-auto drop-shadow-lg" />
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Welkom bij Moneylith</h2>
+                  <p className="text-sm text-slate-600">
+                    Local-first financieel kompas: breng je inkomsten, vaste lasten, schulden en patronen in kaart. AI helpt alleen met analyse; jouw data blijft lokaal.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIntroSeen(true)}
+                className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow hover:bg-amber-400"
+              >
+                Start
+              </button>
+            </div>
+            <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+                <h3 className="text-base font-semibold text-slate-900">Wat je hier doet</h3>
+                <ul className="mt-2 space-y-1 list-disc pl-4">
+                  <li>Leg je intentie vast en check je fundament (inkomen & vaste lasten).</li>
+                  <li>Voer schulden/verplichtingen in en zie direct de maanddruk.</li>
+                  <li>Upload afschriften om patronen/potjes te vinden (geen cloud, alles lokaal).</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+                <h3 className="text-base font-semibold text-slate-900">Belangrijk om te weten</h3>
+                <ul className="mt-2 space-y-1 list-disc pl-4">
+                  <li>Local-first: geen server-side opslag; exporteer/backup zelf.</li>
+                  <li>AI analyseert maar beslist niets voor je; je invoer blijft leidend.</li>
+                  <li>Schakel hulpmodus in voor uitleg per tabblad (vraagteken-cursor).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <footer className="mt-6 border-t border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-200 flex flex-wrap gap-3 justify-center">
