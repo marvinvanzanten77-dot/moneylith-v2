@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { asSession, createProfile, deriveProfileEncryptionKey, listProfiles, touchLastLogin, verifyProfilePassword, type ProfileRecord } from "../services/profileStore";
 import { useCurrentUser, getDefaultUserId } from "../state/userContext";
 
@@ -28,6 +29,11 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
+    if (typeof indexedDB === "undefined") {
+      setLoadError("Profielen niet beschikbaar: IndexedDB is geblokkeerd in deze browser.");
+      setLoading(false);
+      return () => undefined;
+    }
     listProfiles()
       .then((items) => {
         if (cancelled) return;
@@ -126,7 +132,7 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
 
   const isDefault = currentUserId === getDefaultUserId();
 
-  return (
+  const content = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
       <div className="card-shell w-full max-w-3xl p-6 text-slate-900">
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -266,4 +272,6 @@ export const ProfilePanel = ({ open, onClose }: ProfilePanelProps) => {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : content;
 };
