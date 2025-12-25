@@ -2320,32 +2320,6 @@ const App = () => {
         </div>
       )}
 
-      {showHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
-          <div className="card-shell w-full max-w-lg p-6 text-slate-900">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Hulp tips</h3>
-                <p className="text-sm text-slate-600">Snelle tips om vlot door Moneylith te gaan.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300"
-              >
-                Sluiten
-              </button>
-            </div>
-            <ul className="space-y-2 text-sm text-slate-700">
-              <li>Begin met Intentie en Fundament om je basis vast te leggen.</li>
-              <li>Upload daarna afschriften zodat AI je variabele potjes kan afleiden.</li>
-              <li>Gebruik de Backup tab om je data lokaal te exporteren.</li>
-              <li>Stel je doelen in en gebruik Vooruitblik om je koers te checken.</li>
-            </ul>
-          </div>
-        </div>
-      )}
-
       {isFixedCostsWizardOpen && (
         <FixedCostsWizard
           items={mergedFixedCostItems}
