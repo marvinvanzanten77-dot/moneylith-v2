@@ -1,4 +1,6 @@
 ﻿import { useEffect, useId } from "react";
+
+import { formatCurrency } from "../utils/format";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { IncomeItem } from "../types";
 
@@ -19,9 +21,6 @@ const newId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return String(Date.now());
 };
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 
 export function IncomeList({
   onSumChange,

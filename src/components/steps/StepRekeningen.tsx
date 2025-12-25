@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+
+import { formatCurrency } from "../../utils/format";
 import type { MoneylithAccount } from "../../types";
 
 interface StepRekeningenProps {
@@ -6,9 +8,6 @@ interface StepRekeningenProps {
   onSaveAccount: (account: MoneylithAccount) => void;
   onDeleteAccount?: (id: string) => void;
 }
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 
 export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: StepRekeningenProps) {
   const [editingId, setEditingId] = useState<string | null>(null);

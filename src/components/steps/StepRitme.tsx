@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+
+import { formatCurrency } from "../../utils/format";
 import type { FinancialSnapshot } from "../../types";
 import { AiAnalyzeButton } from "../AiAnalyzeButton";
 
@@ -21,9 +23,6 @@ interface RitmeProps {
     isEssential?: boolean;
   }[];
 }
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
 
 export function StepRitme({
   financialSnapshot,

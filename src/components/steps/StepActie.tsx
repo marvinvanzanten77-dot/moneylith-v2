@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+
+import { formatCurrency } from "../../utils/format";
 import type { FinancialSnapshot, FinanceMode, MonthFocus } from "../../types";
 
 type StepVooruitblikProps = {
@@ -10,9 +12,6 @@ type StepVooruitblikProps = {
   readOnly?: boolean;
   aiAnalysisDone?: boolean;
 };
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
 
 export function StepVooruitblik({
   financialSnapshot,

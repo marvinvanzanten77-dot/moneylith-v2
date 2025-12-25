@@ -1,4 +1,6 @@
 import { useEffect, useMemo } from "react";
+
+import { formatCurrency } from "../../utils/format";
 import { VermogenCard } from "../VermogenCard";
 import type { FinancialSnapshot } from "../../types";
 import type { FinanceMode } from "../../logic/snapshot";
@@ -23,9 +25,6 @@ interface StepVermogenProps {
   readOnly?: boolean;
   mode?: FinanceMode;
 }
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
 
 export function StepVermogen({
   assets,

@@ -23,9 +23,6 @@ interface StepSchuldenProps {
   actions?: AiActions | null;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
-
 export function StepSchulden({
   onDebtSummary,
   financialSnapshot,

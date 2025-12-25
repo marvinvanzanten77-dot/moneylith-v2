@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+
+import { formatCurrency } from "../../utils/format";
 import { projectGoal } from "../../logic/goals";
 import type { FinancialSnapshot, MoneylithBucket, MoneylithGoal } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
@@ -16,9 +18,6 @@ type StepFocusProps = {
   mode?: "personal" | "business";
   actions?: AiActions | null;
 };
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value || 0);
 
 export function StepFocus({
   financialSnapshot,
