@@ -1,6 +1,7 @@
 ﻿import { useEffect, useId } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { FixedCostManualItem } from "../types";
+import { formatCurrency } from "../utils/format";
 
 interface FixedCostsListProps {
   onSumChange?: (sum: number) => void;
@@ -21,9 +22,6 @@ const newId = () => {
   }
   return String(Date.now());
 };
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 
 export function FixedCostsList({
   onSumChange,
