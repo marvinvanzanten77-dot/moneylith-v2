@@ -2082,7 +2082,7 @@ const App = () => {
         filled = rekeningenFilled;
         break;
       case "inbox":
-        filled = false;
+        filled = activeInboxItems.length > 0;
         break;
       case "afschriften":
         filled = afschriftenFilled;
@@ -2103,7 +2103,7 @@ const App = () => {
         filled = false;
         break;
     }
-    const label = active ? "Actief" : filled ? "Ingevuld" : "Nog te doen";
+    const label = active ? "Actief" : normalized === "inbox" ? "Optioneel" : filled ? "Ingevuld" : "Nog te doen";
     return { active, filled, label };
   };
   const helpCopy: Record<string, string> = {
