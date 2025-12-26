@@ -617,17 +617,17 @@ export function StepSchulden({
       {view === "analysis" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">AI-analyse</h3>
-                    <p className="text-xs text-slate-400">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">AI-analyse</h3>
+                  <p className="text-xs text-slate-400">
                     Genereer 4 strategieën (incl. Custom) en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
-                    </p>
-                    <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <button
+                  </p>
+                  <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <button
                     type="button"
                     onClick={runAiStrategies}
                     disabled={aiLoading}
@@ -642,96 +642,93 @@ export function StepSchulden({
                     theme="dark"
                   />
                 </div>
-                </div>
-                {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
-                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {strategies.map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      onClick={() => applyStrategyToDebts(s)}
-                      className={`rounded-xl border p-3 text-left text-xs transition ${
-                        selectedStrategy === s.key
-                          ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
-                          : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
-                      } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
-                      title="AI vult alleen aan; jouw invoer blijft staan."
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-100">{s.title}</span>
-                        {s.recommended && (
-                          <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-950">
-                            Aanbevolen
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-slate-200">{s.summary}</p>
-                      <div className="mt-2 space-y-1 text-slate-300">
-                        <div>
-                          <span className="font-semibold text-emerald-400">+ Pro's:</span>
-                          <ul className="ml-3 list-disc">
-                            {s.pros.map((p, idx) => (
-                              <li key={idx}>{p}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-red-300">- Con's:</span>
-                          <ul className="ml-3 list-disc">
-                            {s.cons.map((c, idx) => (
-                              <li key={idx}>{c}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                  {!strategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
-                </div>
-
-                {selectedStrategy === "custom" && (
-                  <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-3 text-xs text-slate-200">
-                    <p className="text-[11px] text-slate-300">
-                      Custom: geef je wensen. Voorbeeld: “Prioriteit: schuldA,schuldB. Extra: schuldA=150. Budget: 450”.
-                    </p>
-                    <textarea
-                      className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/80 p-2 text-xs text-slate-100"
-                      rows={3}
-                      value={customStrategyText}
-                      onChange={(e) => setCustomStrategyText(e.target.value)}
-                      placeholder="Typ instructies voor de custom strategie..."
-                    />
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900"
-                        onClick={() => {
-                          const idByName: Record<string, string> = {};
-                          debts.forEach((d) => {
-                            if (d.naam) {
-                              idByName[d.naam.toLowerCase()] = d.id;
-                              idByName[d.naam] = d.id;
-                            }
-                          });
-                          const plan = buildCustomPlanFromAI(customStrategyText, idByName);
-                          setCustomPlan(plan);
-                        }}
-                      >
-                        Zet om naar plan
-                      </button>
-                      {customPlan && (
-                        <span className="text-[11px] text-emerald-200">
-                          Plan actief: {customPlan.priorityOrder?.length ? `volgorde ${customPlan.priorityOrder.length}` : "geen volgorde"} · extra:{" "}
-                          {customPlan.extraPerDebt ? Object.keys(customPlan.extraPerDebt).length : 0} · budget:{" "}
-                          {customPlan.monthlyBudgetOverride ?? "standaard"}
+              </div>
+              {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {strategies.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => applyStrategyToDebts(s)}
+                    className={`rounded-xl border p-3 text-left text-xs transition ${
+                      selectedStrategy === s.key
+                        ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
+                        : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
+                    } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
+                    title="AI vult alleen aan; jouw invoer blijft staan."
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-100">{s.title}</span>
+                      {s.recommended && (
+                        <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-950">
+                          Aanbevolen
                         </span>
                       )}
                     </div>
-                  </div>
-                )}
+                    <p className="mt-2 text-slate-200">{s.summary}</p>
+                    <div className="mt-2 space-y-1 text-slate-300">
+                      <div>
+                        <span className="font-semibold text-emerald-400">+ Pro's:</span>
+                        <ul className="ml-3 list-disc">
+                          {s.pros.map((p, idx) => (
+                            <li key={idx}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-red-300">- Con's:</span>
+                        <ul className="ml-3 list-disc">
+                          {s.cons.map((c, idx) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {!strategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
               </div>
-            </div>
-          </div>
+
+              {selectedStrategy === "custom" && (
+                <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-3 text-xs text-slate-200">
+                  <p className="text-[11px] text-slate-300">
+                    Custom: geef je wensen. Voorbeeld: “Prioriteit: schuldA,schuldB. Extra: schuldA=150. Budget: 450”.
+                  </p>
+                  <textarea
+                    className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/80 p-2 text-xs text-slate-100"
+                    rows={3}
+                    value={customStrategyText}
+                    onChange={(e) => setCustomStrategyText(e.target.value)}
+                    placeholder="Typ instructies voor de custom strategie..."
+                  />
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900"
+                      onClick={() => {
+                        const idByName: Record<string, string> = {};
+                        debts.forEach((d) => {
+                          if (d.naam) {
+                            idByName[d.naam.toLowerCase()] = d.id;
+                            idByName[d.naam] = d.id;
+                          }
+                        });
+                        const plan = buildCustomPlanFromAI(customStrategyText, idByName);
+                        setCustomPlan(plan);
+                      }}
+                    >
+                      Zet om naar plan
+                    </button>
+                    {customPlan && (
+                      <span className="text-[11px] text-emerald-200">
+                        Plan actief: {customPlan.priorityOrder?.length ? `volgorde ${customPlan.priorityOrder.length}` : "geen volgorde"} · extra:{" "}
+                        {customPlan.extraPerDebt ? Object.keys(customPlan.extraPerDebt).length : 0} · budget:{" "}
+                        {customPlan.monthlyBudgetOverride ?? "standaard"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -779,9 +776,9 @@ export function StepSchulden({
                 <span className="font-semibold">{formatCurrency(totalDebt)}</span>
               </div>
               <div className="flex justify-between">
-                  <span>Maanddruk (maand 1, strategie)</span>
-                  <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
-                </div>
+                <span>Maanddruk (maand 1, strategie)</span>
+                <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
+              </div>
               <div className="flex justify-between">
                 <span>Vrij na schulden</span>
                 <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
