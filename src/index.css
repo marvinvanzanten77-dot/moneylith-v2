@@ -5,37 +5,40 @@
 @layer base {
   :root {
     --bg-start: #0f172a;
-    --bg-end: #111827;
-    --card-bg: rgba(255, 255, 255, 0.85);
-    --border-soft: rgba(255, 255, 255, 0.2);
-    --shadow-soft: 0 20px 60px -35px rgba(15, 23, 42, 0.6);
-    --primary: #7c3aed;
-    --primary-strong: #4c1d95;
+    --bg-end: #0b1223;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --border-soft: rgba(15, 23, 42, 0.08);
+    --shadow-soft: 0 24px 60px -36px rgba(15, 23, 42, 0.7);
+    --primary: #f59e0b;
+    --primary-strong: #d97706;
+    --secondary: #2563eb;
     --muted: #94a3b8;
+    --text-strong: #0f172a;
+    --text-muted: #475569;
   }
 
   body {
     @apply text-slate-50 antialiased;
     font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: radial-gradient(120% 120% at 20% 20%, rgba(124, 58, 237, 0.16), transparent 40%),
-      radial-gradient(120% 120% at 80% 0%, rgba(14, 165, 233, 0.18), transparent 35%),
+    background: radial-gradient(120% 120% at 20% 20%, rgba(245, 158, 11, 0.14), transparent 42%),
+      radial-gradient(120% 120% at 80% 0%, rgba(37, 99, 235, 0.16), transparent 38%),
       linear-gradient(180deg, var(--bg-start), var(--bg-end));
   }
 
   ::selection {
-    background: rgba(124, 58, 237, 0.3);
+    background: rgba(245, 158, 11, 0.35);
     color: #fff;
   }
 }
 
 @layer components {
   .card-shell {
-    @apply rounded-2xl border border-white/30 bg-white/90 shadow-xl backdrop-blur-xl transition duration-200 ease-out;
-    box-shadow: 0 25px 70px -40px rgba(15, 23, 42, 0.65);
+    @apply rounded-2xl border border-white/40 bg-white/90 shadow-xl backdrop-blur-xl transition duration-200 ease-out;
+    box-shadow: var(--shadow-soft);
   }
 
   .card-shell:hover {
-    @apply shadow-2xl -translate-y-0.5 border-white/50;
+    @apply shadow-2xl -translate-y-0.5 border-white/60;
   }
 
   .card-title {
@@ -55,7 +58,15 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition duration-150 ease-out hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-white/20;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-sm font-semibold text-slate-900 shadow-lg transition duration-150 ease-out hover:shadow-xl hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-slate-900/20;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-slate-800/80 px-4 py-2 text-sm font-semibold text-slate-100 shadow transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900/20;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2 focus:ring-offset-slate-900/20;
   }
 
   input,
@@ -67,6 +78,19 @@
   input:focus,
   select:focus,
   textarea:focus {
-    @apply ring-2 ring-purple-300 border-purple-300;
+    @apply ring-2 ring-amber-300 border-amber-300;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold;
+  }
+  .status-pill.active {
+    @apply bg-amber-100 text-amber-900 border border-amber-200;
+  }
+  .status-pill.filled {
+    @apply bg-emerald-100 text-emerald-900 border border-emerald-200;
+  }
+  .status-pill.todo {
+    @apply bg-slate-200 text-slate-700 border border-slate-300;
   }
 }
