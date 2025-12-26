@@ -169,7 +169,9 @@ export const SchuldenkaartCard = ({
                 <div className="flex flex-col">
                   <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
                   {proposal?.strategyKey && (
-                    <span className="text-[11px] font-semibold text-amber-700">{proposal.strategyKey.toUpperCase()}</span>
+                    <span className="text-[11px] font-semibold text-amber-700">
+                      {proposal.strategyKey.toUpperCase()} · {formatCurrency(proposal.minPayment)}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 font-semibold text-slate-800">
