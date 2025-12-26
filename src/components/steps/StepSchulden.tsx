@@ -9,8 +9,7 @@ import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency } from "../../utils/format";
-import { simulatePayoff, type StrategyKey, type CustomPlan } from "../../logic/debtSimulator";
-import { buildCustomPlanFromAI } from "../../logic/buildCustomPlan";
+import { simulatePayoff, type StrategyKey } from "../../logic/debtSimulator";
 
 interface StepSchuldenProps {
   onDebtSummary: (s: { totalDebt: number; totalMinPayment: number; debtCount: number }) => void;
@@ -75,8 +74,6 @@ export function StepSchulden({
     `moneylith.${variant}.debts.aiNotes`,
     {}
   );
-  const [customStrategyText, setCustomStrategyText] = useState("");
-  const [customPlan, setCustomPlan] = useState<CustomPlan | null>(null);
   const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
   const [undoVisible, setUndoVisible] = useState(false);
   const [strategyProposals, setStrategyProposals] = useState<
@@ -329,72 +326,69 @@ export function StepSchulden({
     }
   };
 
-  const buildCustomProposals = (plan: CustomPlan) => {
-    const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
-    const orderIds =
-      plan.priorityOrder && plan.priorityOrder.length
-        ? plan.priorityOrder
-        : debts
-            .slice()
-            .sort((a, b) => (b.saldo || 0) - (a.saldo || 0))
-            .map((d) => d.id);
-    debts.forEach((d) => {
-      const remaining = d.saldo || 0;
-      const baseMin =
-        plan.payFullInsteadOfRegeling === true
-          ? remaining
-          : plan.extraPerDebt?.[d.id] ??
-            (typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0 ? d.minimaleMaandlast : 0);
-      const minPayment = Math.max(0, baseMin);
-      const monthsToClear = minPayment > 0 ? Math.ceil(remaining / minPayment) : null;
-      const priorityInfo = orderIds.indexOf(d.id) >= 0 ? orderIds.indexOf(d.id) + 1 : "-";
-      const budgetInfo = plan.monthlyBudgetOverride ? `Budget: ${formatCurrency(plan.monthlyBudgetOverride)}` : "Budget: standaard";
-      proposals[d.id] = {
-        minPayment,
-        monthsToClear,
-        note: `Custom strategie actief. Volgorde #${priorityInfo}. ${budgetInfo}. Bij ${formatCurrency(
-          minPayment,
-        )} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
-        strategyKey: "custom",
-      };
-    });
-    return proposals;
-  };
-
   const applyStrategyToDebts = (strategy: StrategyCard) => {
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
     setLastSnapshot(debts);
-    if (strategy.key === "custom") {
-      if (customPlan) {
-        const proposals = buildCustomProposals(customPlan);
-        setStrategyProposals(proposals);
-      } else {
-        setStrategyProposals({});
-      }
-      setView("list");
-      return;
-    }
-    setCustomPlan(null);
-    setCustomStrategyText("");
     const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
-    debts.forEach((d) => {
-      const base =
-        typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0
-          ? d.minimaleMaandlast
-          : Math.max(25, Math.round((d.saldo || 0) / 24) || 0);
-      const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
-      const minPayment = Math.max(1, Math.round(base * factor));
-      const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
-      proposals[d.id] = {
-        minPayment,
-        monthsToClear,
-        note: `Strategie ${strategy.title}: focus op ${
-          strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"
-        } schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
-        strategyKey: strategy.key,
-      };
-    });
+    if (strategy.key === "fullpay") {
+      // Volledige schulden aflossen één per maand, groot naar klein
+      const order = [...debts].sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
+      order.forEach((d, idx) => {
+        const minPayment = Math.max(1, Math.round(d.saldo || 0));
+        const monthsToClear = 1;
+        const monthPlanned = idx + 1;
+        proposals[d.id] = {
+          minPayment,
+          monthsToClear,
+          note: `Volledig aflossen in maand ${monthPlanned}. Gehele schuld ineens: ${formatCurrency(minPayment)}.`,
+          strategyKey: "fullpay",
+        };
+      });
+    } else if (strategy.key === "steady") {
+      // Gelijkmatig tempo over 12 maanden
+      debts.forEach((d) => {
+        const minPayment = Math.max(1, Math.round((d.saldo || 0) / 12));
+        const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+        proposals[d.id] = {
+          minPayment,
+          monthsToClear,
+          note: `Gelijkmatig tempo: ${formatCurrency(minPayment)} p/m, klaar in ${monthsToClear ?? "?"} maanden.`,
+          strategyKey: "steady",
+        };
+      });
+    } else if (strategy.key === "buffered") {
+      // Basis minima, 10% extra als er minima is
+      debts.forEach((d) => {
+        const base = typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0 ? d.minimaleMaandlast : Math.max(10, (d.saldo || 0) / 18);
+        const minPayment = Math.max(1, Math.round(base * 1.1));
+        const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+        proposals[d.id] = {
+          minPayment,
+          monthsToClear,
+          note: `Buffer-vriendelijk: ${formatCurrency(minPayment)} p/m, focus op houdbare cashflow.`,
+          strategyKey: "buffered",
+        };
+      });
+    } else {
+      debts.forEach((d) => {
+        const base =
+          typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0
+            ? d.minimaleMaandlast
+            : Math.max(25, Math.round((d.saldo || 0) / 24) || 0);
+        const factor = strategy.key === "snowball" ? 1.05 : strategy.key === "avalanche" ? 1.15 : 1.1;
+        const minPayment = Math.max(1, Math.round(base * factor));
+        const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+        proposals[d.id] = {
+          minPayment,
+          monthsToClear,
+          note: `Strategie ${strategy.title}: focus op ${
+            strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"
+          } schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+          strategyKey: strategy.key,
+        };
+      });
+    }
     setStrategyProposals(proposals);
     setView("list");
   };
