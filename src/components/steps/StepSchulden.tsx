@@ -8,8 +8,9 @@ import { useAiOrchestrator, type TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { useMemo } from "react";
 import { formatCurrency } from "../../utils/format";
+import { simulatePayoff, type StrategyKey, type CustomPlan } from "../../logic/debtSimulator";
+import { buildCustomPlanFromAI } from "../../logic/buildCustomPlan";
 
 interface StepSchuldenProps {
   onDebtSummary: (s: { totalDebt: number; totalMinPayment: number; debtCount: number }) => void;
@@ -35,13 +36,8 @@ export function StepSchulden({
   actions = null,
 }: StepSchuldenProps) {
   const snapshot = financialSnapshot ?? null;
-  const totalDebt = snapshot?.totalDebt ?? debtSummary?.totalDebt ?? debts.reduce((sum, d) => sum + (d.saldo || 0), 0);
-  const totalMinPayment =
-    snapshot?.monthlyPressure ?? debtSummary?.totalMinPayment ?? debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
   const debtCount = debtSummary?.debtCount ?? debts.length;
   const netFree = snapshot?.netFree ?? 0;
-  const monthsToClear = totalDebt > 0 && totalMinPayment > 0 ? Math.ceil(totalDebt / totalMinPayment) : null;
-  const freeAfterDebt = netFree - totalMinPayment;
   const isReadOnly = readOnly === true;
   const storageKey = `moneylith.${variant}.debts.uploadStatus`;
   const pendingRowsKey = `moneylith.${variant}.debts.pendingRows`;
@@ -59,7 +55,6 @@ export function StepSchulden({
   const turnstileOptional =
     import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
-  type StrategyKey = "snowball" | "balanced" | "avalanche";
   type StrategyCard = {
     key: StrategyKey;
     title: string;
@@ -80,6 +75,8 @@ export function StepSchulden({
     `moneylith.${variant}.debts.aiNotes`,
     {}
   );
+  const [customStrategyText, setCustomStrategyText] = useState("");
+  const [customPlan, setCustomPlan] = useState<CustomPlan | null>(null);
   const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
   const [undoVisible, setUndoVisible] = useState(false);
   const [strategyProposals, setStrategyProposals] = useState<
@@ -93,6 +90,22 @@ export function StepSchulden({
       }
     >
   >({});
+
+  const strategyKey: StrategyKey = (selectedStrategy as StrategyKey | null) ?? "balanced";
+  const monthlyBudget = Math.max(
+    netFree,
+    snapshot?.monthlyPressure ?? debtSummary?.totalMinPayment ?? debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0),
+  );
+  const simulation = simulatePayoff(
+    debts,
+    customPlan?.monthlyBudgetOverride ?? monthlyBudget,
+    strategyKey,
+    strategyKey === "custom" ? customPlan : undefined,
+  );
+  const totalDebt = simulation.totalDebtStart;
+  const totalMinPayment = debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
+  const monthsToClear = simulation.monthsToZero;
+  const freeAfterDebt = simulation.freeRoomNow;
 
   const { runAi } = useAiOrchestrator({
     mode,
@@ -122,7 +135,7 @@ export function StepSchulden({
   const donutData = useMemo(() => {
     const paid = 0; // geen tracking van afbetaald, placeholder 0
     const remaining = totalDebt;
-    const monthly = totalMinPayment > 0 ? totalMinPayment : 0;
+    const monthly = simulation.monthlyPressureNow > 0 ? simulation.monthlyPressureNow : 0;
     return {
       main: [
         { name: "Resterend", value: remaining },
@@ -130,7 +143,7 @@ export function StepSchulden({
       ],
       monthly,
     };
-  }, [totalDebt, totalMinPayment]);
+  }, [totalDebt, simulation.monthlyPressureNow]);
 
   const createId = () =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -249,7 +262,7 @@ export function StepSchulden({
     setAiError(null);
     setAiLoading(true);
     const system =
-      "Moneylith schuldenanalyse. Geef exact 3 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein).";
+      "Moneylith schuldenanalyse. Geef exact 4 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein), custom (afgestemd op gebruiker).";
     const debtsList = debts
       .map(
         (d, idx) =>
@@ -259,7 +272,7 @@ export function StepSchulden({
       )
       .join("\n");
     const user = [
-      "Genereer 3 strategieën met velden: key (snowball|balanced|avalanche), title, summary, pros[], cons[], recommended (bool).",
+      "Genereer 4 strategieën met velden: key (snowball|balanced|avalanche|custom), title, summary, pros[], cons[], recommended (bool).",
       "Eerst een korte NL-samenvatting in mensentaal. Daarna alleen JSON tussen <STRAT_JSON> ... </STRAT_JSON> tags. Root: { strategies: Strategy[] }.",
       "Gebruik beknopte NL tekst; geen codeblokken.",
       "Schuldenlijst:",
@@ -296,7 +309,7 @@ export function StepSchulden({
           recommended: !!s.recommended,
         })) ?? [];
       if (list.length) {
-        setStrategies(list.slice(0, 3));
+        setStrategies(list.slice(0, 4));
         const rec = list.find((s) => s.recommended) ?? list[0];
         setSelectedStrategy(rec?.key ?? null);
         appendAiMessage({
@@ -319,6 +332,10 @@ export function StepSchulden({
   const applyStrategyToDebts = (strategy: StrategyCard) => {
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
+    if (strategy.key !== "custom") {
+      setCustomPlan(null);
+      setCustomStrategyText("");
+    }
     setLastSnapshot(debts);
     const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
     debts.forEach((d) => {
@@ -332,7 +349,9 @@ export function StepSchulden({
       proposals[d.id] = {
         minPayment,
         monthsToClear,
-        note: `Strategie ${strategy.title}: focus op ${strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"} schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+        note: `Strategie ${strategy.title}: focus op ${
+          strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"
+        } schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
         strategyKey: strategy.key,
       };
     });
@@ -369,6 +388,8 @@ export function StepSchulden({
   const clearAiNotes = () => {
     if (isReadOnly) return;
     setSelectedStrategy(null);
+    setCustomPlan(null);
+    setCustomStrategyText("");
     setAiNotes({});
     setStrategyProposals({});
     const reset = debts.map((d) => ({ ...d, aiOpmerking: undefined }));
@@ -511,8 +532,8 @@ export function StepSchulden({
                     <span className="font-semibold">{formatCurrency(totalDebt)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Maanddruk (minimaal)</span>
-                    <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
+                    <span>Maanddruk (maand 1, strategie)</span>
+                    <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Vrije ruimte na schulden</span>
@@ -574,8 +595,8 @@ export function StepSchulden({
                 <span className="font-semibold">{formatCurrency(totalDebt)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Maanddruk (minimaal)</span>
-                <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
+                <span>Maanddruk (maand 1, strategie)</span>
+                <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Vrije ruimte na schulden</span>
@@ -596,17 +617,17 @@ export function StepSchulden({
       {view === "analysis" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">AI-analyse</h3>
-                  <p className="text-xs text-slate-400">
-                    Genereer 3 strategieën en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
-                  </p>
-                  <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <button
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">AI-analyse</h3>
+                    <p className="text-xs text-slate-400">
+                    Genereer 4 strategieën (incl. Custom) en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
+                    </p>
+                    <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
                     type="button"
                     onClick={runAiStrategies}
                     disabled={aiLoading}
@@ -621,52 +642,96 @@ export function StepSchulden({
                     theme="dark"
                   />
                 </div>
-              </div>
-              {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
-              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {strategies.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => applyStrategyToDebts(s)}
-              className={`rounded-xl border p-3 text-left text-xs transition ${
-                selectedStrategy === s.key
-                  ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
-                  : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
-              } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
-              title="AI vult alleen aan; jouw invoer blijft staan."
-            >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-100">{s.title}</span>
-                      {s.recommended && (
-                        <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-950">
-                          Aanbevolen
+                </div>
+                {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
+                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {strategies.map((s) => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => applyStrategyToDebts(s)}
+                      className={`rounded-xl border p-3 text-left text-xs transition ${
+                        selectedStrategy === s.key
+                          ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
+                          : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
+                      } ${s.recommended ? "ring-2 ring-emerald-400" : ""}`}
+                      title="AI vult alleen aan; jouw invoer blijft staan."
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-100">{s.title}</span>
+                        {s.recommended && (
+                          <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-emerald-950">
+                            Aanbevolen
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-slate-200">{s.summary}</p>
+                      <div className="mt-2 space-y-1 text-slate-300">
+                        <div>
+                          <span className="font-semibold text-emerald-400">+ Pro's:</span>
+                          <ul className="ml-3 list-disc">
+                            {s.pros.map((p, idx) => (
+                              <li key={idx}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-red-300">- Con's:</span>
+                          <ul className="ml-3 list-disc">
+                            {s.cons.map((c, idx) => (
+                              <li key={idx}>{c}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {!strategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
+                </div>
+
+                {selectedStrategy === "custom" && (
+                  <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-3 text-xs text-slate-200">
+                    <p className="text-[11px] text-slate-300">
+                      Custom: geef je wensen. Voorbeeld: “Prioriteit: schuldA,schuldB. Extra: schuldA=150. Budget: 450”.
+                    </p>
+                    <textarea
+                      className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900/80 p-2 text-xs text-slate-100"
+                      rows={3}
+                      value={customStrategyText}
+                      onChange={(e) => setCustomStrategyText(e.target.value)}
+                      placeholder="Typ instructies voor de custom strategie..."
+                    />
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900"
+                        onClick={() => {
+                          const idByName: Record<string, string> = {};
+                          debts.forEach((d) => {
+                            if (d.naam) {
+                              idByName[d.naam.toLowerCase()] = d.id;
+                              idByName[d.naam] = d.id;
+                            }
+                          });
+                          const plan = buildCustomPlanFromAI(customStrategyText, idByName);
+                          setCustomPlan(plan);
+                        }}
+                      >
+                        Zet om naar plan
+                      </button>
+                      {customPlan && (
+                        <span className="text-[11px] text-emerald-200">
+                          Plan actief: {customPlan.priorityOrder?.length ? `volgorde ${customPlan.priorityOrder.length}` : "geen volgorde"} · extra:{" "}
+                          {customPlan.extraPerDebt ? Object.keys(customPlan.extraPerDebt).length : 0} · budget:{" "}
+                          {customPlan.monthlyBudgetOverride ?? "standaard"}
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 text-slate-200">{s.summary}</p>
-                    <div className="mt-2 space-y-1 text-slate-300">
-                      <div>
-                        <span className="font-semibold text-emerald-400">+ Pro's:</span>
-                        <ul className="ml-3 list-disc">
-                          {s.pros.map((p, idx) => (
-                            <li key={idx}>{p}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-red-300">- Con's:</span>
-                        <ul className="ml-3 list-disc">
-                          {s.cons.map((c, idx) => (
-                            <li key={idx}>{c}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-                {!strategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
             </div>
           </div>
 
@@ -697,7 +762,7 @@ export function StepSchulden({
             {donutData.monthly > 0 && (
               <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200">
                 <div className="flex items-center justify-between">
-                  <span>Maanddruk</span>
+                  <span>Maanddruk (maand 1, strategie)</span>
                   <span className="font-semibold">{formatCurrency(donutData.monthly)}</span>
                 </div>
                 <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
@@ -714,9 +779,9 @@ export function StepSchulden({
                 <span className="font-semibold">{formatCurrency(totalDebt)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Maanddruk</span>
-                <span className="font-semibold">{formatCurrency(totalMinPayment)}</span>
-              </div>
+                  <span>Maanddruk (maand 1, strategie)</span>
+                  <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
+                </div>
               <div className="flex justify-between">
                 <span>Vrij na schulden</span>
                 <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>

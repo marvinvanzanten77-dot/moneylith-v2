@@ -6,6 +6,8 @@ import type { TabKey } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import type { AiActions } from "../../logic/extractActions";
 import { TurnstileWidget } from "../TurnstileWidget";
+import { formatCurrency } from "../../utils/format";
+import { PotjeDetailView } from "../PotjeDetailView";
 
 interface StepAfschriftenProps {
   accounts: MoneylithAccount[];
@@ -60,6 +62,7 @@ export function StepAfschriften({
   const [pendingTx, setPendingTx] = useState<MoneylithTransaction[]>([]);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileNonce, setTurnstileNonce] = useState(0);
+  const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
   const turnstileOptional =
     import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
@@ -80,6 +83,16 @@ export function StepAfschriften({
       /* ignore */
     }
     return [];
+  });
+  const fuelOverrideKey = `${bucketPrefix}.fuelOverrides`;
+  const [fuelOverrides, setFuelOverrides] = useState<Record<string, "fuel" | "shop">>(() => {
+    try {
+      const raw = localStorage.getItem(fuelOverrideKey);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    return {};
   });
 
   const parseBucketsFromText = useCallback(
@@ -126,6 +139,14 @@ export function StepAfschriften({
     },
     [accountId, accounts, fileName]
   );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(fuelOverrideKey, JSON.stringify(fuelOverrides));
+    } catch {
+      /* ignore */
+    }
+  }, [fuelOverrides, fuelOverrideKey]);
 
   useEffect(() => {
     if (aiAnalysisDone) {
@@ -198,14 +219,51 @@ export function StepAfschriften({
     return map;
   }, [statements]);
 
-  const buckets = useMemo(() => {
-    if (aiBuckets.length) return aiBuckets;
+  const FUEL_KEYWORDS = ["diesel", "euro95", "euro 95", "e10", "litr", "liter", "l.", "v-power", "ultimate", "fuel", "tanken", "benzine"];
+  const SHOP_KEYWORDS = ["shop", "kiosk", "broodje", "koffie", "snack", "sigaret", "tabak", "red bull", "monster", "water", "chocolade"];
+  const TANK_MERCHANTS = ["shell", "esso", "bp", "tinq", "q8", "total", "texaco", "argos", "gulf", "avia", "ok nederland"];
+  const TANK_SHOP_THRESHOLD = 20;
+
+  type AugTx = MoneylithTransaction & {
+    merchantKey: string;
+    derivedCategory?: string;
+    isTankCandidate?: boolean;
+  };
+
+  const classifyTankTx = (tx: MoneylithTransaction): { category?: string; merchantKey: string; isTankCandidate: boolean } => {
+    const merchant = (tx.counterparty || tx.description || "").toLowerCase();
+    const merchantKey = merchant.trim() || "onbekend";
+    const desc = (tx.description || "").toLowerCase();
+    const amountAbs = Math.abs(tx.amount || 0);
+
+    const override = fuelOverrides[merchantKey];
+    if (override === "fuel") return { category: "Brandstof", merchantKey, isTankCandidate: true };
+    if (override === "shop") return { category: "Tankstation Shop/Overig", merchantKey, isTankCandidate: true };
+
+    const hasFuel = FUEL_KEYWORDS.some((k) => desc.includes(k));
+    const hasShop = SHOP_KEYWORDS.some((k) => desc.includes(k));
+    const merchantIsTank = TANK_MERCHANTS.some((m) => merchant.includes(m));
+    const isTankCandidate = merchantIsTank || hasFuel || hasShop;
+
+    if (hasFuel) return { category: "Brandstof", merchantKey, isTankCandidate };
+    if (hasShop) return { category: "Tankstation Shop/Overig", merchantKey, isTankCandidate };
+    if (merchantIsTank) {
+      if (amountAbs < TANK_SHOP_THRESHOLD) {
+        return { category: "Tankstation Shop/Overig", merchantKey, isTankCandidate };
+      }
+      return { category: "Brandstof", merchantKey, isTankCandidate };
+    }
+    return { category: undefined, merchantKey, isTankCandidate };
+  };
+
+  const { buckets, bucketTxMap } = useMemo(() => {
+    if (aiBuckets.length) return { buckets: aiBuckets, bucketTxMap: {} };
     if (_transactions && _transactions.length > 0) {
       const now = Date.now();
       const cutoffMs = now - 90 * 24 * 60 * 60 * 1000;
       let minDate = Number.MAX_SAFE_INTEGER;
       let maxDate = 0;
-      const spendTxs = _transactions.filter((t) => {
+      const spendTxs: AugTx[] = _transactions.filter((t) => {
         if (t.amount >= 0) return false;
         const ts = Date.parse(t.date);
         if (Number.isFinite(ts)) {
@@ -214,18 +272,22 @@ export function StepAfschriften({
           return ts >= cutoffMs;
         }
         return true;
+      }).map((t) => {
+        const cls = classifyTankTx(t);
+        return { ...t, derivedCategory: cls.category, merchantKey: cls.merchantKey, isTankCandidate: cls.isTankCandidate };
       });
       if (!spendTxs.length) return [];
 
       const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
-      const map = new Map<string, { total: number; count: number }>();
+      const map = new Map<string, { total: number; count: number; txs: AugTx[] }>();
       spendTxs.forEach((t) => {
-        const key = (t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
+        const key = (t.derivedCategory || t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
         const isBlocked = blocklist.some((f) => f && key.includes(f));
         if (isBlocked) return;
-        const entry = map.get(key) ?? { total: 0, count: 0 };
+        const entry = map.get(key) ?? { total: 0, count: 0, txs: [] };
         entry.total += Math.abs(t.amount);
         entry.count += 1;
+        entry.txs.push(t);
         map.set(key, entry);
       });
 
@@ -235,28 +297,38 @@ export function StepAfschriften({
           : 30;
       const months = Math.max(1, Math.round(spanDays / 30));
 
+      const txMap: Record<string, AugTx[]> = {};
       const computed = Array.from(map.entries())
-        .map(([label, info]) => ({
-          id: `bucket-${label}`,
-          label: label || "potje",
-          monthlyAvg: Math.round(info.total / months),
-          count: info.count,
-        }))
+        .map(([label, info]) => {
+          const id = `bucket-${label}`;
+          txMap[id] = info.txs;
+          return {
+            id,
+            label: label || "potje",
+            monthlyAvg: Math.round(info.total / months),
+            count: info.count,
+            transactions: info.txs,
+          };
+        })
         .filter((b) => b.monthlyAvg > 0)
         .sort((a, b) => b.monthlyAvg - a.monthlyAvg);
       const max = Math.min(9, Math.max(6, computed.length));
       const trimmed = computed.slice(0, max);
-      if (trimmed.length) return trimmed;
+      if (trimmed.length) return { buckets: trimmed, bucketTxMap: txMap };
     }
 
     // Lege placeholders (alleen visuals) als fallback
-    return Array.from({ length: 6 }).map((_, idx) => ({
-      id: `ph-${idx}`,
-      label: "",
-      monthlyAvg: 0,
-      count: 0,
-    }));
-  }, [_transactions, aiBuckets, excludeLabels, fixedCostLabels]);
+    return {
+      buckets: Array.from({ length: 6 }).map((_, idx) => ({
+        id: `ph-${idx}`,
+        label: "",
+        monthlyAvg: 0,
+        count: 0,
+        transactions: [],
+      })),
+      bucketTxMap: {},
+    };
+  }, [_transactions, aiBuckets, excludeLabels, fixedCostLabels, fuelOverrides]);
 
   const runAiBuckets = useCallback(async (token?: string) => {
     const spendTxs = (_transactions ?? []).filter((t) => t.amount < 0);
@@ -598,6 +670,8 @@ export function StepAfschriften({
                 {(() => {
                   const maxAvg = Math.max(...buckets.map((b) => b.monthlyAvg || 0), 1);
                   return buckets.map((b, idx) => {
+                    const txs = (bucketTxMap[b.id] ?? (b as any).transactions) || [];
+                    const hasTx = txs.length > 0;
                     const fill = Math.min(100, Math.round(((b.monthlyAvg || 0) / maxAvg) * 100));
                     const accent =
                       ["from-fuchsia-500/20 to-blue-500/15", "from-amber-400/25 to-orange-500/20", "from-emerald-400/20 to-cyan-400/15", "from-sky-400/20 to-indigo-500/15", "from-pink-400/20 to-rose-500/15", "from-lime-400/25 to-green-500/15"][idx % 6];
@@ -627,6 +701,17 @@ export function StepAfschriften({
                             style={{ width: `${fill}%` }}
                           />
                         </div>
+                        {hasTx && (
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedBucketId(b.id)}
+                              className="rounded-md border border-slate-300 bg-white/80 px-2 py-1 text-[11px] font-semibold text-slate-800 shadow hover:bg-white"
+                            >
+                              Bekijk transacties
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   });
@@ -747,6 +832,17 @@ export function StepAfschriften({
 
         </div>
       </div>
+
+      {selectedBucketId && (
+        <PotjeDetailView
+          label={buckets.find((b) => b.id === selectedBucketId)?.label ?? "Potje"}
+          transactions={(bucketTxMap[selectedBucketId] as any) || []}
+          onClose={() => setSelectedBucketId(null)}
+          onOverride={(merchantKey, kind) => {
+            setFuelOverrides((prev) => ({ ...prev, [merchantKey]: kind }));
+          }}
+        />
+      )}
     </div>
   );
 }

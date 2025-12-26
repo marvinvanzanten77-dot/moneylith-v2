@@ -1,159 +1,280 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
-import type { FinancialSnapshot, FinanceMode, MonthFocus } from "../../types";
+import type { FinancialSnapshot, FinanceMode } from "../../types";
+
+type ScenarioKey = "baseline" | "upside" | "worst";
+
+type ScenarioDelta = {
+  extraIncomePerMonth?: number;
+  savingsPerMonth?: number;
+  shockAmount?: number;
+  shockPerMonth?: number;
+  shockDurationMonths?: number;
+  shockStartMonth?: number;
+};
+
+type ForecastInput = {
+  debtNow: number;
+  monthlyPayment: number;
+  freeRoomNow: number;
+  bufferNow: number;
+};
+
+type ForecastResult = {
+  debtNow: number;
+  debtAt12: number;
+  bufferNow: number;
+  bufferAt12: number;
+  freeRoomNow: number;
+  freeRoomAt12: number;
+  monthsToDebtFree: number | null;
+  debtTimeline: number[];
+  bufferTimeline: number[];
+  freeRoomTimeline: number[];
+};
+
+const clamp = (v: number) => (Number.isFinite(v) ? v : 0);
+
+const simulateForecast = (input: ForecastInput, delta: ScenarioDelta, months = 12): ForecastResult => {
+  const debtTimeline: number[] = [];
+  const bufferTimeline: number[] = [];
+  const freeRoomTimeline: number[] = [];
+
+  let debt = Math.max(0, input.debtNow);
+  let buffer = Math.max(0, input.bufferNow);
+  const monthlyPay = Math.max(0, input.monthlyPayment);
+  const extraIncome = clamp(delta.extraIncomePerMonth ?? 0);
+  const savings = clamp(delta.savingsPerMonth ?? 0);
+  const shockPerMonth = clamp(delta.shockPerMonth ?? 0);
+  const shockDuration = Math.max(0, Math.round(delta.shockDurationMonths ?? 0));
+  const shockStart = Math.max(0, Math.round(delta.shockStartMonth ?? 0));
+  const shockAmount = clamp(delta.shockAmount ?? 0);
+
+  let monthsToZero: number | null = null;
+
+  for (let m = 0; m <= months; m++) {
+    const inShockWindow = m >= shockStart && m < shockStart + shockDuration;
+    const shockHit = m === shockStart && shockAmount > 0;
+    let freeRoom = input.freeRoomNow + extraIncome - (inShockWindow ? shockPerMonth : 0);
+    if (shockHit) buffer = Math.max(0, buffer - shockAmount);
+
+    const pay = Math.min(debt, monthlyPay);
+    debt = Math.max(0, debt - pay);
+
+    buffer = Math.max(0, buffer + savings);
+
+    debtTimeline.push(debt);
+    bufferTimeline.push(buffer);
+    freeRoomTimeline.push(freeRoom);
+
+    if (debt === 0 && monthsToZero === null) monthsToZero = m;
+  }
+
+  return {
+    debtNow: input.debtNow,
+    debtAt12: debtTimeline[Math.min(12, debtTimeline.length - 1)] ?? debt,
+    bufferNow: input.bufferNow,
+    bufferAt12: bufferTimeline[Math.min(12, bufferTimeline.length - 1)] ?? buffer,
+    freeRoomNow: input.freeRoomNow,
+    freeRoomAt12: freeRoomTimeline[Math.min(12, freeRoomTimeline.length - 1)] ?? input.freeRoomNow,
+    monthsToDebtFree: monthsToZero,
+    debtTimeline,
+    bufferTimeline,
+    freeRoomTimeline,
+  };
+};
 
 type StepVooruitblikProps = {
   financialSnapshot?: FinancialSnapshot | null;
-  spendBuckets?: { id: string; name: string; monthlyAverage: number; shareOfFree?: number }[];
-  monthFocus?: MonthFocus | null;
   variant?: "personal" | "business";
   mode?: FinanceMode;
   readOnly?: boolean;
-  aiAnalysisDone?: boolean;
 };
 
-export function StepVooruitblik({
-  financialSnapshot,
-  spendBuckets,
-  variant = "personal",
-  mode = "personal",
-  aiAnalysisDone = false,
-}: StepVooruitblikProps) {
+export function StepVooruitblik({ financialSnapshot, variant = "personal" }: StepVooruitblikProps) {
   const snapshot = financialSnapshot ?? null;
-  const isBusiness = variant === "business";
-  const totalDebt = snapshot?.totalDebt ?? 0;
-  const monthlyPressure = snapshot?.monthlyPressure ?? 0;
-  const runwayMonths = snapshot?.runwayMonths ?? null;
-  const netFree = snapshot?.netFree ?? 0;
-  const assetsTotal = snapshot?.assetsTotal ?? 0;
-  const hasCoreData = totalDebt > 0 || assetsTotal > 0 || netFree !== 0;
-  const locked = !isBusiness && aiAnalysisDone !== true && !hasCoreData;
-  const debtMonths = monthlyPressure > 0 ? Math.ceil(totalDebt / monthlyPressure) : null;
+  const debtNow = snapshot?.totalDebt ?? 0;
+  const monthlyPayment = snapshot?.monthlyPressure ?? 0;
+  const freeRoomNow = snapshot?.netFree ?? 0;
+  const bufferNow = snapshot?.assetsTotal ?? 0;
 
-  if (locked) {
-    return (
-      <div className="space-y-6">
-        <div className="mb-6 flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-slate-50">Vooruitblik</h1>
-          <p className="text-sm text-slate-400">Dit is wat er gebeurt als alles vanaf nu hetzelfde blijft.</p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-200">
-          Voer eerst AI-analyse uit om Vooruitblik te vullen.
-        </div>
-      </div>
-    );
-  }
+  const baseInput: ForecastInput = {
+    debtNow,
+    monthlyPayment,
+    freeRoomNow,
+    bufferNow,
+  };
 
-  const timeline = useMemo(() => {
-    const items: { label: string; detail: string; highlight: boolean }[] = [];
-    items.push({
-      label: "Nu",
-      detail: `Vrij: ${formatCurrency(netFree)} | Buffer: ${runwayMonths !== null ? `${runwayMonths}m` : "onbekend"}`,
-      highlight: true,
-    });
-    items.push({
-      label: "Schuldvrij",
-      detail: monthlyPressure > 0 && debtMonths ? `+/- ${debtMonths} maanden bij huidige maanddruk` : "Geen maandtempo ingesteld",
-      highlight: monthlyPressure > 0 && Boolean(debtMonths) && debtMonths < 36,
-    });
-    items.push({
-      label: "Buffer 3-6m",
-      detail: runwayMonths !== null ? `Nog op te bouwen naar 3-6 maanden` : "Geen maandtempo ingesteld",
-      highlight: runwayMonths !== null && runwayMonths >= 3,
-    });
-    return items;
-  }, [netFree, runwayMonths, debtMonths, monthlyPressure]);
+  const [scenario, setScenario] = useState<ScenarioKey>("baseline");
+  const [upside, setUpside] = useState<{ extraIncomePerMonth: number; savingsPerMonth: number }>({
+    extraIncomePerMonth: 0,
+    savingsPerMonth: 0,
+  });
+  const [worst, setWorst] = useState<{ shockAmount: number; shockPerMonth: number; shockDurationMonths: number; shockStartMonth: number }>({
+    shockAmount: 0,
+    shockPerMonth: 0,
+    shockDurationMonths: 0,
+    shockStartMonth: 0,
+  });
 
-  const heading = "Vooruitblik";
-  const subheading = isBusiness
-    ? "Dit is het zakelijke scenario als je huidige koers, ritme en verplichtingen gelijk blijven."
-    : "Dit is wat er gebeurt als alles vanaf nu hetzelfde blijft.";
+  const deltas: Record<ScenarioKey, ScenarioDelta> = {
+    baseline: {},
+    upside,
+    worst,
+  };
+
+  const results = {
+    baseline: simulateForecast(baseInput, deltas.baseline),
+    upside: simulateForecast(baseInput, deltas.upside),
+    worst: simulateForecast(baseInput, deltas.worst),
+  };
+
+  const current = results[scenario];
+
+  const conclusion = `Als je niets verandert, ziet je situatie er over 12 maanden zo uit: schuld ${formatCurrency(
+    results.baseline.debtAt12,
+  )}, buffer ${formatCurrency(results.baseline.bufferAt12)}, vrije ruimte ${formatCurrency(results.baseline.freeRoomAt12)}.`;
+
+  const costNothing =
+    results.baseline.freeRoomNow > 0
+      ? results.baseline.freeRoomNow * 12
+      : 0;
+
+  const timelinePoints = [
+    { label: "Nu", idx: 0 },
+    { label: "6m", idx: 6 },
+    { label: "12m", idx: 12 },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="mb-6 flex flex-col gap-2">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-50">{heading}</h1>
-            <p className="text-sm text-slate-400">{subheading}</p>
+      <div className="mb-4 flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold text-slate-50">Vooruitblik</h1>
+        <p className="text-sm text-slate-400">Deterministische projectie van je huidige pad en scenario’s.</p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <p className="text-sm font-semibold text-slate-50">{conclusion}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(["baseline", "upside", "worst"] as ScenarioKey[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setScenario(key)}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+              scenario === key ? "bg-amber-400 text-slate-900" : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+            }`}
+          >
+            {key === "baseline" ? "Huidig pad" : key === "upside" ? "Upside" : "Worst case"}
+          </button>
+        ))}
+      </div>
+
+      {scenario === "upside" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-50 space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <label className="text-xs text-slate-300">
+              Extra inkomen p/m
+              <input
+                type="number"
+                className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={upside.extraIncomePerMonth}
+                onChange={(e) => setUpside((p) => ({ ...p, extraIncomePerMonth: Number(e.target.value) || 0 }))}
+              />
+            </label>
+            <label className="text-xs text-slate-300">
+              Sparen p/m
+              <input
+                type="number"
+                className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={upside.savingsPerMonth}
+                onChange={(e) => setUpside((p) => ({ ...p, savingsPerMonth: Number(e.target.value) || 0 }))}
+              />
+            </label>
           </div>
+        </div>
+      )}
+
+      {scenario === "worst" && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-50 space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <label className="text-xs text-slate-300">
+              Shock bedrag (eenmalig)
+              <input
+                type="number"
+                className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={worst.shockAmount}
+                onChange={(e) => setWorst((p) => ({ ...p, shockAmount: Number(e.target.value) || 0 }))}
+              />
+            </label>
+            <label className="text-xs text-slate-300">
+              Shock p/m
+              <input
+                type="number"
+                className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={worst.shockPerMonth}
+                onChange={(e) => setWorst((p) => ({ ...p, shockPerMonth: Number(e.target.value) || 0 }))}
+              />
+            </label>
+            <label className="text-xs text-slate-300">
+              Duur (mnd)
+              <input
+                type="number"
+                className="mt-1 w-24 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={worst.shockDurationMonths}
+                onChange={(e) => setWorst((p) => ({ ...p, shockDurationMonths: Number(e.target.value) || 0 }))}
+              />
+            </label>
+            <label className="text-xs text-slate-300">
+              Start maand
+              <input
+                type="number"
+                className="mt-1 w-24 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
+                value={worst.shockStartMonth}
+                onChange={(e) => setWorst((p) => ({ ...p, shockStartMonth: Number(e.target.value) || 0 }))}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
+          <p className="text-xs text-slate-400">Totale schuld over 12 maanden</p>
+          <p className="text-lg font-semibold">{formatCurrency(current.debtAt12)}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
+          <p className="text-xs text-slate-400">Buffer over 12 maanden</p>
+          <p className="text-lg font-semibold">{formatCurrency(current.bufferAt12)}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
+          <p className="text-xs text-slate-400">Vrije ruimte p/m dan</p>
+          <p className="text-lg font-semibold">{formatCurrency(current.freeRoomAt12)}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-3">
-        <div className="2xl:col-span-2 flex flex-col gap-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="mb-1 text-sm font-semibold text-slate-50">Schuldvrije projectie</h2>
-            <p className="mb-2 text-xs text-slate-400">Op basis van je huidige maanddruk.</p>
-            <div className="text-lg font-semibold text-slate-50">
-              {monthlyPressure > 0 ? `+/- ${Math.ceil(totalDebt / monthlyPressure)} maanden` : "Geen maandelijkse aflossing ingesteld"}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-50 space-y-3">
+        <h3 className="text-sm font-semibold text-slate-100">Tijdslijn (nu → 6m → 12m)</h3>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {timelinePoints.map((p) => (
+            <div key={p.label} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+              <div className="text-xs text-slate-400">{p.label}</div>
+              <div className="mt-1 text-[11px] text-slate-300">Schuld: {formatCurrency(current.debtTimeline[p.idx] ?? current.debtNow)}</div>
+              <div className="text-[11px] text-slate-300">Buffer: {formatCurrency(current.bufferTimeline[p.idx] ?? bufferNow)}</div>
+              <div className="text-[11px] text-slate-300">Vrij: {formatCurrency(current.freeRoomTimeline[p.idx] ?? freeRoomNow)}</div>
             </div>
-            {monthlyPressure <= 0 && <p className="mt-1 text-xs text-slate-400">Zonder aflosritme blijft je schuldpositie gelijk.</p>}
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="mb-1 text-sm font-semibold text-slate-50">Buffer-ontwikkeling</h2>
-            <p className="mb-2 text-xs text-slate-400">Op basis van beschikbare vrije ruimte.</p>
-            <div className="text-sm text-slate-50">{runwayMonths !== null ? `Huidig: ${runwayMonths} maanden` : "Geen maandelijkse inzet ingesteld"}</div>
-            <div className="mt-1 text-xs text-slate-400">Richtwaarde: 3-6 maanden vaste lasten als zakelijke buffer.</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="mb-1 text-sm font-semibold text-slate-50">Vrije ruimte</h2>
-            <p className="mb-2 text-xs text-slate-400">Op basis van je huidige vaste lasten en cashflow.</p>
-            <div className="text-lg font-semibold text-slate-50">{formatCurrency(netFree)} / maand</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="mb-1 text-sm font-semibold text-slate-50">Als er niets verandert</h2>
-            <p className="mb-2 text-xs text-slate-400">Dit is het zakelijke pad waar je nu feitelijk op zit.</p>
-            <p className="text-sm text-slate-50">Zonder wijziging in aflossing, cashflow of doelen blijft dit scenario zich maandelijks herhalen.</p>
-          </div>
+          ))}
         </div>
+      </div>
 
-        <div className="2xl:col-span-1">
-          <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-50">Wat je hier ziet</h2>
-                <p className="text-xs text-slate-400">
-                  Dit is geen advies. Dit is de doorrekening van je huidige zakelijke inrichting in de tijd. Wijzigingen in cashflow, doelen of verplichtingen veranderen dit beeld direct.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-50">
-              <div className="mb-2 flex justify-between text-xs text-slate-400">
-                <span>Totale schuld</span>
-                <span className="text-slate-50">{totalDebt === 0 && monthlyPressure === 0 ? "Niet ingevuld" : formatCurrency(totalDebt)}</span>
-              </div>
-              <div className="mb-2 flex justify-between text-xs text-slate-400">
-                <span>Totale buffer/vermogen</span>
-                <span className="text-slate-50">{assetsTotal === 0 ? "Niet ingevuld" : formatCurrency(assetsTotal)}</span>
-              </div>
-              <div className="mb-2 flex justify-between text-xs text-slate-400">
-                <span>Structuur/ritme</span>
-                <span className="text-slate-50">{(spendBuckets?.length ?? 0) > 0 ? `${spendBuckets?.length ?? 0} potjes` : "Nog geen ritme"}</span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-              <h3 className="mb-2 text-sm font-semibold text-slate-50">Tijdlijn</h3>
-              <div className="flex flex-col gap-3">
-                {timeline.map((item) => (
-                  <div key={item.label} className="flex items-center gap-3">
-                    <div className={`h-2 w-2 rounded-full border ${item.highlight ? "bg-fuchsia-500 border-fuchsia-300" : "bg-slate-800 border-slate-700"}`} />
-                    <div className="flex-1">
-                      <div className="text-xs font-semibold text-slate-100">{item.label}</div>
-                      <div className="text-[11px] text-slate-400">{item.detail}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="rounded-2xl border border-amber-300/50 bg-amber-500/10 p-4 text-sm text-amber-50 space-y-2">
+        <h3 className="text-sm font-semibold text-amber-100">Wat kost niets doen?</h3>
+        <p className="text-xs text-amber-100">Verloren maanden: {results.baseline.monthsToDebtFree ?? "onbekend"} (bij huidig tempo).</p>
+        <p className="text-xs text-amber-100">Onbenutte vrije ruimte (12m): {formatCurrency(costNothing)}</p>
+        {results.baseline.bufferAt12 === 0 && <p className="text-xs text-amber-100">Buffer blijft 0 → kwetsbaarheid blijft hoog.</p>}
       </div>
     </div>
   );

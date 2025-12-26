@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
 import { parseDateNlToIso } from "../utils/date";
 
@@ -37,7 +37,8 @@ type SchuldenkaartCardProps = {
   onRejectProposal?: (id: string) => void;
 };
 
-const createId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+const createId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 
 export const SchuldenkaartCard = ({
   items,
@@ -50,19 +51,24 @@ export const SchuldenkaartCard = ({
   onRejectProposal,
 }: SchuldenkaartCardProps) => {
   const isReadOnly = readOnly === true;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const totalDebt = items.reduce((sum, item) => sum + (Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0), 0);
     const totalMinPayment = items.reduce(
-      (sum, item) => sum + (Number.isFinite(item.minimaleMaandlast ?? NaN) ? Math.max(0, item.minimaleMaandlast ?? 0) : 0),
-      0
+      (sum, item) =>
+        sum + (Number.isFinite(item.minimaleMaandlast ?? NaN) ? Math.max(0, item.minimaleMaandlast ?? 0) : 0),
+      0,
     );
     onSummaryChange?.({ totalDebt, totalMinPayment, debtCount: items.length });
   }, [items, onSummaryChange]);
 
   const addItem = () => {
     if (isReadOnly) return;
-    onChange([...items, { id: createId(), naam: "", saldo: 0, minimaleMaandlast: undefined }]);
+    const id = createId();
+    onChange([...items, { id, naam: "", saldo: 0, minimaleMaandlast: undefined }]);
+    setExpandedId(id);
   };
 
   const updateItem = (id: string, partial: Partial<SchuldItem>) => {
@@ -75,19 +81,50 @@ export const SchuldenkaartCard = ({
     const ok = window.confirm("Weet je zeker dat je deze verplichting wilt verwijderen?");
     if (!ok) return;
     onChange(items.filter((item) => item.id !== id));
+    if (expandedId === id) {
+      setExpandedId(null);
+    }
   };
+
+  const toggleExpanded = (id: string) => {
+    if (isReadOnly) return;
+    setExpandedId((current) => (current === id ? null : id));
+  };
+
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (expandedId && listRef.current && !listRef.current.contains(target)) {
+        setExpandedId(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setExpandedId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickAway);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickAway);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [expandedId]);
 
   const totalSaldo = items.reduce((sum, item) => sum + (Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0), 0);
   const totalMinLasten = items.reduce(
     (sum, item) => sum + (Number.isFinite(item.minimaleMaandlast ?? NaN) ? Math.max(0, item.minimaleMaandlast ?? 0) : 0),
-    0
+    0,
   );
 
-  const restbedragLabel = variant === "business" ? "Restbedrag (€)" : "Openstaand bedrag (€)";
+  const restbedragLabel = variant === "business" ? "Restbedrag (ƒ,ª)" : "Openstaand bedrag (ƒ,ª)";
   const maandLabel = variant === "business" ? "Maandelijkse betaling" : "Maanddruk (minimaal)";
 
   return (
-    <div className="card-shell p-3 text-slate-900 space-y-2">
+    <div ref={listRef} className="card-shell p-3 text-slate-900 space-y-2">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-slate-600">{variant === "business" ? "Verplichtingenkaart" : "Schuldenkaart"}</p>
@@ -98,7 +135,7 @@ export const SchuldenkaartCard = ({
         <button
           type="button"
           onClick={addItem}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm hover:shadow"
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-amber-400 hover:shadow"
           disabled={isReadOnly}
         >
           {variant === "business" ? "+ Nieuwe verplichting" : "+ Nieuwe schuld"}
@@ -113,149 +150,186 @@ export const SchuldenkaartCard = ({
         )}
         {items.map((item) => {
           const proposal = proposals?.[item.id];
+          const isExpanded = expandedId === item.id;
           return (
-          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 text-xs text-slate-800">
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-slate-600">Naam</span>
-                <input
-                  type="text"
-                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  value={item.naam}
-                  onChange={(e) => updateItem(item.id, { naam: e.target.value })}
-                  placeholder={variant === "business" ? "Bijv. zakelijke lening ING, BTW-regeling" : "Bijv. DUO"}
-                  readOnly={isReadOnly}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-slate-600">{restbedragLabel}</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  value={Number.isFinite(item.saldo) ? item.saldo : ""}
-                  onChange={(e) => updateItem(item.id, { saldo: parseFloat(e.target.value) || 0 })}
-                  placeholder="0"
-                  readOnly={isReadOnly}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-slate-600">{maandLabel}</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  value={Number.isFinite(item.minimaleMaandlast ?? NaN) ? item.minimaleMaandlast : ""}
-                  onChange={(e) =>
-                    updateItem(item.id, {
-                      minimaleMaandlast: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  placeholder="optioneel"
-                  readOnly={isReadOnly}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-slate-600">Afschrijvingsdag (0-31 of datum)</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  value={Number.isFinite(item.afschrijfDag ?? NaN) ? item.afschrijfDag : ""}
-                  onChange={(e) => {
-                    if (isReadOnly) return;
-                    const raw = e.target.value.trim();
-                    if (!raw) {
-                      updateItem(item.id, { afschrijfDag: undefined });
-                      return;
-                    }
-                    const num = parseInt(raw, 10);
-                    if (!Number.isNaN(num) && num >= 0 && num <= 31) {
-                      updateItem(item.id, { afschrijfDag: num });
-                      return;
-                    }
-                    const parsed = parseDateNlToIso(raw);
-                    if (parsed) {
-                      const day = new Date(parsed).getDate();
-                      updateItem(item.id, { afschrijfDag: day });
-                    }
-                  }}
-                  placeholder="bijv. 27 of 15-04-2026"
-                  readOnly={isReadOnly}
-                />
-                <span className="text-[10px] text-slate-500">Je kunt een dagnummer of een datum (DD-MM-JJJJ) invullen; we slaan alleen de dag op.</span>
-              </label>
-              <label className="flex flex-col gap-1 md:col-span-2">
-                <span className="text-[11px] font-semibold text-slate-600">Opmerking (gebruiker)</span>
-                <textarea
-                  className="rounded-md border border-slate-300 px-2 py-1 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  value={item.gebruikerOpmerking ?? ""}
-                  onChange={(e) => updateItem(item.id, { gebruikerOpmerking: e.target.value })}
-                  placeholder="Eigen notitie of context"
-                  readOnly={isReadOnly}
-                  rows={2}
-                />
-              </label>
-              {item.aiOpmerking && (
-                <div className="md:col-span-2 rounded-md bg-slate-50 border border-purple-100 p-2 text-[11px] text-slate-700">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-purple-600">AI opmerking</div>
-                  <div className="whitespace-pre-line">{item.aiOpmerking}</div>
-                </div>
-              )}
-              {proposal && !isReadOnly && (
-                <div className="md:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold">
-                      AI voorstel {proposal.strategyKey ? `(${proposal.strategyKey})` : ""}
-                    </span>
-                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                      {formatCurrency(proposal.minPayment)}
-                    </span>
-                  </div>
-                  <div>
-                    Bij dit tempo is deze schuld ongeveer{" "}
-                    {proposal.monthsToClear ? `${proposal.monthsToClear} maanden` : "onbekend aantal maanden"} aanwezig.
-                  </div>
-                  <div className="text-slate-800">{proposal.note}</div>
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => onAcceptProposal?.(item.id)}
-                      className="rounded-md bg-emerald-500 px-3 py-1 text-[11px] font-semibold text-emerald-950 hover:bg-emerald-400"
-                    >
-                      Accepteer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRejectProposal?.(item.id)}
-                      className="rounded-md border border-amber-300 px-3 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
-                    >
-                      Verberg
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end">
+            <div
+              key={item.id}
+              className={`rounded-xl border bg-white shadow-sm transition-all duration-200 ${
+                isExpanded ? "border-amber-400 ring-2 ring-amber-100" : "border-slate-200 hover:border-amber-200"
+              }`}
+            >
               <button
                 type="button"
-                onClick={() => removeItem(item.id)}
-                className="text-[11px] font-semibold text-red-600 hover:underline"
+                onClick={() => toggleExpanded(item.id)}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
+                  isExpanded ? "bg-amber-50" : "hover:bg-slate-50"
+                }`}
                 disabled={isReadOnly}
               >
-                Verwijderen
+                <div className="flex flex-col">
+                  <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
+                  {proposal?.strategyKey && (
+                    <span className="text-[11px] font-semibold text-amber-700">{proposal.strategyKey.toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 font-semibold text-slate-800">
+                  <span>{formatCurrency(Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0)}</span>
+                  <span className="text-xs text-slate-500" aria-hidden>
+                    {isExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
               </button>
+
+              {isExpanded && (
+                <div className="border-t border-amber-100 px-3 py-3 text-xs text-slate-800 space-y-2">
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-600">Naam</span>
+                      <input
+                        type="text"
+                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        value={item.naam}
+                        onChange={(e) => updateItem(item.id, { naam: e.target.value })}
+                        placeholder={variant === "business" ? "Factuur/Verplichting" : "Schuldnaam"}
+                        readOnly={isReadOnly}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-600">{restbedragLabel}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        value={Number.isFinite(item.saldo) ? item.saldo : ""}
+                        onChange={(e) => updateItem(item.id, { saldo: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        readOnly={isReadOnly}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-600">{maandLabel}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        value={Number.isFinite(item.minimaleMaandlast) ? item.minimaleMaandlast : ""}
+                        onChange={(e) => updateItem(item.id, { minimaleMaandlast: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        readOnly={isReadOnly}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        value={item.afschrijfDag ? item.afschrijfDag.toString() : ""}
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          if (val.includes("-")) {
+                            const iso = parseDateNlToIso(val);
+                            if (iso) {
+                              const day = new Date(iso).getDate();
+                              updateItem(item.id, { afschrijfDag: day });
+                              return;
+                            }
+                          }
+                          updateItem(item.id, { afschrijfDag: parseInt(val) || undefined });
+                        }}
+                        placeholder="Dag 1-31"
+                        readOnly={isReadOnly}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 md:col-span-2">
+                      <span className="text-[11px] font-semibold text-slate-600">Opmerking</span>
+                      <textarea
+                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        value={item.gebruikerOpmerking ?? ""}
+                        onChange={(e) => updateItem(item.id, { gebruikerOpmerking: e.target.value })}
+                        placeholder="Notities of details over deze schuld"
+                        readOnly={isReadOnly}
+                        rows={2}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 md:col-span-2">
+                      <span className="text-[11px] font-semibold text-slate-600">AI-opmerking</span>
+                      <textarea
+                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-700 shadow-inner"
+                        value={item.aiOpmerking ?? ""}
+                        readOnly
+                        rows={2}
+                        placeholder="Nog geen AI-opmerking"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-700">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">
+                        {variant === "business" ? "Verplichting" : "Schuld"}
+                      </span>
+                      {proposal && (
+                        <>
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 font-semibold">
+                            AI voorstel: {proposal.strategyKey ?? "strategie"}
+                          </span>
+                          {proposal.monthsToClear !== null && (
+                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 font-semibold">
+                              {proposal.monthsToClear} mnd
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {proposal && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onAcceptProposal?.(item.id)}
+                            className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold text-emerald-700 hover:bg-emerald-100"
+                            disabled={isReadOnly}
+                          >
+                            Accepteren
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRejectProposal?.(item.id)}
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                            disabled={isReadOnly}
+                          >
+                            Afwijzen
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-[11px] font-semibold text-red-600 hover:underline"
+                        disabled={isReadOnly}
+                      >
+                        Verwijderen
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        );})}
+          );
+        })}
       </div>
 
-      <div className="rounded-lg bg-white/80 p-2.5 text-xs text-slate-800 shadow-inner">
-        <p>Totaal openstaand: {formatCurrency(totalSaldo)}</p>
-        <p>Aantal schulden: {items.length}</p>
-        <p>Som maanddruk (minimaal): {formatCurrency(totalMinLasten)}</p>
+      <div className="rounded-lg bg-white/80 p-3 text-xs text-slate-800 shadow-inner">
+        <div className="flex items-center justify-between">
+          <span>Totaal openstaand</span>
+          <span className="font-semibold">{formatCurrency(totalSaldo)}</span>
+        </div>
+        <div className="mt-1 flex items-center justify-between">
+          <span>Totaal minimale maandlast</span>
+          <span className="font-semibold">{formatCurrency(totalMinLasten)}</span>
+        </div>
       </div>
     </div>
   );

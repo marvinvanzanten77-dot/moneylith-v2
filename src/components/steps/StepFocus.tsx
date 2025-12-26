@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
 import { projectGoal } from "../../logic/goals";
@@ -35,6 +35,10 @@ export function StepFocus({
   const freePerMonth = snapshot ? snapshot.totalIncome.value - snapshot.fixedCostsTotal.value : 0;
   const isBusiness = variant === "business";
   const isReadOnly = readOnly === true;
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [deadlineInput, setDeadlineInput] = useState("");
+  const [deadlineValid, setDeadlineValid] = useState(true);
 
   const [formState, setFormState] = useState<{
     id?: string;
@@ -90,6 +94,8 @@ export function StepFocus({
       linkedBucketIds: goal.linkedBucketIds ?? [],
       isActive: goal.isActive,
     });
+    setDeadlineInput(goal.deadline ?? "");
+    setDeadlineValid(true);
   };
 
   const handleBucketToggle = (id: string) => {
@@ -175,6 +181,38 @@ export function StepFocus({
     return "Stabiel tempo";
   };
 
+  const toggleGoal = (goalId: string, goal: MoneylithGoal) => {
+    if (isReadOnly) return;
+    setExpandedGoalId((current) => {
+      const next = current === goalId ? null : goalId;
+      if (next === goalId) {
+        handleEdit(goal);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (expandedGoalId && listRef.current && !listRef.current.contains(target)) {
+        setExpandedGoalId(null);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setExpandedGoalId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickAway);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickAway);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [expandedGoalId]);
+
   return (
     <div className="space-y-6">
       <div className="mb-6 flex flex-col gap-2">
@@ -201,7 +239,7 @@ export function StepFocus({
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <div ref={listRef} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-50">{isBusiness ? "Een actief zakelijk doel" : "Een actief doel"}</h2>
@@ -221,10 +259,23 @@ export function StepFocus({
                 {goals.map((goal) => {
                   const projection = projections.get(goal.id);
                   const progress = goal.targetAmount > 0 ? Math.min(goal.currentAmount / goal.targetAmount, 1) : 0;
+                  const isExpanded = expandedGoalId === goal.id;
                   return (
-                    <div key={goal.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-sm text-slate-200">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
+                    <div
+                      key={goal.id}
+                      className={`rounded-xl border bg-slate-900/60 text-sm text-slate-200 shadow-sm transition-all duration-200 ${
+                        isExpanded ? "border-amber-400 ring-2 ring-amber-100/30" : "border-slate-800 hover:border-amber-300/40"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleGoal(goal.id, goal)}
+                        className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition ${
+                          isExpanded ? "bg-amber-500/10" : "hover:bg-slate-800/60"
+                        }`}
+                        disabled={isReadOnly}
+                      >
+                        <div className="flex flex-col">
                           <div className="text-sm font-semibold text-slate-50">{goal.label}</div>
                           <div className="text-[11px] text-slate-400">{goal.type}</div>
                         </div>
@@ -232,59 +283,67 @@ export function StepFocus({
                           <div>{Math.round(progress * 100)}%</div>
                           <div className="text-[11px]">{goal.isActive ? "Actief" : "Passief"}</div>
                         </div>
-                      </div>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
+                          <span>{formatCurrency(goal.targetAmount)}</span>
+                          <span aria-hidden className="text-slate-500">
+                            {isExpanded ? "▲" : "▼"}
+                          </span>
+                        </div>
+                      </button>
 
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-300">
-                        <div>
-                          <div className="text-slate-400">Doelwaarde</div>
-                          <div className="font-semibold text-slate-50">{formatCurrency(goal.targetAmount)}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Huidige stand</div>
-                          <div className="font-semibold text-slate-50">{formatCurrency(goal.currentAmount)}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Inleg p/m</div>
-                          <div className="font-semibold text-slate-50">{formatCurrency(goal.monthlyContribution)}</div>
-                        </div>
-                        {goal.deadline && (
-                          <div>
-                            <div className="text-slate-400">Deadline</div>
-                            <div className="font-semibold text-slate-50">{goal.deadline}</div>
+                      {isExpanded && (
+                        <div className="border-t border-amber-200/30 px-3 py-3 text-xs">
+                          <div className="grid grid-cols-2 gap-2 text-slate-300">
+                            <div>
+                              <div className="text-slate-400">Doelwaarde</div>
+                              <div className="font-semibold text-slate-50">{formatCurrency(goal.targetAmount)}</div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400">Huidige stand</div>
+                              <div className="font-semibold text-slate-50">{formatCurrency(goal.currentAmount)}</div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400">Inleg p/m</div>
+                              <div className="font-semibold text-slate-50">{formatCurrency(goal.monthlyContribution)}</div>
+                            </div>
+                            {goal.deadline && (
+                              <div>
+                                <div className="text-slate-400">Deadline</div>
+                                <div className="font-semibold text-slate-50">{goal.deadline}</div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
 
-                      {projection && (
-                        <div className="mt-2 text-[11px] text-slate-400">
-                          <div>Resterend: {formatCurrency(projection.remaining)}</div>
-                          <div>Tempo: {formatCurrency(projection.pressurePerMonth)} per maand</div>
-                          <div>Bereikt in: {projection.monthsToTarget ?? "-"} maanden</div>
-                        </div>
-                      )}
+                          {projection && (
+                            <div className="mt-2 text-[11px] text-slate-400">
+                              <div>Resterend: {formatCurrency(projection.remaining)}</div>
+                              <div>Tempo: {formatCurrency(projection.pressurePerMonth)} per maand</div>
+                              <div>Bereikt in: {projection.monthsToTarget ?? "-"} maanden</div>
+                            </div>
+                          )}
 
-                      {goal.linkedBucketIds && goal.linkedBucketIds.length > 0 && (
-                        <div className="mt-2 text-[11px] text-slate-400">
-                          Gekoppeld aan: {goal.linkedBucketIds.join(", ")}
-                        </div>
-                      )}
+                          {goal.linkedBucketIds && goal.linkedBucketIds.length > 0 && (
+                            <div className="mt-2 text-[11px] text-slate-400">Gekoppeld aan: {goal.linkedBucketIds.join(", ")}</div>
+                          )}
 
-                      {!isReadOnly && (
-                        <div className="mt-3 flex gap-2 text-xs">
-                          <button
-                            type="button"
-                            className="rounded-md border border-slate-600 px-2 py-1 text-slate-200"
-                            onClick={() => handleEdit(goal)}
-                          >
-                            Bewerken
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-md border border-red-400 px-2 py-1 text-red-200"
-                            onClick={() => handleDelete(goal.id)}
-                          >
-                            Verwijderen
-                          </button>
+                          {!isReadOnly && (
+                            <div className="mt-3 flex gap-2 text-xs">
+                              <button
+                                type="button"
+                                className="rounded-md border border-amber-200/60 bg-amber-500/10 px-2 py-1 text-amber-50"
+                                onClick={() => toggleGoal(goal.id, goal)}
+                              >
+                                Bewerk in formulier
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded-md border border-red-400 px-2 py-1 text-red-200"
+                                onClick={() => handleDelete(goal.id)}
+                              >
+                                Verwijderen
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

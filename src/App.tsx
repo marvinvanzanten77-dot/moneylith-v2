@@ -2082,7 +2082,7 @@ const App = () => {
         filled = rekeningenFilled;
         break;
       case "inbox":
-        filled = activeInboxItems.length > 0;
+        filled = false;
         break;
       case "afschriften":
         filled = afschriftenFilled;
