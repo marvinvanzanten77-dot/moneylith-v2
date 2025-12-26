@@ -257,13 +257,12 @@ export function StepAfschriften({
   };
 
   const { buckets, bucketTxMap } = useMemo(() => {
-    if (aiBuckets.length) return { buckets: aiBuckets, bucketTxMap: {} };
-    if (_transactions && _transactions.length > 0) {
-      const now = Date.now();
-      const cutoffMs = now - 90 * 24 * 60 * 60 * 1000;
-      let minDate = Number.MAX_SAFE_INTEGER;
-      let maxDate = 0;
-      const spendTxs: AugTx[] = _transactions.filter((t) => {
+    const now = Date.now();
+    const cutoffMs = now - 90 * 24 * 60 * 60 * 1000;
+    let minDate = Number.MAX_SAFE_INTEGER;
+    let maxDate = 0;
+    const spendTxs: AugTx[] = (_transactions || [])
+      .filter((t) => {
         if (t.amount >= 0) return false;
         const ts = Date.parse(t.date);
         if (Number.isFinite(ts)) {
@@ -272,52 +271,61 @@ export function StepAfschriften({
           return ts >= cutoffMs;
         }
         return true;
-      }).map((t) => {
+      })
+      .map((t) => {
         const cls = classifyTankTx(t);
         return { ...t, derivedCategory: cls.category, merchantKey: cls.merchantKey, isTankCandidate: cls.isTankCandidate };
       });
-      if (!spendTxs.length) return [];
 
-      const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
-      const map = new Map<string, { total: number; count: number; txs: AugTx[] }>();
-      spendTxs.forEach((t) => {
-        const key = (t.derivedCategory || t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
-        const isBlocked = blocklist.some((f) => f && key.includes(f));
-        if (isBlocked) return;
-        const entry = map.get(key) ?? { total: 0, count: 0, txs: [] };
-        entry.total += Math.abs(t.amount);
-        entry.count += 1;
-        entry.txs.push(t);
-        map.set(key, entry);
+    const blocklist = [...fixedCostLabels, ...excludeLabels].map((f) => f.toLowerCase()).filter(Boolean);
+    const map = new Map<string, { total: number; count: number; txs: AugTx[] }>();
+    spendTxs.forEach((t) => {
+      const key = (t.derivedCategory || t.category || t.description || "onbekend").toLowerCase().slice(0, 60);
+      const isBlocked = blocklist.some((f) => f && key.includes(f));
+      if (isBlocked) return;
+      const entry = map.get(key) ?? { total: 0, count: 0, txs: [] };
+      entry.total += Math.abs(t.amount);
+      entry.count += 1;
+      entry.txs.push(t);
+      map.set(key, entry);
+    });
+
+    const spanDays =
+      minDate !== Number.MAX_SAFE_INTEGER && maxDate > 0
+        ? Math.max(1, Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)))
+        : 30;
+    const months = Math.max(1, Math.round(spanDays / 30));
+
+    const txMap: Record<string, AugTx[]> = {};
+    const computed = Array.from(map.entries())
+      .map(([label, info]) => {
+        const id = `bucket-${label}`;
+        txMap[id] = info.txs;
+        return {
+          id,
+          label: label || "potje",
+          monthlyAvg: Math.round(info.total / months),
+          count: info.count,
+          transactions: info.txs,
+        };
+      })
+      .filter((b) => b.monthlyAvg > 0)
+      .sort((a, b) => b.monthlyAvg - a.monthlyAvg);
+    const max = Math.min(9, Math.max(6, computed.length));
+    const trimmed = computed.slice(0, max);
+
+    if (aiBuckets.length) {
+      const norm = (s: string) => s.toLowerCase().trim();
+      const aiWithTx = aiBuckets.map((b) => {
+        const matchKey = Object.keys(txMap).find((k) => norm(k).includes(norm(b.label)) || norm(b.label).includes(norm(k)));
+        const txs = matchKey ? txMap[matchKey] : [];
+        return { ...b, transactions: txs, count: txs.length };
       });
-
-      const spanDays =
-        minDate !== Number.MAX_SAFE_INTEGER && maxDate > 0
-          ? Math.max(1, Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)))
-          : 30;
-      const months = Math.max(1, Math.round(spanDays / 30));
-
-      const txMap: Record<string, AugTx[]> = {};
-      const computed = Array.from(map.entries())
-        .map(([label, info]) => {
-          const id = `bucket-${label}`;
-          txMap[id] = info.txs;
-          return {
-            id,
-            label: label || "potje",
-            monthlyAvg: Math.round(info.total / months),
-            count: info.count,
-            transactions: info.txs,
-          };
-        })
-        .filter((b) => b.monthlyAvg > 0)
-        .sort((a, b) => b.monthlyAvg - a.monthlyAvg);
-      const max = Math.min(9, Math.max(6, computed.length));
-      const trimmed = computed.slice(0, max);
-      if (trimmed.length) return { buckets: trimmed, bucketTxMap: txMap };
+      return { buckets: aiWithTx, bucketTxMap: txMap };
     }
 
-    // Lege placeholders (alleen visuals) als fallback
+    if (trimmed.length) return { buckets: trimmed, bucketTxMap: txMap };
+
     return {
       buckets: Array.from({ length: 6 }).map((_, idx) => ({
         id: `ph-${idx}`,
@@ -328,7 +336,7 @@ export function StepAfschriften({
       })),
       bucketTxMap: {},
     };
-  }, [_transactions, aiBuckets, excludeLabels, fixedCostLabels, fuelOverrides]);
+  }, [_transactions, aiBuckets, classifyTankTx, excludeLabels, fixedCostLabels, fuelOverrides]);
 
   const runAiBuckets = useCallback(async (token?: string) => {
     const spendTxs = (_transactions ?? []).filter((t) => t.amount < 0);
