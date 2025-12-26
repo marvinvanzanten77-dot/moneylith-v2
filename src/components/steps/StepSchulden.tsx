@@ -334,7 +334,35 @@ export function StepSchulden({
     setSelectedStrategy(strategy.key);
     setLastSnapshot(debts);
     if (strategy.key === "custom") {
-      setStrategyProposals({});
+      // Gebruik het custom plan om voorstellen te vullen, zodat Accept/Reject werkt
+      if (!customPlan) {
+        setStrategyProposals({});
+        setView("list");
+        return;
+      }
+      const proposals: Record<
+        string,
+        { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }
+      > = {};
+      debts.forEach((d) => {
+        const minPayment = Math.max(
+          0,
+          customPlan.extraPerDebt?.[d.id] ??
+            (typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0 ? d.minimaleMaandlast : 0),
+        );
+        const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
+        const priorityInfo = customPlan.priorityOrder?.length ? customPlan.priorityOrder.join(", ") : "niet opgegeven";
+        const budgetInfo = customPlan.monthlyBudgetOverride ? `Budget: ${formatCurrency(customPlan.monthlyBudgetOverride)}` : "Budget: standaard";
+        proposals[d.id] = {
+          minPayment,
+          monthsToClear,
+          note: `Custom strategie actief. Prioriteit: ${priorityInfo}. ${budgetInfo}. Bij ${formatCurrency(
+            minPayment,
+          )} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+          strategyKey: "custom",
+        };
+      });
+      setStrategyProposals(proposals);
       setView("list");
       return;
     }
