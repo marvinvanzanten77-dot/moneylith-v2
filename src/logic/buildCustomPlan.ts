@@ -70,9 +70,15 @@ export function buildCustomPlanFromAI(text: string, idByName: Record<string, str
     }
   }
 
+  const fullPaySignals = ["geen regeling", "geen betalingsregeling", "volledig bedrag", "in 1 keer", "in één keer", "geheel aflossen"];
+  if (fullPaySignals.some((k) => text.toLowerCase().includes(k))) {
+    plan.payFullInsteadOfRegeling = true;
+  }
+
   return {
     priorityOrder: plan.priorityOrder,
     extraPerDebt: plan.extraPerDebt,
     monthlyBudgetOverride: plan.monthlyBudgetOverride,
+    payFullInsteadOfRegeling: plan.payFullInsteadOfRegeling,
   };
 }

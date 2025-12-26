@@ -329,40 +329,49 @@ export function StepSchulden({
     }
   };
 
+  const buildCustomProposals = (plan: CustomPlan) => {
+    const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
+    const orderIds =
+      plan.priorityOrder && plan.priorityOrder.length
+        ? plan.priorityOrder
+        : debts
+            .slice()
+            .sort((a, b) => (b.saldo || 0) - (a.saldo || 0))
+            .map((d) => d.id);
+    debts.forEach((d) => {
+      const remaining = d.saldo || 0;
+      const baseMin =
+        plan.payFullInsteadOfRegeling === true
+          ? remaining
+          : plan.extraPerDebt?.[d.id] ??
+            (typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0 ? d.minimaleMaandlast : 0);
+      const minPayment = Math.max(0, baseMin);
+      const monthsToClear = minPayment > 0 ? Math.ceil(remaining / minPayment) : null;
+      const priorityInfo = orderIds.indexOf(d.id) >= 0 ? orderIds.indexOf(d.id) + 1 : "-";
+      const budgetInfo = plan.monthlyBudgetOverride ? `Budget: ${formatCurrency(plan.monthlyBudgetOverride)}` : "Budget: standaard";
+      proposals[d.id] = {
+        minPayment,
+        monthsToClear,
+        note: `Custom strategie actief. Volgorde #${priorityInfo}. ${budgetInfo}. Bij ${formatCurrency(
+          minPayment,
+        )} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+        strategyKey: "custom",
+      };
+    });
+    return proposals;
+  };
+
   const applyStrategyToDebts = (strategy: StrategyCard) => {
     if (isReadOnly) return;
     setSelectedStrategy(strategy.key);
     setLastSnapshot(debts);
     if (strategy.key === "custom") {
-      // Gebruik het custom plan om voorstellen te vullen, zodat Accept/Reject werkt
-      if (!customPlan) {
+      if (customPlan) {
+        const proposals = buildCustomProposals(customPlan);
+        setStrategyProposals(proposals);
+      } else {
         setStrategyProposals({});
-        setView("list");
-        return;
       }
-      const proposals: Record<
-        string,
-        { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }
-      > = {};
-      debts.forEach((d) => {
-        const minPayment = Math.max(
-          0,
-          customPlan.extraPerDebt?.[d.id] ??
-            (typeof d.minimaleMaandlast === "number" && d.minimaleMaandlast > 0 ? d.minimaleMaandlast : 0),
-        );
-        const monthsToClear = minPayment > 0 ? Math.ceil((d.saldo || 0) / minPayment) : null;
-        const priorityInfo = customPlan.priorityOrder?.length ? customPlan.priorityOrder.join(", ") : "niet opgegeven";
-        const budgetInfo = customPlan.monthlyBudgetOverride ? `Budget: ${formatCurrency(customPlan.monthlyBudgetOverride)}` : "Budget: standaard";
-        proposals[d.id] = {
-          minPayment,
-          monthsToClear,
-          note: `Custom strategie actief. Prioriteit: ${priorityInfo}. ${budgetInfo}. Bij ${formatCurrency(
-            minPayment,
-          )} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
-          strategyKey: "custom",
-        };
-      });
-      setStrategyProposals(proposals);
       setView("list");
       return;
     }
@@ -728,25 +737,37 @@ export function StepSchulden({
                     onChange={(e) => setCustomStrategyText(e.target.value)}
                     placeholder="Typ instructies voor de custom strategie..."
                   />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="button"
-                className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900"
-                onClick={() => {
-                  const idByName: Record<string, string> = {};
-                  debts.forEach((d) => {
-                    if (d.naam) {
-                      idByName[d.naam.toLowerCase()] = d.id;
-                      idByName[d.naam] = d.id;
-                    }
-                  });
-                  const plan = buildCustomPlanFromAI(customStrategyText, idByName);
-                  setCustomPlan(plan);
-                  setView("list");
-                }}
-              >
-                Zet om naar plan
-              </button>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900"
+                      onClick={() => {
+                        const idByName: Record<string, string> = {};
+                        debts.forEach((d) => {
+                          if (d.naam) {
+                            idByName[d.naam.toLowerCase()] = d.id;
+                            idByName[d.naam] = d.id;
+                          }
+                        });
+                        const plan = buildCustomPlanFromAI(customStrategyText, idByName);
+                        setCustomPlan(plan);
+                        if (plan) {
+                          const proposals = buildCustomProposals(plan);
+                          setStrategyProposals(proposals);
+                        }
+                      }}
+                    >
+                      Bereken voorstel
+                    </button>
+                    {customPlan && (
+                      <button
+                        type="button"
+                        className="rounded-md border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900"
+                        onClick={() => setView("list")}
+                      >
+                        Gebruik in lijst
+                      </button>
+                    )}
                     {customPlan && (
                       <span className="text-[11px] text-emerald-200">
                         Plan actief: {customPlan.priorityOrder?.length ? `volgorde ${customPlan.priorityOrder.length}` : "geen volgorde"} · extra:{" "}

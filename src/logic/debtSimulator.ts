@@ -6,6 +6,7 @@ export type CustomPlan = {
   priorityOrder?: string[]; // ordered debt ids to target with extra budget
   extraPerDebt?: Record<string, number>; // optional custom per-debt override for minPayment
   monthlyBudgetOverride?: number;
+  payFullInsteadOfRegeling?: boolean;
 };
 
 export type SimulatedDebt = {
