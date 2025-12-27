@@ -87,6 +87,9 @@ export function StepSchulden({
       }
     >
   >({});
+  // Legacy placeholders (custom strategie verwijderd)
+  const customStrategyText = "";
+  const customPlan = null;
 
   const strategyKey: StrategyKey = (selectedStrategy as StrategyKey | null) ?? "balanced";
   const monthlyBudget = Math.max(
