@@ -1,6 +1,6 @@
 import type { SchuldItem } from "../components/SchuldenkaartCard";
 
-export type StrategyKey = "snowball" | "balanced" | "avalanche" | "custom";
+export type StrategyKey = "snowball" | "balanced" | "avalanche" | "fullpay";
 
 export type CustomPlan = {
   priorityOrder?: string[]; // ordered debt ids to target with extra budget
@@ -40,7 +40,7 @@ const pickOrder = (items: SimulatedDebt[], strategy: StrategyKey): SimulatedDebt
   if (strategy === "snowball") {
     return [...items].sort((a, b) => a.remaining - b.remaining);
   }
-  if (strategy === "avalanche") {
+  if (strategy === "avalanche" || strategy === "fullpay") {
     return [...items].sort((a, b) => b.remaining - a.remaining);
   }
   // balanced: fallback to highest minPayment first, then largest remaining
