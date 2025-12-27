@@ -95,9 +95,8 @@ export function StepSchulden({
   );
   const simulation = simulatePayoff(
     debts,
-    customPlan?.monthlyBudgetOverride ?? monthlyBudget,
+    monthlyBudget,
     strategyKey,
-    strategyKey === "custom" ? customPlan : undefined,
   );
   const totalDebt = simulation.totalDebtStart;
   const totalMinPayment = debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
@@ -761,13 +760,6 @@ export function StepSchulden({
                       >
                         Gebruik in lijst
                       </button>
-                    )}
-                    {customPlan && (
-                      <span className="text-[11px] text-emerald-200">
-                        Plan actief: {customPlan.priorityOrder?.length ? `volgorde ${customPlan.priorityOrder.length}` : "geen volgorde"} · extra:{" "}
-                        {customPlan.extraPerDebt ? Object.keys(customPlan.extraPerDebt).length : 0} · budget:{" "}
-                        {customPlan.monthlyBudgetOverride ?? "standaard"}
-                      </span>
                     )}
                   </div>
                 </div>
