@@ -223,14 +223,6 @@ export function StepSchulden({
 
   const mergedStrategies = useMemo(() => mergeWithBaseStrategies(strategies), [strategies]);
 
-  const [aiNotes, setAiNotes] = useLocalStorage<Record<string, string>>(
-
-    `moneylith.${variant}.debts.aiNotes`,
-
-    {}
-
-  );
-
   const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
 
   const [undoVisible, setUndoVisible] = useState(false);
@@ -250,6 +242,10 @@ export function StepSchulden({
         note: string;
 
         strategyKey?: StrategyKey;
+
+        month?: number;
+
+        freeAfter?: number;
 
       }
 
@@ -281,6 +277,15 @@ export function StepSchulden({
     strategyKey,
 
   );
+
+  const computeFullpayBudget = () => {
+    const income = snapshot?.totalIncome?.value ?? 0;
+    const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
+    const raw = Number.isFinite(income - fixed) && income - fixed > 0 ? income - fixed : netFree;
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    const reserve = Math.max(50, raw * 0.1);
+    return Math.max(0, raw - reserve);
+  };
 
   const totalDebt = simulation.totalDebtStart;
 
@@ -933,34 +938,46 @@ export function StepSchulden({
 
     setLastSnapshot(debts);
 
-    const proposals: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey }> = {};
+    const proposals: Record<
+      string,
+      { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey; month?: number; freeAfter?: number }
+    > = {};
 
     if (strategy.key === "fullpay") {
 
-      // Volledige schulden aflossen één per maand, groot naar klein
+      // Volledige schulden aflossen één per maand op basis van vrije ruimte (inkomen - vaste lasten), groot -> klein.
+      const monthlyBudget = computeFullpayBudget();
+      const order = [...debts].filter((d) => (d.saldo ?? 0) > 0).sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
+      let carryOver = 0;
+      let monthCounter = 1;
 
-      const order = [...debts].sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
+      order.forEach((d) => {
+        const amount = Math.max(0, d.saldo || 0);
+        if (amount === 0) return;
+        if (monthlyBudget <= 0) {
+          proposals[d.id] = {
+            minPayment: amount,
+            monthsToClear: 1,
+            note: "Geen vrij te besteden budget berekend voor fullpay.",
+            strategyKey: "fullpay",
+          };
+          return;
+        }
 
-      order.forEach((d, idx) => {
-
-        const minPayment = Math.max(1, Math.round(d.saldo || 0));
-
-        const monthsToClear = 1;
-
-        const monthPlanned = idx + 1;
-
+        const monthsNeeded = carryOver + monthlyBudget < amount ? Math.ceil((amount - carryOver) / monthlyBudget) : 1;
+        const payMonth = monthCounter + monthsNeeded - 1;
+        const totalAvailable = carryOver + monthsNeeded * monthlyBudget;
+        const leftover = Math.max(0, totalAvailable - amount);
+        carryOver = leftover;
         proposals[d.id] = {
-
-          minPayment,
-
-          monthsToClear,
-
-          note: `Volledig aflossen in maand ${monthPlanned}. Gehele schuld ineens: ${formatCurrency(minPayment)}.`,
-
+          minPayment: amount,
+          monthsToClear: 1,
+          note: `Volledig aflossen in maand ${payMonth}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
           strategyKey: "fullpay",
-
+          month: payMonth,
+          freeAfter: leftover,
         };
-
+        monthCounter = payMonth + 1;
       });
 
     } else if (strategy.key === "steady") {
@@ -1078,7 +1095,12 @@ export function StepSchulden({
       d.id === debtId
 
 
-        ? { ...d, minimaleMaandlast: proposal.minPayment, aiOpmerking: proposal.note }
+        ? {
+            ...d,
+            minimaleMaandlast: proposal.minPayment,
+            afschrijfDag: proposal.strategyKey === "fullpay" && proposal.month ? undefined : d.afschrijfDag,
+            gebruikerOpmerking: proposal.note ? proposal.note : d.gebruikerOpmerking,
+          }
 
 
         : d
@@ -1089,8 +1111,6 @@ export function StepSchulden({
 
     onDebtsChange?.(nextDebts);
 
-
-    setAiNotes((prev) => ({ ...prev, [debtId]: proposal.note }));
 
 
     setStrategyProposals((prev) => {
@@ -1144,11 +1164,9 @@ export function StepSchulden({
 
     setSelectedStrategy(null);
 
-    setAiNotes({});
-
     setStrategyProposals({});
 
-    const reset = debts.map((d) => ({ ...d, aiOpmerking: undefined }));
+    const reset = debts.map((d) => ({ ...d }));
 
     onDebtsChange?.(reset);
 
@@ -1170,9 +1188,6 @@ export function StepSchulden({
 
 
       setSelectedStrategy(null);
-
-
-      setAiNotes({});
 
 
       setUndoVisible(false);
@@ -1490,7 +1505,7 @@ export function StepSchulden({
                 Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieën, donut
 
 
-                en AI-opmerkingen; terug naar lijst om bedragen te bewerken.
+                wissel naar <span className="font-semibold">Analyse</span> voor strategieën en donut; terug naar lijst om bedragen te bewerken.
 
 
               </div>
@@ -1505,7 +1520,6 @@ export function StepSchulden({
                   ...d,
 
 
-                  aiOpmerking: d.aiOpmerking ?? aiNotes[d.id],
 
 
                 }))}

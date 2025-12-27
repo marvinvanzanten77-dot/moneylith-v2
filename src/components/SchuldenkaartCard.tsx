@@ -166,14 +166,16 @@ export const SchuldenkaartCard = ({
                 }`}
                 disabled={isReadOnly}
               >
-                <div className="flex flex-col">
-                  <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
-                  {proposal?.strategyKey && (
-                    <span className="text-[11px] font-semibold text-amber-700">
-                      {proposal.strategyKey.toUpperCase()} · {formatCurrency(proposal.minPayment)}
-                    </span>
-                  )}
-                </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
+              {proposal?.strategyKey && (
+                <span className="text-[11px] font-semibold text-amber-700">
+                  {proposal.strategyKey.toUpperCase()} ·{" "}
+                  {proposal.strategyKey === "fullpay" && proposal.month ? `maand ${proposal.month} · ` : ""}
+                  {formatCurrency(proposal.minPayment)}
+                </span>
+              )}
+            </div>
                 <div className="flex items-center gap-2 font-semibold text-slate-800">
                   <span>{formatCurrency(Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0)}</span>
                   <span className="text-xs text-slate-500" aria-hidden>
@@ -222,29 +224,38 @@ export const SchuldenkaartCard = ({
                         readOnly={isReadOnly}
                       />
                     </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={item.afschrijfDag ? item.afschrijfDag.toString() : ""}
-                        onChange={(e) => {
-                          const val = e.target.value.trim();
-                          if (val.includes("-")) {
-                            const iso = parseDateNlToIso(val);
-                            if (iso) {
-                              const day = new Date(iso).getDate();
-                              updateItem(item.id, { afschrijfDag: day });
-                              return;
+                    {proposal?.strategyKey === "fullpay" && proposal.month ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-slate-600">Maand (fullpay voorstel)</span>
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-800">
+                          Maand {proposal.month}
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                          value={item.afschrijfDag ? item.afschrijfDag.toString() : ""}
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            if (val.includes("-")) {
+                              const iso = parseDateNlToIso(val);
+                              if (iso) {
+                                const day = new Date(iso).getDate();
+                                updateItem(item.id, { afschrijfDag: day });
+                                return;
+                              }
                             }
-                          }
-                          updateItem(item.id, { afschrijfDag: parseInt(val) || undefined });
-                        }}
-                        placeholder="Dag 1-31"
-                        readOnly={isReadOnly}
-                      />
-                    </label>
+                            updateItem(item.id, { afschrijfDag: parseInt(val) || undefined });
+                          }}
+                          placeholder="Dag 1-31"
+                          readOnly={isReadOnly}
+                        />
+                      </label>
+                    )}
                     <label className="flex flex-col gap-1 md:col-span-2">
                       <span className="text-[11px] font-semibold text-slate-600">Opmerking</span>
                       <textarea
@@ -254,16 +265,6 @@ export const SchuldenkaartCard = ({
                         placeholder="Notities of details over deze schuld"
                         readOnly={isReadOnly}
                         rows={2}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 md:col-span-2">
-                      <span className="text-[11px] font-semibold text-slate-600">AI-opmerking</span>
-                      <textarea
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-slate-700 shadow-inner"
-                        value={item.aiOpmerking ?? ""}
-                        readOnly
-                        rows={2}
-                        placeholder="Nog geen AI-opmerking"
                       />
                     </label>
                   </div>
@@ -277,6 +278,11 @@ export const SchuldenkaartCard = ({
                           <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 font-semibold">
                             AI voorstel: {proposal.strategyKey ?? "strategie"}
                           </span>
+                          {proposal.strategyKey === "fullpay" && proposal.month && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 font-semibold">
+                              Maand {proposal.month}
+                            </span>
+                          )}
                           {proposal.monthsToClear !== null && (
                             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 font-semibold">
                               {proposal.monthsToClear} mnd
