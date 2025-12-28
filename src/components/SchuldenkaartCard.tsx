@@ -171,7 +171,11 @@ export const SchuldenkaartCard = ({
               {proposal?.strategyKey && (
                 <span className="text-[11px] font-semibold text-amber-700">
                   {proposal.strategyKey.toUpperCase()} ·{" "}
-                  {proposal.strategyKey === "fullpay" && proposal.month ? `maand ${proposal.month} · ` : ""}
+                  {proposal.strategyKey === "fullpay" && proposal.monthLabel
+                    ? `${proposal.monthLabel} · `
+                    : proposal.strategyKey === "fullpay" && proposal.month
+                    ? `maand ${proposal.month} · `
+                    : ""}
                   {formatCurrency(proposal.minPayment)}
                 </span>
               )}
@@ -279,9 +283,9 @@ export const SchuldenkaartCard = ({
                             AI voorstel: {proposal.strategyKey ?? "strategie"}
                           </span>
                           {proposal.strategyKey === "fullpay" && proposal.month && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 font-semibold">
-                              Maand {proposal.month}
-                            </span>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800 font-semibold">
+                            {proposal.monthLabel ?? `Maand ${proposal.month}`}
+                          </span>
                           )}
                           {proposal.monthsToClear !== null && (
                             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 font-semibold">

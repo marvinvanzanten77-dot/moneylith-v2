@@ -247,6 +247,8 @@ export function StepSchulden({
 
         freeAfter?: number;
 
+        monthLabel?: string;
+
       }
 
     >
@@ -287,6 +289,13 @@ export function StepSchulden({
     if (!Number.isFinite(raw) || raw <= 0) return 0;
     const reserve = Math.max(50, raw * 0.1);
     return Math.max(0, raw - reserve);
+  };
+
+  const formatMonthLabel = (start: Date, monthNumber: number) => {
+    const months = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + Math.max(0, monthNumber - 1));
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   const totalDebt = simulation.totalDebtStart;
@@ -952,6 +961,7 @@ export function StepSchulden({
       const order = [...debts].filter((d) => (d.saldo ?? 0) > 0).sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
       let carryOver = 0;
       let monthCounter = 1;
+      const start = new Date();
 
       order.forEach((d) => {
         const amount = Math.max(0, d.saldo || 0);
@@ -971,13 +981,15 @@ export function StepSchulden({
         const totalAvailable = carryOver + monthsNeeded * monthlyBudget;
         const leftover = Math.max(0, totalAvailable - amount);
         carryOver = leftover;
+        const monthLabel = formatMonthLabel(start, payMonth);
         proposals[d.id] = {
           minPayment: amount,
           monthsToClear: 1,
-          note: `Volledig aflossen in maand ${payMonth}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
+          note: `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
           strategyKey: "fullpay",
           month: payMonth,
           freeAfter: leftover,
+          monthLabel,
         };
         monthCounter = payMonth + 1;
       });
@@ -1516,14 +1528,15 @@ export function StepSchulden({
               <SchuldenkaartCard
 
 
-                items={debts.map((d) => ({
-
-
+                items={(selectedStrategy === "fullpay"
+                  ? [...debts].sort((a, b) => {
+                      const ma = strategyProposals[a.id]?.month ?? 9999;
+                      const mb = strategyProposals[b.id]?.month ?? 9999;
+                      return ma - mb;
+                    })
+                  : debts
+                ).map((d) => ({
                   ...d,
-
-
-
-
                 }))}
 
 
