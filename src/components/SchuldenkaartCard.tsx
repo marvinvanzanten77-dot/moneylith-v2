@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
 import { parseDateNlToIso } from "../utils/date";
 
@@ -124,7 +124,7 @@ export const SchuldenkaartCard = ({
     0,
   );
 
-  const restbedragLabel = variant === "business" ? "Restbedrag (ƒ,ª)" : "Openstaand bedrag (ƒ,ª)";
+  const restbedragLabel = variant === "business" ? "Restbedrag (EUR)" : "Openstaand bedrag (EUR)";
   const maandLabel = variant === "business" ? "Maandelijkse betaling" : "Maanddruk (minimaal)";
 
   return (
@@ -171,24 +171,24 @@ export const SchuldenkaartCard = ({
                 }`}
                 disabled={isReadOnly}
               >
-            <div className="flex flex-col">
-              <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
-              {proposal?.strategyKey && (
-                <span className="text-[11px] font-semibold text-amber-700">
-                  {proposal.strategyKey.toUpperCase()} ·{" "}
-                  {proposal.strategyKey === "fullpay" && proposal.monthLabel
-                    ? `${proposal.monthLabel} · `
-                    : proposal.strategyKey === "fullpay" && proposal.month
-                    ? `maand ${proposal.month} · `
-                    : ""}
-                  {formatCurrency(proposal.minPayment)}
-                </span>
-              )}
-            </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</span>
+                  {proposal?.strategyKey && (
+                    <span className="text-[11px] font-semibold text-amber-700">
+                      {proposal.strategyKey.toUpperCase()} -{" "}
+                      {proposal.strategyKey === "fullpay" && proposal.monthLabel
+                        ? `${proposal.monthLabel} - `
+                        : proposal.strategyKey === "fullpay" && proposal.month
+                        ? `Maand ${proposal.month} - `
+                        : ""}
+                      {formatCurrency(proposal.minPayment)}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 font-semibold text-slate-800">
                   <span>{formatCurrency(Number.isFinite(item.saldo) ? Math.max(0, item.saldo) : 0)}</span>
                   <span className="text-xs text-slate-500" aria-hidden>
-                    {isExpanded ? "▲" : "▼"}
+                    {isExpanded ? "v" : ">"}
                   </span>
                 </div>
               </button>
@@ -351,3 +351,14 @@ export const SchuldenkaartCard = ({
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+

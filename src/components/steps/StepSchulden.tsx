@@ -299,9 +299,10 @@ export function StepSchulden({
 
   const fullpayMonthStats = useMemo(() => {
     if (selectedStrategy !== "fullpay") return null;
-    const effective = acceptedProposals.size
-      ? Object.fromEntries(Object.entries(strategyProposals).filter(([id]) => acceptedProposals.has(id)))
-      : strategyProposals;
+    const effective =
+      acceptedProposals.size > 0
+        ? Object.fromEntries(Object.entries(strategyProposals).filter(([id]) => acceptedProposals.has(id)))
+        : strategyProposals;
     const months = Object.values(effective)
       .map((p) => p.month)
       .filter((m): m is number => typeof m === "number" && m > 0);
@@ -974,10 +975,9 @@ export function StepSchulden({
 
     if (strategy.key === "fullpay") {
 
-      // Volledige schulden aflossen één per maand op basis van vrije ruimte (inkomen - vaste lasten), groot -> klein.
+      // Volledige schulden aflossen per maand op basis van vrije ruimte (inkomen - vaste lasten), groot -> klein.
       const monthlyBudget = computeFullpayBudget();
       const order = [...debts].filter((d) => (d.saldo ?? 0) > 0).sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
-      let carryOver = 0;
       let monthCounter = 1;
       const start = new Date();
 
@@ -991,25 +991,26 @@ export function StepSchulden({
             note: "Geen vrij te besteden budget berekend voor fullpay.",
             strategyKey: "fullpay",
           };
+          monthCounter += 1;
           return;
         }
 
-        const monthsNeeded = carryOver + monthlyBudget < amount ? Math.ceil((amount - carryOver) / monthlyBudget) : 1;
-        const payMonth = monthCounter + monthsNeeded - 1;
-        const totalAvailable = carryOver + monthsNeeded * monthlyBudget;
-        const leftover = Math.max(0, totalAvailable - amount);
-        carryOver = leftover;
+        const payMonth = monthCounter;
+        const leftover = Math.max(0, monthlyBudget - amount);
         const monthLabel = formatMonthLabel(start, payMonth);
         proposals[d.id] = {
           minPayment: amount,
           monthsToClear: 1,
-          note: `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
+          note:
+            amount > monthlyBudget
+              ? `Volledig aflossen in ${monthLabel}. Let op: bedrag is hoger dan maandbudget (${formatCurrency(monthlyBudget)}).`
+              : `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
           strategyKey: "fullpay",
           month: payMonth,
           freeAfter: leftover,
           monthLabel,
         };
-        monthCounter = payMonth + 1;
+        monthCounter += 1;
       });
 
     } else if (strategy.key === "steady") {
@@ -1613,7 +1614,7 @@ export function StepSchulden({
 
                     <span>Maanddruk (maand 1, strategie)</span>
 
-                    <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
+                    <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
 
                   </div>
 
@@ -1797,7 +1798,7 @@ export function StepSchulden({
 
                 <span>Maanddruk (maand 1, strategie)</span>
 
-                <span className="font-semibold">{formatCurrency(simulation.monthlyPressureNow)}</span>
+                <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
 
               </div>
 
@@ -2109,5 +2110,6 @@ export function StepSchulden({
 
 
 }
+
 
 
