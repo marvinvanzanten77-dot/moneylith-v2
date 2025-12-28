@@ -299,17 +299,20 @@ export function StepSchulden({
 
   const fullpayMonthStats = useMemo(() => {
     if (selectedStrategy !== "fullpay") return null;
-    const months = Object.values(strategyProposals)
+    const effective = acceptedProposals.size
+      ? Object.fromEntries(Object.entries(strategyProposals).filter(([id]) => acceptedProposals.has(id)))
+      : strategyProposals;
+    const months = Object.values(effective)
       .map((p) => p.month)
       .filter((m): m is number => typeof m === "number" && m > 0);
     if (!months.length) return null;
     const earliest = Math.min(...months);
-    const monthPayment = Object.values(strategyProposals)
+    const monthPayment = Object.values(effective)
       .filter((p) => p.month === earliest)
       .reduce((sum, p) => sum + (p.minPayment || 0), 0);
     const freeAfter = Math.max(0, computeFullpayBudget() - monthPayment);
     return { earliest, monthPayment, freeAfter };
-  }, [selectedStrategy, strategyProposals]);
+  }, [selectedStrategy, strategyProposals, acceptedProposals]);
 
   const totalDebt = simulation.totalDebtStart;
 
