@@ -280,8 +280,6 @@ export function StepSchulden({
 
   );
 
-  const totalMinPerMonth = fullpayMonthStats?.monthPayment ?? simulation.monthlyPressureNow;
-
   const computeFullpayBudget = () => {
     const income = snapshot?.totalIncome?.value ?? 0;
     const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
@@ -317,6 +315,8 @@ export function StepSchulden({
   const totalMinPayment = debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
 
   const monthsToClear = simulation.monthsToZero;
+
+  const totalMinPerMonth = fullpayMonthStats?.monthPayment ?? simulation.monthlyPressureNow;
 
   const freeAfterDebt = fullpayMonthStats ? fullpayMonthStats.freeAfter : simulation.freeRoomNow;
 
