@@ -278,6 +278,8 @@ export function StepSchulden({
 
   );
 
+  const totalMinPerMonth = simulation.monthlyPressureNow;
+
   const computeFullpayBudget = () => {
     const income = snapshot?.totalIncome?.value ?? 0;
     const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
