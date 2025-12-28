@@ -2056,7 +2056,7 @@ export function StepSchulden({
 
                 <span>Tijd tot nul (simulatie)</span>
 
-                <span className="font-semibold">{monthsToZero ? `${monthsToZero} mnd` : "n.v.t."}</span>
+                <span className="font-semibold">{monthsToClear ? `${monthsToClear} mnd` : "n.v.t."}</span>
 
               </div>
 
