@@ -1101,6 +1101,7 @@ export function StepSchulden({
     }
 
     setStrategyProposals(proposals);
+    setAcceptedProposals(new Set());
 
     setView("list");
 
@@ -1177,7 +1178,11 @@ export function StepSchulden({
     });
 
     onDebtsChange?.(nextDebts);
-    setAcceptedProposals(new Set(Object.keys(strategyProposals)));
+    setAcceptedProposals((prev) => {
+      const next = new Set(prev);
+      Object.keys(strategyProposals).forEach((id) => next.add(id));
+      return next;
+    });
   };
 
 
@@ -1189,6 +1194,8 @@ export function StepSchulden({
     setSelectedStrategy(null);
 
     setStrategyProposals({});
+
+    setAcceptedProposals(new Set());
 
     const reset = debts.map((d) => ({ ...d }));
 
@@ -1487,7 +1494,7 @@ export function StepSchulden({
                 <div className="flex items-center gap-3">
 
 
-                  {applyCheck.ok && !isReadOnly && (
+                  {Object.keys(strategyProposals).length > 0 && !isReadOnly && (
 
 
                     <button

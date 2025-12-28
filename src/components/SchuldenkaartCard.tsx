@@ -237,7 +237,7 @@ export const SchuldenkaartCard = ({
                       <div className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Maand (fullpay voorstel)</span>
                         <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-800">
-                          Maand {proposal.month}
+                          {proposal.monthLabel ?? `Maand ${proposal.month}`}
                         </div>
                       </div>
                     ) : (
