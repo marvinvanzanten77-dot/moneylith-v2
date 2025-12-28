@@ -1170,6 +1170,26 @@ export function StepSchulden({
 
 
 
+  const applyAllProposals = () => {
+    if (isReadOnly) return;
+    if (!Object.keys(strategyProposals).length) return;
+
+    const nextDebts = debts.map((d) => {
+      const proposal = strategyProposals[d.id];
+      if (!proposal) return d;
+      return {
+        ...d,
+        minimaleMaandlast: proposal.minPayment,
+        afschrijfDag: proposal.strategyKey === "fullpay" && proposal.month ? undefined : d.afschrijfDag,
+        gebruikerOpmerking: proposal.note ? proposal.note : d.gebruikerOpmerking,
+      };
+    });
+
+    onDebtsChange?.(nextDebts);
+    setStrategyProposals({});
+    setSelectedStrategy(null);
+  };
+
 
 
   const clearAiNotes = () => {
@@ -1486,7 +1506,7 @@ export function StepSchulden({
                       type="button"
 
 
-                      onClick={handleApplyAiDebts}
+                      onClick={applyAllProposals}
 
 
                       className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-amber-400"
@@ -1495,7 +1515,7 @@ export function StepSchulden({
                     >
 
 
-                      Neem AI-suggesties over
+                      Accepteer alle voorstellen
 
 
                     </button>
@@ -1530,10 +1550,10 @@ export function StepSchulden({
 
                 items={(selectedStrategy === "fullpay"
                   ? [...debts].sort((a, b) => {
-                      const ma = strategyProposals[a.id]?.month ?? 9999;
-                      const mb = strategyProposals[b.id]?.month ?? 9999;
-                      return ma - mb;
-                    })
+                  const ma = strategyProposals[a.id]?.month ?? 9999;
+                  const mb = strategyProposals[b.id]?.month ?? 9999;
+                  return ma - mb;
+                })
                   : debts
                 ).map((d) => ({
                   ...d,
