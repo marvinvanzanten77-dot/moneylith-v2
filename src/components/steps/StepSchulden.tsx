@@ -280,7 +280,7 @@ export function StepSchulden({
 
   );
 
-  const totalMinPerMonth = simulation.monthlyPressureNow;
+  const totalMinPerMonth = fullpayMonthStats?.monthPayment ?? simulation.monthlyPressureNow;
 
   const computeFullpayBudget = () => {
     const income = snapshot?.totalIncome?.value ?? 0;
@@ -298,13 +298,27 @@ export function StepSchulden({
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
+  const fullpayMonthStats = useMemo(() => {
+    if (selectedStrategy !== "fullpay") return null;
+    const months = Object.values(strategyProposals)
+      .map((p) => p.month)
+      .filter((m): m is number => typeof m === "number" && m > 0);
+    if (!months.length) return null;
+    const earliest = Math.min(...months);
+    const monthPayment = Object.values(strategyProposals)
+      .filter((p) => p.month === earliest)
+      .reduce((sum, p) => sum + (p.minPayment || 0), 0);
+    const freeAfter = Math.max(0, computeFullpayBudget() - monthPayment);
+    return { earliest, monthPayment, freeAfter };
+  }, [selectedStrategy, strategyProposals]);
+
   const totalDebt = simulation.totalDebtStart;
 
   const totalMinPayment = debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
 
   const monthsToClear = simulation.monthsToZero;
 
-  const freeAfterDebt = simulation.freeRoomNow;
+  const freeAfterDebt = fullpayMonthStats ? fullpayMonthStats.freeAfter : simulation.freeRoomNow;
 
 
 
@@ -384,7 +398,7 @@ export function StepSchulden({
 
     const remaining = totalDebt;
 
-    const monthly = simulation.monthlyPressureNow > 0 ? simulation.monthlyPressureNow : 0;
+    const monthly = totalMinPerMonth > 0 ? totalMinPerMonth : 0;
 
     return {
 
@@ -400,7 +414,7 @@ export function StepSchulden({
 
     };
 
-  }, [totalDebt, simulation.monthlyPressureNow]);
+  }, [totalDebt, totalMinPerMonth]);
 
 
 
@@ -882,13 +896,13 @@ export function StepSchulden({
 
       if (list.length) {
 
-        const merged = mergeWithBaseStrategies(list.slice(0, 4));
+    const merged = mergeWithBaseStrategies(list.slice(0, 4));
 
-        setStrategies(merged);
+    setStrategies(merged);
 
-        const rec = merged.find((s) => s.recommended) ?? merged[0];
+    const rec = merged.find((s) => s.recommended) ?? merged[0];
 
-        setSelectedStrategy(rec?.key ?? null);
+    setSelectedStrategy(rec?.key ?? null);
 
         appendAiMessage({
 
@@ -1092,56 +1106,34 @@ export function StepSchulden({
 
 
   const applyProposalToDebt = (debtId: string) => {
-
-
     if (isReadOnly) return;
 
-
     const proposal = strategyProposals[debtId];
-
-
     if (!proposal) return;
 
-
     const nextDebts = debts.map((d) =>
-
-
       d.id === debtId
-
-
         ? {
             ...d,
             minimaleMaandlast: proposal.minPayment,
             afschrijfDag: proposal.strategyKey === "fullpay" && proposal.month ? undefined : d.afschrijfDag,
             gebruikerOpmerking: proposal.note ? proposal.note : d.gebruikerOpmerking,
           }
-
-
-        : d
-
-
+        : d,
     );
-
 
     onDebtsChange?.(nextDebts);
 
-
-
     setStrategyProposals((prev) => {
-
-
       const next = { ...prev };
-
-
       delete next[debtId];
-
-
       return next;
-
-
     });
 
-
+    setSelectedStrategy((prev) => {
+      const remaining = Object.keys(strategyProposals).filter((id) => id !== debtId).length;
+      return remaining === 0 ? null : prev;
+    });
   };
 
 
