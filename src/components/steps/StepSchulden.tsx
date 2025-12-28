@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 
 import { SchuldenkaartCard, type SchuldItem } from "../SchuldenkaartCard";
 
@@ -21,6 +21,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCurrency } from "../../utils/format";
 
 import { simulatePayoff, type StrategyKey } from "../../logic/debtSimulator";
+import type { MoneylithBucket } from "../../types";
 
 
 
@@ -101,6 +102,8 @@ export function StepSchulden({
 
   const isReadOnly = readOnly === true;
 
+  const bucketsKey = variant === "business" ? "moneylith.business.buckets" : "moneylith.personal.buckets";
+ 
   const storageKey = `moneylith.${variant}.debts.uploadStatus`;
 
 
@@ -120,6 +123,7 @@ export function StepSchulden({
 
 
   const [pendingRows, setPendingRows] = useLocalStorage<SchuldItem[]>(pendingRowsKey, []);
+  const [buckets] = useLocalStorage<MoneylithBucket[]>(bucketsKey, []);
 
 
   const applyCheck = canApplyDebtsSuggestions({ mode, actions, currentDebts: debts });
@@ -181,13 +185,13 @@ export function StepSchulden({
       key: "avalanche",
       title: "Avalanche: groot naar klein aflossen",
       summary: "Begin met de grootste schuld om rente te besparen en sneller schuldenvrij te zijn.",
-      pros: ["Bespaart rente en kosten", "Snelle vermindering totale schuld", "Financieel meest efficiënt"],
+      pros: ["Bespaart rente en kosten", "Snelle vermindering totale schuld", "Financieel meest efficiÃ«nt"],
       cons: ["Minder snelle successen, kan demotiverend zijn", "Complexer om vol te houden"],
     },
     {
       key: "fullpay",
       title: "Fullpay: volledige schuld per maand",
-      summary: "Betaal elke maand maximaal één schuld volledig af (groot naar klein), zonder regelingen.",
+      summary: "Betaal elke maand maximaal Ã©Ã©n schuld volledig af (groot naar klein), zonder regelingen.",
       pros: ["Elke maand een duidelijke stap klaar", "Geen doorlopende regelingen", "Maximale focus per schuld"],
       cons: ["Vergt voldoende maandruimte", "Minder spreiding over meerdere schulden"],
     },
@@ -255,17 +259,43 @@ export function StepSchulden({
 
   >({});
   const [acceptedProposals, setAcceptedProposals] = useState<Set<string>>(new Set());
+  const [includePatterns, setIncludePatterns] = useLocalStorage<boolean>(
+    `moneylith.${variant}.debts.includePatterns`,
+    false,
+  );
 
 
 
 
 
+
+  const patternSpend = useMemo(
+    () => buckets.filter((b) => b.type === "variable").reduce((sum, b) => sum + (b.monthlyAvg || 0), 0),
+    [buckets],
+  );
+
+  const capacityAggressive = useMemo(() => {
+    const income = snapshot?.totalIncome?.value ?? 0;
+    const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
+    const raw = income - fixed;
+    return Number.isFinite(raw) ? raw : netFree;
+  }, [snapshot?.totalIncome?.value, snapshot?.fixedCostsTotal?.value, netFree]);
+
+  const capacityRealistic = useMemo(() => {
+    const raw = capacityAggressive - patternSpend;
+    return Number.isFinite(raw) ? raw : capacityAggressive;
+  }, [capacityAggressive, patternSpend]);
+
+  const capacityForView = useMemo(
+    () => Math.max(0, view === "analysis" && includePatterns ? capacityRealistic : capacityAggressive),
+    [view, includePatterns, capacityRealistic, capacityAggressive],
+  );
 
   const strategyKey: StrategyKey = (selectedStrategy as StrategyKey | null) ?? "balanced";
 
   const monthlyBudget = Math.max(
 
-    netFree,
+    capacityForView,
 
     snapshot?.monthlyPressure ?? debtSummary?.totalMinPayment ?? debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0),
 
@@ -282,9 +312,7 @@ export function StepSchulden({
   );
 
   const computeFullpayBudget = () => {
-    const income = snapshot?.totalIncome?.value ?? 0;
-    const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
-    const raw = Number.isFinite(income - fixed) && income - fixed > 0 ? income - fixed : netFree;
+    const raw = capacityForView;
     if (!Number.isFinite(raw) || raw <= 0) return 0;
     const reserve = Math.max(50, raw * 0.1);
     return Math.max(0, raw - reserve);
@@ -391,7 +419,7 @@ export function StepSchulden({
       ? "Zakelijke schulden, contracten en regelingen die hoe dan ook betaald moeten worden."
 
 
-      : "Zie in één oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
+      : "Zie in Ã©Ã©n oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
 
 
 
@@ -535,7 +563,7 @@ export function StepSchulden({
     const toNumber = (value: string) => {
 
 
-      const normalized = value.replace(/[€\s]/g, "").replace(",", ".");
+      const normalized = value.replace(/[â‚¬\s]/g, "").replace(",", ".");
 
 
       const num = parseFloat(normalized);
@@ -772,7 +800,7 @@ export function StepSchulden({
 
 
     const system =
-      "Moneylith schuldenanalyse. Geef exact 4 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein), fullpay (volledige schuld per maand, groot->klein).";
+      "Moneylith schuldenanalyse. Geef exact 4 strategieÃ«n: snowball (klein->groot), balanced (mix), avalanche (groot->klein), fullpay (volledige schuld per maand, groot->klein).";
 
     const debtsList = debts
 
@@ -783,7 +811,7 @@ export function StepSchulden({
         (d, idx) =>
 
 
-          `${idx + 1}. ${d.naam || "schuld"} | saldo: €${d.saldo ?? 0} | maanddruk: €${d.minimaleMaandlast ?? 0} | afschrijfdag: ${
+          `${idx + 1}. ${d.naam || "schuld"} | saldo: â‚¬${d.saldo ?? 0} | maanddruk: â‚¬${d.minimaleMaandlast ?? 0} | afschrijfdag: ${
 
 
             d.afschrijfDag ?? 0
@@ -801,7 +829,7 @@ export function StepSchulden({
     const user = [
 
 
-      "Genereer 4 strategieën met velden: key (snowball|balanced|avalanche|fullpay), title, summary, pros[], cons[], recommended (bool).",
+      "Genereer 4 strategieÃ«n met velden: key (snowball|balanced|avalanche|fullpay), title, summary, pros[], cons[], recommended (bool).",
 
       "Eerst een korte NL-samenvatting in mensentaal. Daarna alleen JSON tussen <STRAT_JSON> ... </STRAT_JSON> tags. Root: { strategies: Strategy[] }.",
 
@@ -915,7 +943,7 @@ export function StepSchulden({
           role: "assistant",
 
 
-          content: `Strategieën gegenereerd. ${rec ? `Aanbevolen: ${rec.title}.` : ""} Klik een strategie om maanddruk in te vullen.`,
+          content: `StrategieÃ«n gegenereerd. ${rec ? `Aanbevolen: ${rec.title}.` : ""} Klik een strategie om maanddruk in te vullen.`,
 
 
         });
@@ -924,7 +952,7 @@ export function StepSchulden({
       } else {
 
 
-        setAiError("Geen strategieën gevonden.");
+        setAiError("Geen strategieÃ«n gevonden.");
 
 
       }
@@ -1091,7 +1119,7 @@ export function StepSchulden({
 
             strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"
 
-          } schulden. Bij ƒ,ª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+          } schulden. Bij Æ’,Âª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
 
           strategyKey: strategy.key,
 
@@ -1534,10 +1562,10 @@ export function StepSchulden({
               <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
 
 
-                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieën, donut
+                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieÃ«n, donut
 
 
-                wissel naar <span className="font-semibold">Analyse</span> voor strategieën en donut; terug naar lijst om bedragen te bewerken.
+                wissel naar <span className="font-semibold">Analyse</span> voor strategieÃ«n en donut; terug naar lijst om bedragen te bewerken.
 
 
               </div>
@@ -1865,6 +1893,38 @@ export function StepSchulden({
 
                 <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden ? Stap 2: Kies strategie ? Stap 3: Bekijk ingevulde lijst.</p>
 
+                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-[11px] text-slate-200">
+                  <span className="text-xs font-semibold text-slate-100">Bouw strategie op basis van maandcapaciteit:</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIncludePatterns(false)}
+                      className={`rounded-full px-3 py-1 font-semibold transition ${
+                        !includePatterns
+                          ? "bg-amber-500 text-slate-900 shadow-amber-500/50"
+                          : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      }`}
+                    >
+                      Exclusief patronen (maximaal)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIncludePatterns(true)}
+                      className={`rounded-full px-3 py-1 font-semibold transition ${
+                        includePatterns
+                          ? "bg-amber-500 text-slate-900 shadow-amber-500/50"
+                          : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      }`}
+                    >
+                      Inclusief patronen (realistischer)
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Exclusief = inkomen - vaste lasten. Inclusief = inkomen - vaste lasten - verwachte patronen. Keuze
+                    wordt toegepast vóór berekening en AI-voorstel.
+                  </p>
+                </div>
+
               </div>
 
               <div className="flex flex-col items-end gap-1">
@@ -2110,6 +2170,8 @@ export function StepSchulden({
 
 
 }
+
+
 
 
 
