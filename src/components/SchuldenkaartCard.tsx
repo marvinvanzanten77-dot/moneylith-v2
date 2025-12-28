@@ -31,8 +31,11 @@ type SchuldenkaartCardProps = {
       monthsToClear: number | null;
       note: string;
       strategyKey?: string;
+      month?: number;
+      monthLabel?: string;
     }
   >;
+  acceptedIds?: Set<string>;
   onAcceptProposal?: (id: string) => void;
   onRejectProposal?: (id: string) => void;
 };
@@ -46,7 +49,8 @@ export const SchuldenkaartCard = ({
   onSummaryChange,
   variant = "personal",
   readOnly = false,
-  proposals,
+  proposals = {},
+  acceptedIds = new Set<string>(),
   onAcceptProposal,
   onRejectProposal,
 }: SchuldenkaartCardProps) => {
@@ -151,6 +155,7 @@ export const SchuldenkaartCard = ({
         {items.map((item) => {
           const proposal = proposals?.[item.id];
           const isExpanded = expandedId === item.id;
+          const isAccepted = acceptedIds.has(item.id);
           return (
             <div
               key={item.id}
@@ -296,7 +301,7 @@ export const SchuldenkaartCard = ({
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {proposal && (
+                      {proposal && !isAccepted && (
                         <>
                           <button
                             type="button"

@@ -254,6 +254,7 @@ export function StepSchulden({
     >
 
   >({});
+  const [acceptedProposals, setAcceptedProposals] = useState<Set<string>>(new Set());
 
 
 
@@ -1109,7 +1110,7 @@ export function StepSchulden({
     if (isReadOnly) return;
 
     const proposal = strategyProposals[debtId];
-    if (!proposal) return;
+    if (!proposal || acceptedProposals.has(debtId)) return;
 
     const nextDebts = debts.map((d) =>
       d.id === debtId
@@ -1124,15 +1125,10 @@ export function StepSchulden({
 
     onDebtsChange?.(nextDebts);
 
-    setStrategyProposals((prev) => {
-      const next = { ...prev };
-      delete next[debtId];
+    setAcceptedProposals((prev) => {
+      const next = new Set(prev);
+      next.add(debtId);
       return next;
-    });
-
-    setSelectedStrategy((prev) => {
-      const remaining = Object.keys(strategyProposals).filter((id) => id !== debtId).length;
-      return remaining === 0 ? null : prev;
     });
   };
 
@@ -1168,7 +1164,7 @@ export function StepSchulden({
 
     const nextDebts = debts.map((d) => {
       const proposal = strategyProposals[d.id];
-      if (!proposal) return d;
+      if (!proposal || acceptedProposals.has(d.id)) return d;
       return {
         ...d,
         minimaleMaandlast: proposal.minPayment,
@@ -1178,8 +1174,7 @@ export function StepSchulden({
     });
 
     onDebtsChange?.(nextDebts);
-    setStrategyProposals({});
-    setSelectedStrategy(null);
+    setAcceptedProposals(new Set(Object.keys(strategyProposals)));
   };
 
 
@@ -1553,6 +1548,7 @@ export function StepSchulden({
 
 
                 proposals={strategyProposals}
+                acceptedIds={acceptedProposals}
 
 
                 onAcceptProposal={applyProposalToDebt}
