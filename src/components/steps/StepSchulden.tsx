@@ -263,6 +263,10 @@ export function StepSchulden({
     `moneylith.${variant}.debts.includePatterns`,
     false,
   );
+  const hasPendingProposals = useMemo(
+    () => Object.keys(strategyProposals).some((id) => !acceptedProposals.has(id)),
+    [strategyProposals, acceptedProposals],
+  );
 
 
 
@@ -1523,7 +1527,7 @@ export function StepSchulden({
                 <div className="flex items-center gap-3">
 
 
-                  {Object.keys(strategyProposals).length > 0 && !isReadOnly && (
+                  {hasPendingProposals && !isReadOnly && (
 
 
                     <button
