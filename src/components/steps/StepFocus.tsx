@@ -45,7 +45,19 @@ export function StepFocus({
     { label: "Vakantie", type: "project", targetAmount: 1200 },
     { label: "Kleine schuld aflossen", type: "debt_payoff", targetAmount: 800 },
   ];
-
+  const monthlyHint = useMemo(() => {
+    const remaining = Math.max(0, formState.targetAmount - formState.currentAmount);
+    if (!deadlineInput.trim()) return null;
+    const iso = parseDateNlToIso(deadlineInput);
+    if (!iso) return null;
+    const now = new Date();
+    const deadlineDate = new Date(iso);
+    const months =
+      (deadlineDate.getFullYear() - now.getFullYear()) * 12 + (deadlineDate.getMonth() - now.getMonth()) + 1;
+    if (!Number.isFinite(months) || months <= 0) return { error: "Deadline ligt in het verleden of is ongeldig." };
+    const perMonth = remaining / months;
+    return { months, perMonth };
+  }, [formState.targetAmount, formState.currentAmount, deadlineInput]);
   const [formState, setFormState] = useState<{
     id?: string;
     label: string;
@@ -72,18 +84,6 @@ export function StepFocus({
   const totalGoalPressure = Array.from(projections.values()).reduce((sum, p) => sum + p.pressurePerMonth, 0);
   const margin = freePerMonth - totalGoalPressure;
   const applyCheck = canApplyGoalsSuggestions({ mode, actions, currentGoals: goals });
-  const monthlyHint = useMemo(() => {
-    const remaining = Math.max(0, formState.targetAmount - formState.currentAmount);
-    if (!deadlineInput.trim()) return null;
-    const iso = parseDateNlToIso(deadlineInput);
-    if (!iso) return null;
-    const now = new Date();
-    const deadlineDate = new Date(iso);
-    const months =
-      (deadlineDate.getFullYear() - now.getFullYear()) * 12 + (deadlineDate.getMonth() - now.getMonth()) + 1;
-    if (!Number.isFinite(months) || months <= 0) return null;
-    return { months, perMonth: remaining / months };
-  }, [formState.targetAmount, formState.currentAmount, deadlineInput]);
 
   const resetForm = () => {
     setFormState({
@@ -427,8 +427,13 @@ export function StepFocus({
                 placeholder="bijv. 15-04-2026"
                 disabled={isReadOnly}
               />
-              {!deadlineValid && <p className="mt-1 text-[11px] text-red-300">Gebruik DD-MM-JJJJ, bijv. 15-04-2026.</p>}
-              {monthlyHint && (
+              {!deadlineValid && (
+                <p className="mt-1 text-[11px] text-red-300">Gebruik DD-MM-JJJJ, bijv. 15-04-2026.</p>
+              )}
+              {monthlyHint?.error && (
+                <p className="mt-1 text-[11px] text-red-300">{monthlyHint.error}</p>
+              )}
+              {monthlyHint && !monthlyHint.error && (
                 <p className="mt-1 text-[11px] text-amber-200">
                   Nodig: {formatCurrency(monthlyHint.perMonth)} per maand voor ~{monthlyHint.months} maand(en).
                 </p>
