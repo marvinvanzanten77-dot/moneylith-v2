@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MoneylithTransaction } from "../../types";
 
 type BankAccountLink = {
@@ -20,22 +20,39 @@ export function StepBank({
   onTransactions: (txs: MoneylithTransaction[]) => void;
   mode?: "personal" | "business";
 }) {
+  const provider =
+    import.meta.env.VITE_BANK_PROVIDER ||
+    (import.meta.env.MODE === "production" ? "real" : "mock");
+  const basePath = useMemo(
+    () => (provider === "real" ? "/api/bank" : "/api/mock-bank"),
+    [provider],
+  );
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [links, setLinks] = useState<BankAccountLink[]>([]);
   const [selectedInstitution, setSelectedInstitution] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [logs, setLogs] = useState<
+    { ts: string; type: string; msg: string }[]
+  >([]);
+
+  const pushLog = (type: string, msg: string) => {
+    setLogs((prev) => [
+      { ts: new Date().toISOString(), type, msg },
+      ...prev,
+    ].slice(0, 20));
+  };
 
   useEffect(() => {
-    fetch("/api/bank/institutions", { method: "POST" })
+    fetch(`${basePath}/institutions`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => setInstitutions(data || []))
       .catch(() => {});
     refreshLinks();
-  }, []);
+  }, [basePath]);
 
   const refreshLinks = () => {
-    fetch("/api/bank/accounts")
+    fetch(`${basePath}/accounts`)
       .then((r) => r.json())
       .then((data) => setLinks(data || []))
       .catch(() => {});
@@ -46,7 +63,7 @@ export function StepBank({
     setLoading(true);
     setStatus(null);
     try {
-      const resp = await fetch("/api/bank/connect", {
+      const resp = await fetch(`${basePath}/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ institutionId: selectedInstitution }),
@@ -57,9 +74,11 @@ export function StepBank({
         window.location.href = data.link;
       } else {
         setStatus("Geen redirect-link ontvangen.");
+        pushLog("connect", "Geen redirect-link ontvangen");
       }
     } catch (err: any) {
       setStatus(err.message || "Koppelen mislukt");
+      pushLog("error", `connect: ${err.message || "mislukt"}`);
     } finally {
       setLoading(false);
     }
@@ -69,7 +88,7 @@ export function StepBank({
     setLoading(true);
     setStatus("Sync bezig...");
     try {
-      const resp = await fetch("/api/bank/sync", {
+      const resp = await fetch(`${basePath}/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId, requisitionId }),
@@ -94,9 +113,11 @@ export function StepBank({
       });
       if (txs.length) onTransactions(txs);
       setStatus(`Sync klaar. ${txs.length} transacties opgehaald.`);
+      pushLog("sync", `Sync klaar (${txs.length} tx)`);
       refreshLinks();
     } catch (err: any) {
       setStatus(err.message || "Sync mislukt");
+      pushLog("error", `sync: ${err.message || "mislukt"}`);
     } finally {
       setLoading(false);
     }
@@ -105,11 +126,12 @@ export function StepBank({
   const handleDisconnect = async (requisitionId: string) => {
     setLoading(true);
     try {
-      await fetch("/api/bank/disconnect", {
+      await fetch(`${basePath}/disconnect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requisitionId }),
       });
+      pushLog("disconnect", `Requisition ${requisitionId} ontkoppeld`);
       refreshLinks();
     } catch {
       /* ignore */
@@ -122,7 +144,9 @@ export function StepBank({
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50">
         <h1 className="text-xl font-semibold">Bankkoppeling ({mode === "business" ? "zakelijk" : "persoonlijk"})</h1>
-        <p className="text-sm text-slate-300">Handmatige PSD2-sync via GoCardless/Nordigen. Data blijft lokaal.</p>
+        <p className="text-sm text-slate-300">
+          Handmatige PSD2-sync via GoCardless/Nordigen. Data blijft lokaal. Provider: {provider}.
+        </p>
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50 space-y-3">
@@ -149,6 +173,17 @@ export function StepBank({
           </button>
         </div>
         <p className="text-xs text-slate-400">Na koppelen word je teruggestuurd en kun je handmatig syncen.</p>
+        {provider !== "real" && (
+          <div className="flex flex-wrap gap-2 text-[11px] text-slate-200">
+            <button
+              type="button"
+              onClick={() => (window.location.href = `${basePath}/callback?mock=1`)}
+              className="rounded-md border border-slate-600 px-2 py-1 hover:border-amber-400 hover:text-amber-200"
+            >
+              Simuleer succes callback
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50 space-y-2">
@@ -200,6 +235,19 @@ export function StepBank({
           ))}
         </div>
         {status && <p className="text-xs text-amber-200">{status}</p>}
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-slate-50 space-y-2">
+        <h2 className="text-lg font-semibold">Logs</h2>
+        {logs.length === 0 && <p className="text-xs text-slate-400">Nog geen events.</p>}
+        <ul className="space-y-1 text-[11px] text-slate-200">
+          {logs.map((l, idx) => (
+            <li key={`${l.ts}-${idx}`} className="rounded border border-slate-800 bg-slate-900/60 px-2 py-1">
+              <span className="text-slate-500">{new Date(l.ts).toLocaleTimeString()}</span>{" "}
+              <span className="font-semibold text-amber-200">{l.type}</span> — {l.msg}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

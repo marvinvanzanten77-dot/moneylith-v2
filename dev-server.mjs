@@ -193,6 +193,127 @@ app.post("/api/bank/disconnect", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== Mock bank routes (for preview/dev) =====
+const mockStore = {
+  requisition: null,
+  accounts: [],
+  syncCount: 0,
+};
+
+const mockTxSeed = [
+  { d: "2025-12-01", a: -42.15, desc: "Boodschappen Jumbo" },
+  { d: "2025-12-03", a: -65.8, desc: "Brandstof Shell" },
+  { d: "2025-12-05", a: -12.99, desc: "Online diensten" },
+  { d: "2025-12-08", a: 1450, desc: "Salaris" },
+  { d: "2025-12-12", a: -120, desc: "Zorgverzekering" },
+  { d: "2025-12-15", a: -80, desc: "Sportclub" },
+  { d: "2025-12-18", a: -30, desc: "Eten buiten de deur" },
+];
+
+function mockGenerateTx(count, offset = 0) {
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const base = mockTxSeed[i % mockTxSeed.length];
+    const date = new Date(base.d);
+    date.setDate(date.getDate() + Math.floor(i / mockTxSeed.length) + offset);
+    out.push({
+      transactionId: `mock-${offset}-${i}`,
+      bookingDate: date.toISOString().slice(0, 10),
+      transactionAmount: { amount: base.a.toFixed(2), currency: "EUR" },
+      remittanceInformationUnstructured: base.desc,
+      status: "booked",
+    });
+  }
+  return out;
+}
+
+app.post("/api/mock-bank/institutions", (_req, res) => {
+  res.json([
+    { id: "MOCKBANK", name: "Mock Bank NL" },
+  ]);
+});
+
+app.post("/api/mock-bank/connect", (_req, res) => {
+  const reqId = `mock-req-${Date.now()}`;
+  mockStore.requisition = {
+    id: reqId,
+    status: "LN",
+    accounts: [],
+    agreement_id: "mock-agreement",
+    institution_id: "MOCKBANK",
+  };
+  const redirect = "/api/mock-bank/callback?mock=1&requisitionId=" + reqId;
+  res.json({ link: redirect, requisitionId: reqId, agreementId: "mock-agreement" });
+});
+
+app.get("/api/mock-bank/callback", (req, res) => {
+  const reqId = req.query.requisitionId || req.query.id || mockStore.requisition?.id || `mock-req-${Date.now()}`;
+  mockStore.requisition = {
+    id: reqId,
+    status: "LN",
+    accounts: ["mock-acc-1", "mock-acc-2"],
+    agreement_id: "mock-agreement",
+    institution_id: "MOCKBANK",
+  };
+  mockStore.accounts = [
+    { id: "mock-acc-1", name: "Mock Betaal", iban: "NL00MOCK0000001" },
+    { id: "mock-acc-2", name: "Mock Spaar", iban: "NL00MOCK0000002" },
+  ];
+  mockStore.syncCount = 0;
+  if (req.query.mock) {
+    return res.redirect("/?bank=mock-connected");
+  }
+  return res.json({ ok: true, requisitionId: reqId });
+});
+
+app.get("/api/mock-bank/accounts", (_req, res) => {
+  if (!mockStore.requisition) return res.json([]);
+  res.json([
+    {
+      requisition_id: mockStore.requisition.id,
+      agreement_id: mockStore.requisition.agreement_id,
+      institution_id: mockStore.requisition.institution_id,
+      accounts: mockStore.accounts.map((a) => a.id),
+      status: mockStore.requisition.status,
+      last_sync: null,
+      last_error: null,
+    },
+  ]);
+});
+
+app.post("/api/mock-bank/sync", (req, res) => {
+  if (!mockStore.requisition) return res.status(400).json({ error: "Geen koppeling" });
+  mockStore.syncCount += 1;
+  const txCount = mockStore.syncCount === 1 ? 120 : mockStore.syncCount === 2 ? 7 : 0;
+  const txs = mockGenerateTx(txCount, mockStore.syncCount * 10);
+  const mapped = txs.map((t) => ({
+    accountId: req.body?.accountId || mockStore.accounts[0]?.id || "mock-acc-1",
+    transactionId: t.transactionId,
+    bookingDate: t.bookingDate,
+    transactionAmount: t.transactionAmount,
+    remittanceInformationUnstructured: t.remittanceInformationUnstructured,
+  }));
+  const response = [{
+    accountId: req.body?.accountId || mockStore.accounts[0]?.id || "mock-acc-1",
+    balances: { current: 1200, available: 1000 },
+    transactions: mapped.map((t) => ({
+      transactionId: t.transactionId,
+      bookingDate: t.bookingDate,
+      transactionAmount: t.transactionAmount,
+      remittanceInformationUnstructured: t.remittanceInformationUnstructured,
+      status: "booked",
+    })),
+  }];
+  return res.json(response);
+});
+
+app.post("/api/mock-bank/disconnect", (_req, res) => {
+  mockStore.requisition = null;
+  mockStore.accounts = [];
+  mockStore.syncCount = 0;
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => {
   console.log(`Dev API server listening on http://localhost:${PORT}`);
 });
