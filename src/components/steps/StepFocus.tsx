@@ -46,6 +46,27 @@ export function StepFocus({
     { label: "Vakantie", type: "project", targetAmount: 1200 },
     { label: "Kleine schuld aflossen", type: "debt_payoff", targetAmount: 800 },
   ];
+  const [formState, setFormState] = useState<{
+    id?: string;
+    label: string;
+    type: MoneylithGoal["type"];
+    targetAmount: number;
+    currentAmount: number;
+    monthlyContribution: number;
+    deadline?: string;
+    linkedBucketIds: string[];
+    isActive: boolean;
+  }>(() => ({
+    label: "",
+    type: "savings",
+    targetAmount: 0,
+    currentAmount: 0,
+    monthlyContribution: 0,
+    deadline: "",
+    linkedBucketIds: [],
+    isActive: true,
+  }));
+
   const selectedBuckets = useMemo(
     () => buckets.filter((b) => formState.linkedBucketIds.includes(b.id)),
     [buckets, formState.linkedBucketIds],
@@ -67,26 +88,6 @@ export function StepFocus({
     const perMonth = remaining / months;
     return { months, perMonth };
   }, [formState.targetAmount, formState.currentAmount, deadlineInput]);
-  const [formState, setFormState] = useState<{
-    id?: string;
-    label: string;
-    type: MoneylithGoal["type"];
-    targetAmount: number;
-    currentAmount: number;
-    monthlyContribution: number;
-    deadline?: string;
-    linkedBucketIds: string[];
-    isActive: boolean;
-  }>(() => ({
-    label: "",
-    type: "savings",
-    targetAmount: 0,
-    currentAmount: 0,
-    monthlyContribution: 0,
-    deadline: "",
-    linkedBucketIds: [],
-    isActive: true,
-  }));
 
   const activeGoals = goals.filter((g) => g.isActive);
   const projections = useMemo(() => new Map(activeGoals.map((g) => [g.id, projectGoal(g)])), [activeGoals]);
