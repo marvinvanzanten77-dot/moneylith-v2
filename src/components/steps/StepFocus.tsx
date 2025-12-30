@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
 import { parseDateNlToIso } from "../../utils/date";
@@ -40,6 +40,7 @@ export function StepFocus({
   const listRef = useRef<HTMLDivElement>(null);
   const [deadlineInput, setDeadlineInput] = useState("");
   const [deadlineValid, setDeadlineValid] = useState(true);
+  const [priorityMap, setPriorityMap] = useState<Record<string, number>>({});
   const goalExamples: Array<{ label: string; type: MoneylithGoal["type"]; targetAmount: number }> = [
     { label: "Buffer 3 maanden vaste lasten", type: "buffer", targetAmount: Math.max(500, freePerMonth * 3) },
     { label: "Vakantie", type: "project", targetAmount: 1200 },
@@ -96,6 +97,15 @@ export function StepFocus({
       deadline: "",
       linkedBucketIds: [],
       isActive: true,
+    });
+  };
+
+  const movePriority = (goalId: string, direction: "up" | "down") => {
+    if (isReadOnly) return;
+    setPriorityMap((prev) => {
+      const current = prev[goalId] ?? 0;
+      const delta = direction === "up" ? 1 : -1;
+      return { ...prev, [goalId]: current + delta };
     });
   };
 
@@ -252,11 +262,11 @@ export function StepFocus({
           <div ref={listRef} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-50">{isBusiness ? "Een actief zakelijk doel" : "Een actief doel"}</h2>
+                <h2 className="text-lg font-semibold text-slate-50">{isBusiness ? "Actieve zakelijke doelen" : "Actieve doelen"}</h2>
                 <p className="text-xs text-slate-400">
                   {isBusiness
-                    ? "Je werkt altijd met een primair zakelijk focuspunt tegelijk."
-                    : "Kies een doel als focus voor deze periode."}
+                    ? "Meerdere doelen kunnen actief zijn; orden ze op prioriteit."
+                    : "Zet meerdere doelen aan en bepaal de volgorde met prioriteit."}
                 </p>
               </div>
               <span className="text-xs text-slate-400">{activeGoals.length} actief</span>
@@ -266,7 +276,18 @@ export function StepFocus({
 
             {goals.length > 0 && (
               <div className="space-y-3">
-                {goals.map((goal) => {
+                {goals
+                  .slice()
+                  .sort((a, b) => {
+                    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+                    const pa = priorityMap[a.id] ?? 0;
+                    const pb = priorityMap[b.id] ?? 0;
+                    if (pa !== pb) return pb - pa;
+                    const da = a.deadline ? new Date(a.deadline).getTime() : Number.POSITIVE_INFINITY;
+                    const db = b.deadline ? new Date(b.deadline).getTime() : Number.POSITIVE_INFINITY;
+                    return da - db;
+                  })
+                  .map((goal) => {
                   const projection = projections.get(goal.id);
                   const progress = goal.targetAmount > 0 ? Math.min(goal.currentAmount / goal.targetAmount, 1) : 0;
                   const isExpanded = expandedGoalId === goal.id;
@@ -287,7 +308,9 @@ export function StepFocus({
                       >
                         <div className="flex flex-col">
                           <div className="text-sm font-semibold text-slate-50">{goal.label}</div>
-                          <div className="text-[11px] text-slate-400">{goal.type}</div>
+                          <div className="text-[11px] text-slate-400">
+                            {goal.type} · Prioriteit {priorityMap[goal.id] ?? 0}
+                          </div>
                         </div>
                         <div className="text-right text-xs text-slate-400">
                           <div>{Math.round(progress * 100)}%</div>
@@ -296,7 +319,7 @@ export function StepFocus({
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
                           <span>{formatCurrency(goal.targetAmount)}</span>
                           <span aria-hidden className="text-slate-500">
-                            {isExpanded ? "â–²" : "â–¼"}
+                            {isExpanded ? "▲" : "▼"}
                           </span>
                         </div>
                       </button>
@@ -352,6 +375,23 @@ export function StepFocus({
                               >
                                 Verwijderen
                               </button>
+                              <div className="flex items-center gap-1 text-slate-300">
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-slate-800 px-2 py-0.5 hover:bg-slate-700"
+                                  onClick={() => movePriority(goal.id, "up")}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-slate-800 px-2 py-0.5 hover:bg-slate-700"
+                                  onClick={() => movePriority(goal.id, "down")}
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                              <span className="text-[11px] text-slate-400">Prioriteit: {priorityMap[goal.id] ?? 0}</span>
                             </div>
                           )}
                         </div>
