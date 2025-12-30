@@ -1,4 +1,4 @@
-﻿import type { UserIntent } from "../../types";
+import type { UserIntent } from "../../types";
 
 type StepIntentProps = {
   value: UserIntent;
@@ -7,20 +7,20 @@ type StepIntentProps = {
   readOnly?: boolean;
 };
 
-const strategyOptionsPersonal: { value: NonNullable<UserIntent["primaryGoal"]>; label: string }[] = [
-  { value: "schulden_verminderen", label: "Schulden verminderen" },
-  { value: "buffer_opbouwen", label: "Buffer opbouwen" },
-  { value: "inkomen_verhogen", label: "Inkomen verhogen" },
-  { value: "stabiliseren", label: "Stabiliseren" },
-  { value: "vermogen_groeien", label: "Vermogen laten groeien" },
+const strategyOptionsPersonal: { value: NonNullable<UserIntent["primaryGoal"]>; label: string; hint: string }[] = [
+  { value: "schulden_verminderen", label: "Schulden verminderen", hint: "Focus op aflossen en maanddruk omlaag." },
+  { value: "buffer_opbouwen", label: "Buffer opbouwen", hint: "Spaar eerst een noodbuffer voor stabiliteit." },
+  { value: "inkomen_verhogen", label: "Inkomen verhogen", hint: "Zoek extra inkomsten of optimaliseer je tarief." },
+  { value: "stabiliseren", label: "Stabiliseren", hint: "Eerst rust en overzicht: kosten strak, geen nieuwe risico's." },
+  { value: "vermogen_groeien", label: "Vermogen laten groeien", hint: "Na basis op orde: gericht investeren/spaarplan." },
 ];
 
-const strategyOptionsBusiness: { value: NonNullable<UserIntent["primaryGoal"]>; label: string }[] = [
-  { value: "vermogen_groeien", label: "Groei / opschalen" },
-  { value: "stabiliseren", label: "Stabiliseren" },
-  { value: "inkomen_verhogen", label: "Omschakelen" },
-  { value: "schulden_verminderen", label: "Afbouwen" },
-  { value: "buffer_opbouwen", label: "Nog onduidelijk" },
+const strategyOptionsBusiness: { value: NonNullable<UserIntent["primaryGoal"]>; label: string; hint: string }[] = [
+  { value: "vermogen_groeien", label: "Groei / opschalen", hint: "Investeren in groei en omzet; meer risico mogelijk." },
+  { value: "stabiliseren", label: "Stabiliseren", hint: "Cashflow gladstrijken, reserves aanvullen, geen nieuwe risico's." },
+  { value: "inkomen_verhogen", label: "Omschakelen", hint: "Businessmodel of prijsstelling aanpassen voor meer omzet." },
+  { value: "schulden_verminderen", label: "Afbouwen", hint: "Leningen/regelingen versneld aflossen, rente omlaag." },
+  { value: "buffer_opbouwen", label: "Nog onduidelijk", hint: "Zakelijke buffer en runway opbouwen voor veiligheid." },
 ];
 
 const pressureOptionsPersonal: { value: UserIntent["mainPressure"][number]; label: string }[] = [
@@ -78,14 +78,14 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
 
   const aiToneOptions = isBusiness
     ? [
-        { value: "ondersteunend", label: "Zacht en ondersteunend" },
-        { value: "spiegelend", label: "Neutraal en feitelijk" },
-        { value: "confronterend", label: "Direct en confronterend" },
+        { value: "ondersteunend", label: "Zacht en ondersteunend", example: "Ik help je stap voor stap, pragmatisch." },
+        { value: "spiegelend", label: "Neutraal en feitelijk", example: "Ik vat samen en leg keuzes objectief voor." },
+        { value: "confronterend", label: "Direct en confronterend", example: "Ik benoem scherp waar het wringt en wat je moet snijden." },
       ]
     : [
-        { value: "spiegelend", label: "Spiegelend" },
-        { value: "confronterend", label: "Confronterend" },
-        { value: "ondersteunend", label: "Ondersteunend" },
+        { value: "spiegelend", label: "Spiegelend", example: "Ik leg terug wat je invult en stel verdiepende vragen." },
+        { value: "confronterend", label: "Confronterend", example: "Ik ben direct en benoem risico's zonder omwegen." },
+        { value: "ondersteunend", label: "Ondersteunend", example: "Ik blijf vriendelijk en help je stap voor stap." },
       ];
 
   const togglePressure = (key: UserIntent["mainPressure"][number]) => {
@@ -120,6 +120,11 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
               </option>
             ))}
           </select>
+          {value.primaryGoal && (
+            <p className="mt-1 text-xs text-slate-500">
+              {strategyOptions.find((o) => o.value === value.primaryGoal)?.hint ?? ""}
+            </p>
+          )}
         </label>
 
         <div className="space-y-2">
@@ -180,11 +185,50 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
               </option>
             ))}
           </select>
+          {value.aiStyle && (
+            <p className="mt-1 text-xs text-slate-500">
+              Voorbeeld: {aiToneOptions.find((o) => o.value === value.aiStyle)?.example ?? ""}
+            </p>
+          )}
         </label>
+
+        <div className="rounded-lg border border-slate-200 bg-white/70 p-3 text-xs text-slate-700">
+          <p className="font-semibold text-slate-900">Controleer je invoer</p>
+          <ul className="mt-1 space-y-1">
+            <li>
+              Strategie:{" "}
+              <span className="font-semibold">
+                {strategyOptions.find((o) => o.value === value.primaryGoal)?.label ?? "nog niet gekozen"}
+              </span>
+            </li>
+            <li>
+              Drukpunten:{" "}
+              <span className="font-semibold">
+                {value.mainPressure && value.mainPressure.length
+                  ? value.mainPressure
+                      .map((p) => pressureOptions.find((o) => o.value === p)?.label ?? p)
+                      .join(", ")
+                  : "geen selectie"}
+              </span>
+            </li>
+            <li>
+              Horizon:{" "}
+              <span className="font-semibold">
+                {horizonOptions.find((o) => o.value === value.timeHorizon)?.label ?? "nog niet gekozen"}
+              </span>
+            </li>
+            <li>
+              AI-stijl:{" "}
+              <span className="font-semibold">
+                {aiToneOptions.find((o) => o.value === value.aiStyle)?.label ?? "nog niet gekozen"}
+              </span>
+            </li>
+          </ul>
+          <p className="mt-1 text-[11px] text-slate-500">Klopt dit voor nu? Je kunt later altijd terug om het aan te passen.</p>
+        </div>
       </div>
     </div>
   );
 }
 
 export default StepIntent;
-
