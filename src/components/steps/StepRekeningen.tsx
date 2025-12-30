@@ -22,6 +22,10 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
   const [amountError, setAmountError] = useState<string | null>(null);
 
   const accountToEdit = useMemo(() => accounts.find((a) => a.id === editingId), [accounts, editingId]);
+  const hasActivePayAccount = useMemo(
+    () => accounts.some((a) => a.type === "betaalrekening" && a.active),
+    [accounts],
+  );
 
   useEffect(() => {
     if (!accountToEdit) return;
@@ -96,6 +100,12 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
         <p className="text-sm text-white">
           Voeg hier je betaal- en spaarrekeningen toe. Deze gebruik ik om afschriften en uitgavenpatronen aan te koppelen.
         </p>
+        {!hasActivePayAccount && (
+          <div className="rounded-lg border border-amber-300 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+            Minimaal één <strong>actieve betaalrekening</strong> is nodig om afschriften, ritme en analyse te gebruiken. Markeer er
+            minstens één als actief (en bij voorkeur primair).
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
