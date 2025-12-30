@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+﻿import { useEffect, useId, useRef, useState } from "react";
 
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { formatCurrency } from "../utils/format";
@@ -108,6 +108,9 @@ export function IncomeList({
         <div>
           <p className="text-sm text-slate-600">{heading ?? "Inkomen"}</p>
           <h3 className="text-lg font-semibold text-slate-900">{subheading ?? "Overzicht van je inkomsten"}</h3>
+          <p className="text-xs text-slate-500">
+            Vrije ruimte = inkomen - vaste lasten. Dit bedrag wordt in andere tabs gebruikt als startpunt.
+          </p>
         </div>
         <button
           type="button"
@@ -144,7 +147,7 @@ export function IncomeList({
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                   <span>{formatCurrency(item.bedrag || 0)}</span>
                   <span className="text-xs text-slate-500" aria-hidden>
-                    {isExpanded ? "▲" : "▼"}
+                    {isExpanded ? "â–²" : "â–¼"}
                   </span>
                 </div>
               </button>
@@ -214,3 +217,4 @@ export function IncomeList({
     </div>
   );
 }
+

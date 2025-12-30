@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
 
 interface AssetSummary {
@@ -10,6 +10,7 @@ interface AssetItem {
   id: string;
   naam: string;
   bedrag: number;
+  type?: "liquid" | "investment" | "other";
 }
 
 interface VermogenCardProps {
@@ -29,7 +30,12 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setInternalItems(externalItems ?? []);
+    setInternalItems(
+      (externalItems ?? []).map((item) => ({
+        ...item,
+        type: item.type ?? "liquid",
+      })),
+    );
   }, [externalItems]);
 
   const summary = useMemo(() => {
@@ -37,7 +43,10 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
       (sum, item) => sum + (Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0),
       0,
     );
-    return { totalAssets, assetsCount: internalItems.length };
+    const liquidAssets = internalItems
+      .filter((i) => (i.type ?? "liquid") === "liquid")
+      .reduce((sum, item) => sum + (Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0), 0);
+    return { totalAssets, assetsCount: internalItems.length, liquidAssets };
   }, [internalItems]);
 
   useEffect(() => {
@@ -143,7 +152,7 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span>{formatCurrency(Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0)}</span>
                 <span className="text-xs text-slate-500" aria-hidden>
-                  {isExpanded ? "▲" : "▼"}
+                  {isExpanded ? "â–²" : "â–¼"}
                 </span>
               </div>
             </button>
@@ -175,6 +184,20 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
                       readOnly={isReadOnly}
                     />
                   </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-slate-600">Categorie</span>
+                    <select
+                      className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                      value={item.type ?? "liquid"}
+                      onChange={(e) => updateItem(item.id, { type: e.target.value as AssetItem["type"] })}
+                      disabled={isReadOnly}
+                    >
+                      <option value="liquid">Spaar/buffer (liquide)</option>
+                      <option value="investment">Belegging</option>
+                      <option value="other">Overige waarde</option>
+                    </select>
+                    <span className="text-[11px] text-slate-500">Alleen liquide telt 100% mee voor buffer.</span>
+                  </label>
                 </div>
                 <div className="mt-3 flex justify-end">
                   <button
@@ -204,3 +227,5 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
     </div>
   );
 };
+
+

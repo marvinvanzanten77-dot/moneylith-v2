@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { FixedCostManualItem } from "../types";
 import { formatCurrency } from "../utils/format";
@@ -111,6 +111,9 @@ export function FixedCostsList({
         <div>
           <p className="text-sm text-slate-600">{heading ?? "Vaste lasten"}</p>
           <h3 className="text-lg font-semibold text-slate-900">{subheading ?? "Overzicht van je vaste lasten"}</h3>
+          <p className="text-xs text-slate-500">
+            Laat zien hoeveel % van je inkomen hierheen gaat. Lager is rustiger; hoger? Kijk of iets omlaag kan.
+          </p>
         </div>
         <button
           type="button"
@@ -147,7 +150,7 @@ export function FixedCostsList({
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                   <span>{formatCurrency(item.bedrag || 0)}</span>
                   <span className="text-xs text-slate-500" aria-hidden>
-                    {isExpanded ? "▲" : "▼"}
+                    {isExpanded ? "â–²" : "â–¼"}
                   </span>
                 </div>
               </button>
@@ -180,7 +183,7 @@ export function FixedCostsList({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-slate-600">Dag van afschrijving</span>
+                      <span className="text-xs font-semibold text-slate-600">Dag van incasso</span>
                       <input
                         type="number"
                         min={1}
@@ -188,9 +191,10 @@ export function FixedCostsList({
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
                         value={Number.isFinite(item.dagVanMaand) ? item.dagVanMaand : ""}
                         onChange={(e) => updateItem(item.id, { dagVanMaand: parseInt(e.target.value) || 1 })}
-                        placeholder="1"
+                        placeholder="1-31 (kies incassodag)"
                         readOnly={isReadOnly}
                       />
+                      <span className="text-[11px] text-slate-500">Tip: dag waarop dit normaal wordt afgeschreven.</span>
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-slate-600">Opmerking</span>
@@ -230,3 +234,5 @@ export function FixedCostsList({
     </div>
   );
 }
+
+

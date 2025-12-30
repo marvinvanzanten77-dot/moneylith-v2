@@ -9,11 +9,13 @@ type AssetItem = {
   id: string;
   naam: string;
   bedrag: number;
+  type?: "liquid" | "investment" | "other";
 };
 
 type AssetSummary = {
   totalAssets: number;
   assetsCount: number;
+  liquidAssets?: number;
 };
 
 interface StepVermogenProps {
@@ -41,9 +43,12 @@ export function StepVermogen({
   const summary = useMemo(() => {
     const totalAssets = assets.reduce(
       (sum, item) => sum + (Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0),
-      0
+      0,
     );
-    return { totalAssets, assetsCount: assets.length };
+    const liquidAssets = assets
+      .filter((i) => (i.type ?? "liquid") === "liquid")
+      .reduce((sum, item) => sum + (Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0), 0);
+    return { totalAssets, assetsCount: assets.length, liquidAssets };
   }, [assets]);
 
   useEffect(() => {
@@ -52,7 +57,8 @@ export function StepVermogen({
   }, [summary, onAssetSummary, isReadOnly]);
 
   const monthlyFixedCosts = financialSnapshot?.fixedCostsTotal?.value ?? 0;
-  const runwayMonths = monthlyFixedCosts > 0 ? summary.totalAssets / monthlyFixedCosts : null;
+  const runwayMonths =
+    monthlyFixedCosts > 0 ? (summary.liquidAssets ?? summary.totalAssets) / monthlyFixedCosts : null;
 
   let bufferStatusLabel = "Onbekend";
   if (runwayMonths != null) {
@@ -104,7 +110,12 @@ export function StepVermogen({
               </div>
             ) : null}
 
-            <VermogenCard items={assets} onItemsChange={onAssetsChange} onSummaryChange={onAssetSummary} readOnly={isReadOnly} />
+            <VermogenCard
+              items={assets}
+              onItemsChange={onAssetsChange}
+              onSummaryChange={onAssetSummary}
+              readOnly={isReadOnly}
+            />
 
             <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner mt-3">
               <p>Totaal vermogen: {formatCurrency(summary.totalAssets)}</p>
@@ -112,7 +123,7 @@ export function StepVermogen({
               {runwayMonths != null ? (
                 <p>Dekt ongeveer: {Math.floor(runwayMonths)} maanden vaste lasten</p>
               ) : (
-                <p>Nog geen vaste lasten ingesteld</p>
+                <p>Nog geen vaste lasten ingesteld (voer vaste lasten in om runway te zien).</p>
               )}
             </div>
           </div>
@@ -140,10 +151,17 @@ export function StepVermogen({
                 <span className="text-slate-400">Buffer-gezondheid</span>
                 <span className="font-medium text-slate-50">{bufferStatusLabel}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Liquide vermogen</span>
+                <span className="font-medium text-slate-50">
+                  {formatCurrency(summary.liquidAssets ?? 0)}
+                </span>
+              </div>
             </div>
 
             <p className="text-xs text-slate-400">
-              Richtwaarde: 3-6 maanden vaste lasten als minimale {isBusiness ? "zakelijke" : "persoonlijke"} buffer. Meer is extra slagruimte.
+              Richtwaarde: 3-6 maanden vaste lasten als minimale {isBusiness ? "zakelijke" : "persoonlijke"} buffer.
+              Alleen liquide posten tellen volledig mee; vul vaste lasten in om de runway te berekenen.
             </p>
           </div>
         </div>
