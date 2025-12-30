@@ -136,6 +136,36 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
     results.baseline.debtAt12,
   )}, buffer ${formatCurrency(results.baseline.bufferAt12)}, vrije ruimte ${formatCurrency(results.baseline.freeRoomAt12)}.`;
 
+  const summaryText = (key: ScenarioKey) => {
+    if (key === "upside") {
+      return `Met +${formatCurrency(upside.extraIncomePerMonth)} inkomen en +${formatCurrency(
+        upside.savingsPerMonth,
+      )} sparen p/m: buffer na 6m ${formatCurrency(results.upside.bufferTimeline[6] ?? 0)}, na 12m ${formatCurrency(
+        results.upside.bufferAt12,
+      )}, vrije ruimte na 12m ${formatCurrency(results.upside.freeRoomAt12)}.`;
+    }
+    if (key === "worst") {
+      return `Shock van ${formatCurrency(worst.shockAmount || worst.shockPerMonth)} ${
+        worst.shockPerMonth ? "per maand" : "eenmalig"
+      } vanaf maand ${worst.shockStartMonth || 0}: schuld na 12m ${formatCurrency(
+        results.worst.debtAt12,
+      )}, buffer ${formatCurrency(results.worst.bufferAt12)}, vrije ruimte ${formatCurrency(results.worst.freeRoomAt12)}.`;
+    }
+    return `Huidig pad: schuld na 12m ${formatCurrency(results.baseline.debtAt12)}, buffer ${formatCurrency(
+      results.baseline.bufferAt12,
+    )}, vrije ruimte ${formatCurrency(results.baseline.freeRoomAt12)}.`;
+  };
+
+  const metrics = [
+    { key: "debt", label: "Schuld", get: (r: ForecastResult) => r.debtAt12 },
+    { key: "buffer", label: "Buffer", get: (r: ForecastResult) => r.bufferAt12 },
+    { key: "free", label: "Vrije ruimte", get: (r: ForecastResult) => r.freeRoomAt12 },
+  ];
+  const compareMax = Math.max(
+    ...metrics.flatMap((m) => [m.get(results.baseline), m.get(current)]).map((v) => Math.max(0, v)),
+    1,
+  );
+
   const costNothing =
     results.baseline.freeRoomNow > 0
       ? results.baseline.freeRoomNow * 12
@@ -151,7 +181,7 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
     <div className="space-y-6">
       <div className="mb-4 flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-slate-50">Vooruitblik</h1>
-        <p className="text-sm text-slate-400">Deterministische projectie van je huidige pad en scenario’s.</p>
+        <p className="text-sm text-slate-400">Deterministische projectie van je huidige pad en scenario's.</p>
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -242,20 +272,32 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
-          <p className="text-xs text-slate-400">Totale schuld over 12 maanden</p>
-          <p className="text-lg font-semibold">{formatCurrency(current.debtAt12)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
-          <p className="text-xs text-slate-400">Buffer over 12 maanden</p>
-          <p className="text-lg font-semibold">{formatCurrency(current.bufferAt12)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50">
-          <p className="text-xs text-slate-400">Vrije ruimte p/m dan</p>
-          <p className="text-lg font-semibold">{formatCurrency(current.freeRoomAt12)}</p>
-        </div>
+        {metrics.map((m) => {
+          const baselineVal = Math.max(0, m.get(results.baseline));
+          const scenarioVal = Math.max(0, m.get(current));
+          const basePct = Math.min(100, (baselineVal / compareMax) * 100);
+          const scenarioPct = Math.min(100, (scenarioVal / compareMax) * 100);
+          return (
+            <div key={m.key} className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-50 space-y-2">
+              <p className="text-xs text-slate-400">{m.label} over 12 maanden</p>
+              <div className="flex items-center justify-between text-xs text-slate-300">
+                <span>Huidig pad</span>
+                <span className="font-semibold text-slate-50">{formatCurrency(baselineVal)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div className="h-full bg-slate-500" style={{ width: `${basePct}%` }} />
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-300">
+                <span>{scenario === "baseline" ? "Scenario" : "Gekozen scenario"}</span>
+                <span className="font-semibold text-amber-100">{formatCurrency(scenarioVal)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div className="h-full bg-amber-400" style={{ width: `${scenarioPct}%` }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
-
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-50 space-y-3">
         <h3 className="text-sm font-semibold text-slate-100">Tijdslijn (nu → 6m → 12m)</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -268,6 +310,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
             </div>
           ))}
         </div>
+        <p className="text-xs text-amber-100">{summaryText(scenario)}</p>
+        <p className="text-[11px] text-slate-500">Tip: Versnel schulden aflossen in de Schulden-tab - buffer kan kort dalen, maar looptijd wordt korter en maanddruk zakt later.</p>
       </div>
 
       <div className="rounded-2xl border border-amber-300/50 bg-amber-500/10 p-4 text-sm text-amber-50 space-y-2">
@@ -275,6 +319,11 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
         <p className="text-xs text-amber-100">Verloren maanden: {results.baseline.monthsToDebtFree ?? "onbekend"} (bij huidig tempo).</p>
         <p className="text-xs text-amber-100">Onbenutte vrije ruimte (12m): {formatCurrency(costNothing)}</p>
         {results.baseline.bufferAt12 === 0 && <p className="text-xs text-amber-100">Buffer blijft 0 → kwetsbaarheid blijft hoog.</p>}
+        {debtNow === 0 && bufferNow === 0 && freeRoomNow === 0 && (
+          <p className="text-xs text-amber-100">
+            Vul inkomen, vaste lasten en schulden in voor een betekenisvolle vooruitblik. Zonder data blijft de simulatie leeg.
+          </p>
+        )}
       </div>
     </div>
   );
