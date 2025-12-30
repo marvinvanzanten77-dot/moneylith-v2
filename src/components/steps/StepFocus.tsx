@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
+import { parseDateNlToIso } from "../../utils/date";
 import { projectGoal } from "../../logic/goals";
 import type { FinancialSnapshot, MoneylithBucket, MoneylithGoal } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
@@ -39,6 +40,11 @@ export function StepFocus({
   const listRef = useRef<HTMLDivElement>(null);
   const [deadlineInput, setDeadlineInput] = useState("");
   const [deadlineValid, setDeadlineValid] = useState(true);
+  const goalExamples: Array<{ label: string; type: MoneylithGoal["type"]; targetAmount: number }> = [
+    { label: "Buffer 3 maanden vaste lasten", type: "buffer", targetAmount: Math.max(500, freePerMonth * 3) },
+    { label: "Vakantie", type: "project", targetAmount: 1200 },
+    { label: "Kleine schuld aflossen", type: "debt_payoff", targetAmount: 800 },
+  ];
 
   const [formState, setFormState] = useState<{
     id?: string;
@@ -66,6 +72,18 @@ export function StepFocus({
   const totalGoalPressure = Array.from(projections.values()).reduce((sum, p) => sum + p.pressurePerMonth, 0);
   const margin = freePerMonth - totalGoalPressure;
   const applyCheck = canApplyGoalsSuggestions({ mode, actions, currentGoals: goals });
+  const monthlyHint = useMemo(() => {
+    const remaining = Math.max(0, formState.targetAmount - formState.currentAmount);
+    if (!deadlineInput.trim()) return null;
+    const iso = parseDateNlToIso(deadlineInput);
+    if (!iso) return null;
+    const now = new Date();
+    const deadlineDate = new Date(iso);
+    const months =
+      (deadlineDate.getFullYear() - now.getFullYear()) * 12 + (deadlineDate.getMonth() - now.getMonth()) + 1;
+    if (!Number.isFinite(months) || months <= 0) return null;
+    return { months, perMonth: remaining / months };
+  }, [formState.targetAmount, formState.currentAmount, deadlineInput]);
 
   const resetForm = () => {
     setFormState({
@@ -121,14 +139,6 @@ export function StepFocus({
       }
       deadlineIso = parsed;
       setDeadlineValid(true);
-    }
-
-    if (formState.isActive) {
-      goals.forEach((g) => {
-        if (g.id !== formState.id && g.isActive) {
-          onUpdateGoal?.(g.id, { isActive: false });
-        }
-      });
     }
 
     if (formState.id) {
@@ -286,7 +296,7 @@ export function StepFocus({
                         <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
                           <span>{formatCurrency(goal.targetAmount)}</span>
                           <span aria-hidden className="text-slate-500">
-                            {isExpanded ? "▲" : "▼"}
+                            {isExpanded ? "â–²" : "â–¼"}
                           </span>
                         </div>
                       </button>
@@ -418,7 +428,36 @@ export function StepFocus({
                 disabled={isReadOnly}
               />
               {!deadlineValid && <p className="mt-1 text-[11px] text-red-300">Gebruik DD-MM-JJJJ, bijv. 15-04-2026.</p>}
+              {monthlyHint && (
+                <p className="mt-1 text-[11px] text-amber-200">
+                  Nodig: {formatCurrency(monthlyHint.perMonth)} per maand voor ~{monthlyHint.months} maand(en).
+                </p>
+              )}
             </label>
+            <div className="text-xs text-slate-300">
+              <p className="mb-1 text-slate-400">Voorbeelden (klik om te vullen):</p>
+              <div className="flex flex-wrap gap-2">
+                {goalExamples.map((ex, idx) => (
+                  <button
+                    key={`${ex.label}-${idx}`}
+                    type="button"
+                    className="rounded-md border border-amber-200/60 bg-amber-500/10 px-2 py-1 text-amber-50 hover:bg-amber-500/20"
+                    onClick={() =>
+                      setFormState((p) => ({
+                        ...p,
+                        label: ex.label,
+                        type: ex.type,
+                        targetAmount: ex.targetAmount,
+                        currentAmount: 0,
+                      }))
+                    }
+                    disabled={isReadOnly}
+                  >
+                    {ex.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <input
                 type="checkbox"
@@ -484,3 +523,4 @@ export function StepFocus({
     </div>
   );
 }
+
