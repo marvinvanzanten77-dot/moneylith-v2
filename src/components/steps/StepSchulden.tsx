@@ -185,13 +185,13 @@ export function StepSchulden({
       key: "avalanche",
       title: "Avalanche: groot naar klein aflossen",
       summary: "Begin met de grootste schuld om rente te besparen en sneller schuldenvrij te zijn.",
-      pros: ["Bespaart rente en kosten", "Snelle vermindering totale schuld", "Financieel meest efficiÃ«nt"],
+      pros: ["Bespaart rente en kosten", "Snelle vermindering totale schuld", "Financieel meest efficiënt"],
       cons: ["Minder snelle successen, kan demotiverend zijn", "Complexer om vol te houden"],
     },
     {
       key: "fullpay",
       title: "Fullpay: volledige schuld per maand",
-      summary: "Betaal elke maand maximaal Ã©Ã©n schuld volledig af (groot naar klein), zonder regelingen.",
+      summary: "Betaal elke maand maximaal één schuld volledig af (groot naar klein), zonder regelingen.",
       pros: ["Elke maand een duidelijke stap klaar", "Geen doorlopende regelingen", "Maximale focus per schuld"],
       cons: ["Vergt voldoende maandruimte", "Minder spreiding over meerdere schulden"],
     },
@@ -423,7 +423,7 @@ export function StepSchulden({
       ? "Zakelijke schulden, contracten en regelingen die hoe dan ook betaald moeten worden."
 
 
-      : "Zie in Ã©Ã©n oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
+      : "Zie in één oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
 
 
 
@@ -804,7 +804,7 @@ export function StepSchulden({
 
 
     const system =
-      "Moneylith schuldenanalyse. Geef exact 4 strategieÃ«n: snowball (klein->groot), balanced (mix), avalanche (groot->klein), fullpay (volledige schuld per maand, groot->klein).";
+      "Moneylith schuldenanalyse. Geef exact 4 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein), fullpay (volledige schuld per maand, groot->klein).";
 
     const debtsList = debts
 
@@ -833,7 +833,7 @@ export function StepSchulden({
     const user = [
 
 
-      "Genereer 4 strategieÃ«n met velden: key (snowball|balanced|avalanche|fullpay), title, summary, pros[], cons[], recommended (bool).",
+      "Genereer 4 strategieën met velden: key (snowball|balanced|avalanche|fullpay), title, summary, pros[], cons[], recommended (bool).",
 
       "Eerst een korte NL-samenvatting in mensentaal. Daarna alleen JSON tussen <STRAT_JSON> ... </STRAT_JSON> tags. Root: { strategies: Strategy[] }.",
 
@@ -947,7 +947,7 @@ export function StepSchulden({
           role: "assistant",
 
 
-          content: `StrategieÃ«n gegenereerd. ${rec ? `Aanbevolen: ${rec.title}.` : ""} Klik een strategie om maanddruk in te vullen.`,
+          content: `Strategieën gegenereerd. ${rec ? `Aanbevolen: ${rec.title}.` : ""} Klik een strategie om maanddruk in te vullen.`,
 
 
         });
@@ -956,7 +956,7 @@ export function StepSchulden({
       } else {
 
 
-        setAiError("Geen strategieÃ«n gevonden.");
+        setAiError("Geen strategieën gevonden.");
 
 
       }
@@ -1550,10 +1550,7 @@ export function StepSchulden({
               <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
 
 
-                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategieÃ«n, donut
-
-
-                wissel naar <span className="font-semibold">Analyse</span> voor strategieÃ«n en donut; terug naar lijst om bedragen te bewerken.
+                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategie?n en donut; wissel naar <span className="font-semibold">Analyse</span> voor strategie?n en donut; terug naar lijst om bedragen te bewerken.
 
 
               </div>
