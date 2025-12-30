@@ -16,8 +16,6 @@ import { appendAiMessage } from "../../logic/aiMessageBus";
 
 import { TurnstileWidget } from "../TurnstileWidget";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-
 import { formatCurrency } from "../../utils/format";
 
 import { simulatePayoff, type StrategyKey } from "../../logic/debtSimulator";
@@ -426,32 +424,6 @@ export function StepSchulden({
       : "Zie in één oogopslag hoeveel druk je schulden zetten op je maand en waar de grootste knelpunten zitten.";
 
 
-
-
-
-  const donutData = useMemo(() => {
-
-    const paid = 0; // geen tracking van afbetaald, placeholder 0
-
-    const remaining = totalDebt;
-
-    const monthly = totalMinPerMonth > 0 ? totalMinPerMonth : 0;
-
-    return {
-
-      main: [
-
-        { name: "Resterend", value: remaining },
-
-        { name: "Afgelost", value: paid },
-
-      ],
-
-      monthly,
-
-    };
-
-  }, [totalDebt, totalMinPerMonth]);
 
 
 
@@ -2066,118 +2038,26 @@ export function StepSchulden({
 
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-slate-50">
-
-            <h3 className="text-lg font-semibold">Visualisatie</h3>
-
-            <p className="text-xs text-slate-400">Totaal vs. maanddruk</p>
-
-            <div className="h-56">
-
-              <ResponsiveContainer>
-
-                <PieChart>
-
-                  <Pie
-
-                    dataKey="value"
-
-                    data={donutData.main}
-
-                    innerRadius={50}
-
-                    outerRadius={70}
-
-                    paddingAngle={3}
-
-                  >
-
-                    {donutData.main.map((_, idx) => (
-
-                      <Cell key={idx} fill={idx === 0 ? "#f97316" : "#1d4ed8"} />
-
-                    ))}
-
-                  </Pie>
-
-                  <Tooltip
-
-                    contentStyle={{ background: "#0f172a", border: "1px solid #334155", color: "#e2e8f0" }}
-
-                    itemStyle={{ color: "#e2e8f0" }}
-
-                  />
-
-                </PieChart>
-
-              </ResponsiveContainer>
-
-            </div>
-
-            {donutData.monthly > 0 && (
-
-              <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200">
-
-                <div className="flex items-center justify-between">
-
-                  <span>Maanddruk (maand 1, strategie)</span>
-
-                  <span className="font-semibold">{formatCurrency(donutData.monthly)}</span>
-
-                </div>
-
-                <div className="mt-2 h-2 w-full rounded-full bg-slate-800">
-
-                  <div
-
-                    className="h-2 rounded-full bg-amber-400"
-
-                    style={{ width: "70%" }}
-
-                  />
-
-                </div>
-
-              </div>
-
-            )}
-
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-slate-50 space-y-3">
+            <h3 className="text-lg font-semibold">Strategie-uitkomst</h3>
             <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200 space-y-1">
-
               <div className="flex justify-between">
-
                 <span>Schulden</span>
-
                 <span className="font-semibold">{formatCurrency(totalDebt)}</span>
-
               </div>
-
               <div className="mt-2 flex items-center justify-between">
-
                 <span>Maanddruk (maand 1, strategie)</span>
-
                 <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
-
               </div>
-
               <div className="mt-2 flex items-center justify-between">
-
                 <span>Vrij na schulden</span>
-
                 <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
-
               </div>
-
               <div className="flex justify-between">
-
                 <span>Tijd tot nul (simulatie)</span>
-
                 <span className="font-semibold">{monthsToClear ? `${monthsToClear} mnd` : "n.v.t."}</span>
-
               </div>
-
             </div>
-
           </div>
 
 
