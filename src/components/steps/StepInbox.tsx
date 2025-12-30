@@ -62,6 +62,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileNonce, setTurnstileNonce] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const { runAi } = useAiOrchestrator({
     mode,
@@ -266,6 +267,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
     }
     setBusyId(id);
     setError(null);
+    setStatusMessage("Document wordt geanalyseerd (meestal 5-10 seconden)...");
     const system =
       "Moneylith Inbox analyse. Extracteer mogelijke updates voor tabbladen in deze modus. Geef alleen suggesties die jij als AI redelijk zeker kunt afleiden.";
     const user = [
@@ -322,6 +324,7 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
       setError("AI-analyse mislukt. Probeer het later opnieuw.");
     } finally {
       setBusyId(null);
+      setStatusMessage(null);
     }
   };
 
@@ -374,6 +377,15 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
           Upload brieven en documenten (PDF, Word, Excel, CSV, JPG/PNG, EML/MSG). AI indexeert wat je kunt bijwerken in
           je {mode === "business" ? "zakelijke" : "persoonlijke"} tabs en geeft voorstellen die je zelf bevestigt.
         </p>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
+          <p>Privacy: documenten blijven lokaal; alleen uitgepakte tekst/velden gaan via de AI-endpoint (/api) voor analyse.</p>
+          <p className="text-slate-400">Tijdens analyse zie je een statusmelding; dit duurt meestal enkele seconden.</p>
+        </div>
+        {statusMessage && (
+          <div className="rounded-lg border border-amber-300 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+            {statusMessage}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -392,7 +404,12 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
             </div>
 
             {items.length === 0 ? (
-              <p className="text-sm text-slate-500">Nog geen documenten toegevoegd.</p>
+              <div className="space-y-2 text-sm text-slate-500">
+                <p>Nog geen documenten toegevoegd.</p>
+                <p className="text-[11px] text-slate-600">
+                  Voorbeeld van AI-voorstellen: "Factuur herkend — toevoegen als vaste last?" of "Herinnering gevonden — nieuwe schuld aanmaken?".
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {items.map((item) => (
@@ -437,6 +454,9 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
             {items.every((item) => (item.suggestions ?? []).length === 0) ? (
               <p className="text-sm text-slate-500">
                 Nog geen AI-voorstellen beschikbaar. Analyseer eerst een document.
+                <span className="block text-[11px] text-slate-600">
+                  Voorbeelden: "Nieuwe vaste last €X op dag Y?" of "Schuldherinnering gevonden, toevoegen aan Schulden?".
+                </span>
               </p>
             ) : (
               <div className="space-y-4">
