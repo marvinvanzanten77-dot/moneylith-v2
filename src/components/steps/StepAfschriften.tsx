@@ -63,6 +63,7 @@ export function StepAfschriften({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileNonce, setTurnstileNonce] = useState(0);
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+  const [uploadSummary, setUploadSummary] = useState<string | null>(null);
   const turnstileOptional =
     import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
@@ -422,6 +423,7 @@ export function StepAfschriften({
       setFilePayloads([]);
       setFileName("");
       setFileNote(null);
+      setUploadSummary(null);
       if (!list.length) return;
 
       const MAX_CHARS = 200_000;
@@ -500,9 +502,33 @@ export function StepAfschriften({
         setFileNote(notes.length ? notes.join("; ") : null);
       }
       if (allTx.length > 0) setPendingTx(allTx);
+      const okCount = payloads.filter((p) => p.content && p.content.length > 0).length;
+      const failCount = payloads.length - okCount;
+      setUploadSummary(
+        `${payloads.length} bestand(en) geladen, ${allTx.length} transacties herkend.` +
+          (failCount > 0 ? ` ${failCount} bestand(en) konden niet worden gelezen.` : ""),
+      );
     },
     [parseTransactionsFromCsv]
   );
+
+  const loadDemoFile = () => {
+    const demoCsv = [
+      "Datum,Omschrijving,Bedrag",
+      "2025-11-02,Boodschappen Jumbo,-42.15",
+      "2025-11-05,Brandstof Shell,-65.80",
+      "2025-11-10,Online diensten,-12.99",
+      "2025-11-15,Restitutie energie,+45.00",
+      "2025-11-18,Lunch werk,-9.50",
+    ].join("\n");
+    const payload = { name: "demo-afschrift.csv", content: demoCsv, note: "Voorbeeldbestand" };
+    setFilePayloads([payload]);
+    setFileName(payload.name);
+    setFileNote(payload.note ?? null);
+    const parsed = parseTransactionsFromCsv(demoCsv);
+    setPendingTx(parsed);
+    setUploadSummary(`Demo-bestand geladen, ${parsed.length} transacties herkend.`);
+  };
 
   const activeAccountOptions = accounts.filter((a) => a.active && a.type === "betaalrekening");
   const hasUploads = statements.length > 0;
@@ -617,7 +643,8 @@ export function StepAfschriften({
         <div className="xl:col-span-2 flex flex-col gap-4">
           {activeAccountOptions.length === 0 ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-sm text-slate-400">
-              Zonder actieve betaalrekening kun je geen afschriften koppelen. Voeg eerst een rekening toe.
+              Zonder actieve betaalrekening kun je geen afschriften koppelen. Ga naar <strong>Rekeningen</strong> en voeg een
+              betaalrekening toe (zet deze op actief).
             </div>
           ) : (
             activeAccountOptions.map((acc) => {
@@ -752,6 +779,16 @@ export function StepAfschriften({
                 ))}
               </select>
             </label>
+            <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
+              <button
+                type="button"
+                className="rounded-md border border-slate-600 px-2 py-1 hover:border-amber-400 hover:text-amber-200"
+                onClick={loadDemoFile}
+              >
+                Gebruik demo-afschrift
+              </button>
+              {uploadSummary && <span className="text-slate-300">{uploadSummary}</span>}
+            </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
               <label>
                 Maand*
