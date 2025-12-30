@@ -46,6 +46,14 @@ export function StepFocus({
     { label: "Vakantie", type: "project", targetAmount: 1200 },
     { label: "Kleine schuld aflossen", type: "debt_payoff", targetAmount: 800 },
   ];
+  const selectedBuckets = useMemo(
+    () => buckets.filter((b) => formState.linkedBucketIds.includes(b.id)),
+    [buckets, formState.linkedBucketIds],
+  );
+  const selectedBucketsTotal = useMemo(
+    () => selectedBuckets.reduce((sum, b) => sum + (Number.isFinite(b.monthlyAvg) ? b.monthlyAvg : 0), 0),
+    [selectedBuckets],
+  );
   const monthlyHint = useMemo(() => {
     const remaining = Math.max(0, formState.targetAmount - formState.currentAmount);
     if (!deadlineInput.trim()) return null;
@@ -531,6 +539,28 @@ export function StepFocus({
                 ))}
                 {buckets.length === 0 && <p className="text-[11px] text-slate-500">Nog geen financiele stromen beschikbaar.</p>}
               </div>
+              {selectedBuckets.length > 0 && (
+                <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/70 p-2 text-[11px] text-slate-300">
+                  <div className="font-semibold text-slate-100">Gekoppeld aan</div>
+                  <ul className="mt-1 space-y-1">
+                    {selectedBuckets.map((b) => (
+                      <li key={b.id} className="flex items-center justify-between">
+                        <span>
+                          {b.label} <span className="text-slate-500">({b.type})</span>
+                        </span>
+                        <span className="font-semibold text-amber-100">{formatCurrency(b.monthlyAvg)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 text-slate-400">
+                    Huidige gekoppelde stroom totaal:{" "}
+                    <span className="font-semibold text-amber-100">{formatCurrency(selectedBucketsTotal)}</span>
+                  </div>
+                  <div className="mt-1 text-slate-500">
+                    Vooruitgang volgt de gekoppelde potjes/vermogens; aanpassing hier beïnvloedt de doelvoortgang.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
