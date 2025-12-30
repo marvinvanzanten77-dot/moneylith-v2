@@ -338,11 +338,12 @@ export function StepSchulden({
       .filter((m): m is number => typeof m === "number" && m > 0);
     if (!months.length) return null;
     const earliest = Math.min(...months);
+    const maxMonth = Math.max(...months);
     const monthPayment = Object.values(effective)
       .filter((p) => p.month === earliest)
       .reduce((sum, p) => sum + (p.minPayment || 0), 0);
     const freeAfter = Math.max(0, computeFullpayBudget() - monthPayment);
-    return { earliest, monthPayment, freeAfter };
+    return { earliest, monthPayment, freeAfter, maxMonth };
   }, [selectedStrategy, strategyProposals, acceptedProposals]);
 
   const totalDebt = simulation.totalDebtStart;
@@ -354,6 +355,8 @@ export function StepSchulden({
   const totalMinPerMonth = fullpayMonthStats?.monthPayment ?? simulation.monthlyPressureNow;
 
   const freeAfterDebt = fullpayMonthStats ? fullpayMonthStats.freeAfter : simulation.freeRoomNow;
+  const displayMonthsToClear =
+    selectedStrategy === "fullpay" && fullpayMonthStats ? fullpayMonthStats.maxMonth ?? monthsToClear : monthsToClear;
 
 
 
@@ -1821,7 +1824,7 @@ export function StepSchulden({
                 <span className="font-semibold">
 
 
-                  {monthsToClear ? `${monthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
+                  {displayMonthsToClear ? `${displayMonthsToClear} maanden` : "Nog geen realistisch aflostempo berekend"}
 
 
                 </span>
@@ -2055,7 +2058,7 @@ export function StepSchulden({
               </div>
               <div className="flex justify-between">
                 <span>Tijd tot nul (simulatie)</span>
-                <span className="font-semibold">{monthsToClear ? `${monthsToClear} mnd` : "n.v.t."}</span>
+                <span className="font-semibold">{displayMonthsToClear ? `${displayMonthsToClear} mnd` : "n.v.t."}</span>
               </div>
             </div>
           </div>
