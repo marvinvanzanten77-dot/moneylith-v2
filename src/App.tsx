@@ -2232,7 +2232,7 @@ const App = () => {
 </aside>
 
         <section className="px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Moneylith / Finance OS</p>
               <h1 className="text-2xl font-semibold text-white">Finance Planner</h1>
@@ -2244,6 +2244,31 @@ const App = () => {
             >
               Stap: {activeTabs.find((s) => s.key === currentStep)?.label}
             </div>
+          </div>
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-xs ${
+              isBusiness
+                ? "border-blue-400/40 bg-blue-950/40 text-blue-50"
+                : "border-amber-300/50 bg-amber-500/10 text-amber-50"
+            }`}
+          >
+            {isBusiness ? (
+              <div className="space-y-1">
+                <p className="font-semibold text-sm">Zakelijke modus</p>
+                <p>Tabs richten zich op cashflow, verplichtingen en zakelijk kapitaal. Persoonlijke data blijft apart.</p>
+                <p className="text-[11px] text-slate-200">
+                  Verschillen: vaste lasten/inkomen komen uit je zakelijke stromen; strategie en vooruitblik rekenen alleen je zakelijke cijfers.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="font-semibold text-sm">Persoonlijke modus</p>
+                <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
+                <p className="text-[11px] text-slate-200">
+                  Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.
+                </p>
+              </div>
+            )}
           </div>
           <div className="space-y-4">{renderContent()}</div>
         </section>
