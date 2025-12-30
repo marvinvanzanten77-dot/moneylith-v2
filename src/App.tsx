@@ -1855,9 +1855,23 @@ const App = () => {
       optimizeCosts: undefined,
     };
 
+    const personalSnapshotForView: FinancialSnapshot = {
+      totalIncome: { value: netIncome ?? 0, source: "manual" },
+      fixedCostsTotal: { value: fixedCosts ?? 0, source: "manual" },
+      netFree: personalNetFree ?? 0,
+      totalDebt: debtsSummary.totalDebt ?? 0,
+      assetsTotal: assetsSummary.totalAssets ?? 0,
+      monthlyPressure: debtsSummary.totalMinPayment ?? 0,
+      runwayMonths:
+        fixedCosts > 0 && assetsSummary.totalAssets > 0 ? Math.floor(assetsSummary.totalAssets / fixedCosts) : null,
+      intent: undefined,
+      focus: null,
+      optimizeCosts: undefined,
+    };
+
     return (
       <StepVooruitblik
-        financialSnapshot={isBusinessVariant ? businessSnapshotForView : financialSnapshot}
+        financialSnapshot={isBusinessVariant ? businessSnapshotForView : personalSnapshotForView}
         spendBuckets={bucketsForVariant}
         monthFocus={monthFocus}
         variant={variant}
