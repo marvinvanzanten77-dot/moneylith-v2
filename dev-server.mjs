@@ -20,6 +20,7 @@ app.use(bodyParser.json({ limit: "2mb" }));
 
 const PORT = process.env.PORT || 3000;
 const MODEL = "gpt-4.1-mini";
+const isProd = process.env.VERCEL_ENV === "production";
 
 // In-memory store voor banklinks (tijdelijk)
 const bankStore = {
@@ -193,7 +194,23 @@ app.post("/api/bank/disconnect", async (req, res) => {
   res.json({ ok: true });
 });
 
+// Runtime health (real only): check env presence + token
+app.get("/api/bank/health", async (_req, res) => {
+  const id = process.env.GC_SECRET_ID || "";
+  const key = process.env.GC_SECRET_KEY || "";
+  if (!id || !key) {
+    return res.json({ ok: false, reason: "missing_credentials", idLen: id.length, keyLen: key.length });
+  }
+  try {
+    const token = await getAccessToken();
+    return res.json({ ok: !!token, reason: token ? "ok" : "no_token" });
+  } catch (err) {
+    return res.status(500).json({ ok: false, reason: err.message || "token_failed" });
+  }
+});
+
 // ===== Mock bank routes (for preview/dev) =====
+if (!isProd) {
 const mockStore = {
   requisition: null,
   accounts: [],
@@ -247,7 +264,14 @@ app.post("/api/mock-bank/connect", (_req, res) => {
 });
 
 app.get("/api/mock-bank/callback", (req, res) => {
-  const reqId = req.query.requisitionId || req.query.id || mockStore.requisition?.id || `mock-req-${Date.now()}`;
+  const reqId =
+    req.query.requisition_id ||
+    req.query.requisitionId ||
+    req.query.id ||
+    req.query.ref ||
+    req.query.reference ||
+    mockStore.requisition?.id ||
+    `mock-req-${Date.now()}`;
   mockStore.requisition = {
     id: reqId,
     status: "LN",
@@ -313,6 +337,10 @@ app.post("/api/mock-bank/disconnect", (_req, res) => {
   mockStore.syncCount = 0;
   res.json({ ok: true });
 });
+} else {
+  // In production, mock routes are not available
+  app.all("/api/mock-bank/*", (_req, res) => res.status(404).json({ error: "not available in production" }));
+}
 
 app.listen(PORT, () => {
   console.log(`Dev API server listening on http://localhost:${PORT}`);
