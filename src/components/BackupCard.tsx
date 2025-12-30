@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const DENYLIST_PREFIXES = ["sentry", "__sentry", "vercel", "vite", "react-devtools"];
 const DENYLIST_EXACT = ["moneylith_consent"];
@@ -37,6 +37,31 @@ export function BackupCard() {
   const [encrypt, setEncrypt] = useState(false);
   const [password, setPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
+  const [includePersonal, setIncludePersonal] = useState(true);
+  const [includeBusiness, setIncludeBusiness] = useState(true);
+  const [autoVersion, setAutoVersion] = useState(true);
+  const [modules, setModules] = useState<Record<string, boolean>>({
+    income: true,
+    fixed: true,
+    debts: true,
+    assets: true,
+    goals: true,
+    accounts: true,
+    statements: true,
+    transactions: true,
+  });
+  const [versions, setVersions] = useState<
+    { id: string; createdAt: string; keys: number; sizeKb: number; modules: string[]; data: string }[]
+  >(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("moneylith.backup.versions");
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    return [];
+  });
 
   const deriveKey = async (pwd: string, salt: Uint8Array) => {
     const enc = new TextEncoder();
@@ -73,13 +98,63 @@ export function BackupCard() {
     return new TextDecoder().decode(plain);
   };
 
+  const moduleLabels = useMemo(
+    () => ({
+      income: "Inkomen",
+      fixed: "Vaste lasten",
+      debts: "Schulden",
+      assets: "Vermogen",
+      goals: "Doelen",
+      accounts: "Rekeningen",
+      statements: "Afschriften",
+      transactions: "Transacties/patronen",
+    }),
+    []
+  );
+
+  const shouldIncludeKey = (key: string) => {
+    const lower = key.toLowerCase();
+    const modeMatch =
+      (includePersonal && lower.includes("personal")) ||
+      (includeBusiness && lower.includes("business")) ||
+      (!lower.includes("personal") && !lower.includes("business"));
+    if (!modeMatch) return false;
+    const activeModules = Object.entries(modules)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (activeModules.length === Object.keys(modules).length) return true;
+    const patterns: Record<string, string[]> = {
+      income: ["income", "inkomen"],
+      fixed: ["fixed", "vaste", "cost"],
+      debts: ["schuld", "debt"],
+      assets: ["asset", "vermogen", "buffer"],
+      goals: ["goal", "doel"],
+      accounts: ["account", "rekening"],
+      statements: ["statement", "afschrift"],
+      transactions: ["transaction", "transactie", "bucket"],
+    };
+    return activeModules.some((m) => patterns[m]?.some((p) => lower.includes(p)));
+  };
+
+  const persistVersions = (next: typeof versions) => {
+    setVersions(next);
+    try {
+      window.localStorage.setItem("moneylith.backup.versions", JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleDownload = async () => {
     if (typeof window === "undefined") return;
     const snapshot = collectSnapshot();
+    const filteredEntries = Object.entries(snapshot).filter(([key]) => shouldIncludeKey(key));
+    const filteredSnapshot = Object.fromEntries(filteredEntries);
     const raw = JSON.stringify(snapshot, null, 2);
-    const keys = Object.keys(snapshot).length;
+    const filteredRaw = JSON.stringify(filteredSnapshot, null, 2);
+    const keys = Object.keys(filteredSnapshot).length || Object.keys(snapshot).length;
     const sizeKb = Math.max(1, Math.round(raw.length / 1024));
-    let filePayload = raw;
+    let filePayload = filteredRaw;
     let nameSuffix = "";
     if (encrypt && password.trim()) {
       const encrypted = await encryptPayload(raw, password.trim());
@@ -94,7 +169,28 @@ export function BackupCard() {
     a.click();
     URL.revokeObjectURL(url);
     setExportStatus("Back-up gedownload.");
-    setExportInfo(`Bevat ${keys} sleutel(s), ~${sizeKb} KB${nameSuffix ? " (versleuteld)" : ""}.`);
+    const selectedModules = Object.entries(modules)
+      .filter(([, v]) => v)
+      .map(([k]) => moduleLabels[k] || k);
+    setExportInfo(
+      `Bevat ${keys} sleutel(s), ~${sizeKb} KB${nameSuffix ? " (versleuteld)" : ""}. Modules: ${
+        selectedModules.length === Object.keys(modules).length ? "alle" : selectedModules.join(", ")
+      }.`
+    );
+    if (autoVersion) {
+      const versionPayload = JSON.stringify(filteredSnapshot);
+      const versionSizeKb = Math.max(1, Math.round(versionPayload.length / 1024));
+      const entry = {
+        id: `${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        keys,
+        sizeKb: versionSizeKb,
+        modules: selectedModules,
+        data: versionPayload,
+      };
+      const next = [entry, ...versions].slice(0, 3);
+      persistVersions(next);
+    }
   };
 
   const handleImportText = async (text: string) => {
@@ -161,6 +257,28 @@ export function BackupCard() {
           >
             Download JSON-back-up
           </button>
+          <div className="flex flex-wrap gap-3 text-[11px] text-slate-300">
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" checked={includePersonal} onChange={(e) => setIncludePersonal(e.target.checked)} />
+              Persoonlijk
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" checked={includeBusiness} onChange={(e) => setIncludeBusiness(e.target.checked)} />
+              Zakelijk
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-300">
+            {Object.keys(modules).map((m) => (
+              <label key={m} className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={modules[m]}
+                  onChange={(e) => setModules((prev) => ({ ...prev, [m]: e.target.checked }))}
+                />
+                {moduleLabels[m] || m}
+              </label>
+            ))}
+          </div>
           <label className="flex items-center gap-2 text-[11px] text-slate-300">
             <input type="checkbox" checked={encrypt} onChange={(e) => setEncrypt(e.target.checked)} />
             Versleutelen met wachtwoord
@@ -180,6 +298,10 @@ export function BackupCard() {
           <p className="text-[11px] text-slate-400">
             Geen geheimen of sessies, alleen de lokale planner-data.
           </p>
+          <label className="flex items-center gap-2 text-[11px] text-slate-300">
+            <input type="checkbox" checked={autoVersion} onChange={(e) => setAutoVersion(e.target.checked)} />
+            Automatische versie opslaan bij export (max 3)
+          </label>
           {exportInfo && <p className="text-[11px] text-slate-300">{exportInfo}</p>}
           {exportStatus && <p className="text-[11px] text-emerald-300">{exportStatus}</p>}
         </div>
@@ -215,6 +337,42 @@ export function BackupCard() {
           {importError && <p className="text-[11px] text-red-300">{importError}</p>}
         </div>
       </div>
+
+      {versions.length > 0 && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-100">
+          <div className="mb-2">
+            <h3 className="text-base font-semibold text-slate-50">Versies (laatste 3)</h3>
+            <p className="text-[11px] text-slate-400">Automatisch opgeslagen bij export. Selecteer om te herstellen.</p>
+          </div>
+          <div className="space-y-2">
+            {versions.map((v) => (
+              <div key={v.id} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-[11px] text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>{new Date(v.createdAt).toLocaleString()}</span>
+                  <span>{v.sizeKb} KB</span>
+                </div>
+                <div className="text-slate-400">Modules: {v.modules.length ? v.modules.join(", ") : "alle"}</div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-100 hover:border-amber-400"
+                    onClick={() => setImportPreview(`Bevat ${v.keys} sleutel(s), ${v.sizeKb} KB, modules: ${v.modules.join(", ") || "alle"}.`)}
+                  >
+                    Bekijken
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-slate-900 hover:bg-amber-400"
+                    onClick={() => handleImportText(v.data)}
+                  >
+                    Herstel versie
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
