@@ -1426,29 +1426,13 @@ export function StepSchulden({
 
 
             {!isReadOnly && (
-
-
               <button
-
-
                 type="button"
-
-
-                onClick={runAiStrategies}
-
-
+                onClick={() => setView("analysis")}
                 className="rounded-full bg-amber-500 px-2 py-0.5 font-semibold text-slate-900"
-
-
               >
-
-
-                Analyseer opnieuw
-
-
+                Naar analyse
               </button>
-
-
             )}
 
 
@@ -1712,6 +1696,19 @@ export function StepSchulden({
 
                 </p>
 
+                <div className="mt-2">
+                  <a
+                    href={
+                      "data:text/csv;charset=utf-8," +
+                      encodeURIComponent("naam,bedrag,maandbedrag\nSchuld A,1200,100\nSchuld B,800,50")
+                    }
+                    download="moneylith-schulden-voorbeeld.csv"
+                    className="inline-flex items-center rounded-md border border-amber-400 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                  >
+                    Download voorbeeld-CSV
+                  </a>
+                </div>
+
 
                 <div className="mt-3">
 
@@ -1892,10 +1889,22 @@ export function StepSchulden({
                 <h3 className="text-lg font-semibold">AI-analyse</h3>
 
                 <p className="text-xs text-slate-400">
-                  Genereer 4 strategie?n (snowball, balanced, avalanche, fullpay) en kies er ??n. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
+                  Genereer 4 strategieën (snowball, balanced, avalanche, fullpay) en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
                 </p>
 
-                <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden ? Stap 2: Kies strategie ? Stap 3: Bekijk ingevulde lijst.</p>
+                <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
+
+                <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-[11px] text-slate-200">
+                  <span className="text-xs font-semibold text-slate-100">Checklist voor een realistische analyse:</span>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-slate-300">
+                    <li>Vul inkomen in (netto).</li>
+                    <li>Vul vaste lasten in.</li>
+                    <li>(Optioneel) Vul patronen/variabele uitgaven in als je realistischer wilt rekenen.</li>
+                  </ul>
+                  <p className="mt-2 text-[10px] text-amber-300">
+                    Geen data ingevuld? Dan gebruiken we een minimale maandlast en kan de analyse minder realistisch zijn.
+                  </p>
+                </div>
 
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-[11px] text-slate-200">
                   <span className="text-xs font-semibold text-slate-100">Bouw strategie op basis van maandcapaciteit:</span>
@@ -1931,7 +1940,7 @@ export function StepSchulden({
 
               </div>
 
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-2">
 
                 <button
 
@@ -1941,13 +1950,18 @@ export function StepSchulden({
 
                   disabled={aiLoading}
 
-                  className="rounded-lg bg-purple-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
 
                 >
 
+                  {aiLoading && (
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-transparent" aria-hidden />
+                  )}
                   {aiLoading ? "Analyseren..." : "Analyseer schulden"}
 
                 </button>
+
+                {aiLoading && <p className="text-[11px] text-slate-300">Aan het rekenen op basis van je invoer…</p>}
 
                 <TurnstileWidget
 
@@ -1967,81 +1981,90 @@ export function StepSchulden({
 
             {aiError && <p className="mt-2 text-xs text-red-300">{aiError}</p>}
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {debts.length <= 1 ? (
+              <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-200">
+                <p className="text-sm font-semibold text-slate-50">Eén schuld gevonden</p>
+                <p className="mt-1 text-slate-300">Strategie-keuze is hier niet relevant; looptijd en maanddruk zijn identiek.</p>
+                <ul className="mt-2 space-y-1">
+                  <li>Looptijd: {monthsToClear ? `${monthsToClear} maand(en)` : "n.v.t."}</li>
+                  <li>Maanddruk: {formatCurrency(totalMinPerMonth)}</li>
+                </ul>
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 
-              {mergedStrategies.map((s) => (
+                {mergedStrategies.map((s) => (
 
-                <button
+                  <button
 
-                  key={s.key}
+                    key={s.key}
 
-                  type="button"
+                    type="button"
 
-                  onClick={() => applyStrategyToDebts(s)}
+                    onClick={() => applyStrategyToDebts(s)}
 
-                  className={`rounded-xl border p-3 text-left text-xs transition ${
-                    selectedStrategy === s.key
-                      ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
-                      : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
-                  }`}
+                    className={`rounded-xl border p-3 text-left text-xs transition ${
+                      selectedStrategy === s.key
+                        ? "border-amber-400 bg-amber-500/20 shadow-amber-500/30"
+                        : "border-slate-700 bg-slate-900/40 hover:border-amber-300 hover:bg-slate-900/60"
+                    }`}
 
-                  title="AI vult alleen aan; jouw invoer blijft staan."
+                    title="AI vult alleen aan; jouw invoer blijft staan."
 
-                >
+                  >
 
-                  <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between">
 
-                    <span className="text-sm font-semibold text-slate-100">{s.title}</span>
-
-                    {/* Aanbevolen badge verwijderd voor rust */}
-
-                  </div>
-
-                  <p className="mt-2 text-slate-200">{s.summary}</p>
-
-                  <div className="mt-2 space-y-1 text-slate-300">
-
-                    <div>
-
-                      <span className="font-semibold text-emerald-400">+ Pro's:</span>
-
-                      <ul className="ml-3 list-disc">
-
-                        {s.pros.map((p, idx) => (
-
-                          <li key={idx}>{p}</li>
-
-                        ))}
-
-                      </ul>
+                      <span className="text-sm font-semibold text-slate-100">{s.title}</span>
 
                     </div>
 
-                    <div>
+                    <p className="mt-2 text-slate-200">{s.summary}</p>
 
-                      <span className="font-semibold text-red-300">- Con's:</span>
+                    <div className="mt-2 space-y-1 text-slate-300">
 
-                      <ul className="ml-3 list-disc">
+                      <div>
 
-                        {s.cons.map((c, idx) => (
+                        <span className="font-semibold text-emerald-400">+ Pro's:</span>
 
-                          <li key={idx}>{c}</li>
+                        <ul className="ml-3 list-disc">
 
-                        ))}
+                          {s.pros.map((p, idx) => (
 
-                      </ul>
+                            <li key={idx}>{p}</li>
+
+                          ))}
+
+                        </ul>
+
+                      </div>
+
+                      <div>
+
+                        <span className="font-semibold text-red-300">- Con's:</span>
+
+                        <ul className="ml-3 list-disc">
+
+                          {s.cons.map((c, idx) => (
+
+                            <li key={idx}>{c}</li>
+
+                          ))}
+
+                        </ul>
+
+                      </div>
 
                     </div>
 
-                  </div>
+                  </button>
 
-                </button>
+                ))}
 
-              ))}
+                {!mergedStrategies.length && <p className="text-xs text-slate-400">Nog geen strategieën. Klik op Analyseer.</p>}
 
-              {!mergedStrategies.length && <p className="text-xs text-slate-400">Nog geen strategie?n. Klik op Analyseer.</p>}
-
-            </div>
+              </div>
+            )}
 
 
           </div>
@@ -2174,6 +2197,7 @@ export function StepSchulden({
 
 
 }
+
 
 
 
