@@ -7,9 +7,9 @@ import {
   getTransactions,
   getBalances,
   deleteRequisition,
-} from "../../src/integrations/bank/gocardless/connector.js";
-import { getAccessToken } from "../../src/integrations/bank/gocardless/auth.js";
-import { mapBankTxToMoneylithTx } from "../../src/integrations/bank/normalize.js";
+} from "../src/integrations/bank/gocardless/connector.js";
+import { getAccessToken } from "../src/integrations/bank/gocardless/auth.js";
+import { mapBankTxToMoneylithTx } from "../src/integrations/bank/normalize.js";
 
 type RequisitionEntry = {
   id: string;
@@ -188,12 +188,16 @@ async function handleRuntimeCheck(res: VercelResponse) {
   });
 }
 
+function getActionFromUrl(url?: string | null): string {
+  if (!url) return "";
+  const path = url.replace(/^\/api\/bank\/?/, "").split("?")[0];
+  return path.split("/")[0] || "";
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const slug = (req.query.slug as string[] | undefined) || [];
-  const action = slug[0] || "";
+  const action = getActionFromUrl(req.url);
 
   if (provider !== "real" && action !== "runtime-check") {
-    // In production we force real; if provider isn't real we return a guard.
     if (isProd) return json(res, 400, { error: "Bank provider staat op mock; zet BANK_PROVIDER=real" });
   }
 
