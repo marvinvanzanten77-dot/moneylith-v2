@@ -20,9 +20,7 @@ export function StepBank({
   onTransactions: (txs: MoneylithTransaction[]) => void;
   mode?: "personal" | "business";
 }) {
-  const provider =
-    import.meta.env.VITE_BANK_PROVIDER ||
-    (import.meta.env.MODE === "production" ? "real" : "mock");
+  const provider = import.meta.env.VITE_BANK_PROVIDER || "mock";
   const basePath = useMemo(
     () => (provider === "real" ? "/api/bank" : "/api/mock-bank"),
     [provider],
@@ -46,10 +44,17 @@ export function StepBank({
 
   useEffect(() => {
     fetch(`${basePath}/institutions`, { method: "POST" })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const txt = await r.text();
+        try {
+          return JSON.parse(txt);
+        } catch {
+          throw new Error(txt.slice(0, 120) || "Invalid JSON");
+        }
+      })
       .then((data) => setInstitutions(data || []))
       .catch((err) => {
-        setStatus("Banklijst ophalen mislukt.");
+        setStatus("Banklijst ophalen mislukt. Controleer provider of gebruik mock.");
         pushLog("error", `institutions: ${err?.message || "fetch failed"}`);
       });
     refreshLinks();
