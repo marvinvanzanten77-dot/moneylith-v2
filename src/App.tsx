@@ -15,7 +15,6 @@ import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften } from "./components/steps/StepAfschriften";
 import { StepBackup } from "./components/steps/StepBackup";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
-import { StepBank } from "./components/steps/StepBank";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { detectRecurringCandidates } from "./utils/recurring";
 import type {
@@ -120,7 +119,6 @@ const personalTabs: TabConfig[] = [
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
   { key: "afschriften", label: "Patronen", desc: "Maandelijkse afschriften" },
-  { key: "bank", label: "Bank", desc: "PSD2 bankkoppeling (handmatige sync)" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
@@ -133,7 +131,6 @@ const businessTabs: TabConfig[] = [
   { key: "biz-kapitaal", label: "Kapitaal/buffer", desc: "Assets, reserves, buffer" },
   { key: "biz-doelen", label: "Doelen (zakelijk)", desc: "Focus voor dit kwartaal" },
   { key: "biz-rekeningen", label: "Rekeningen", desc: "Zakelijke rekeningen" },
-  { key: "biz-bank", label: "Bank", desc: "PSD2 bankkoppeling (handmatige sync)" },
   { key: "biz-inbox", label: "Inbox", desc: "Documenten & brieven" },
   { key: "biz-afschriften", label: "Afschriften", desc: "AI-analyse" },
   { key: "biz-vooruitblik", label: "Vooruitblik", desc: "Scenario als alles zo blijft" },
@@ -1919,12 +1916,6 @@ const App = () => {
     return <StepRekeningen accounts={accountsSource} onSaveAccount={saveFn} onDeleteAccount={deleteFn} />;
   };
 
-  const renderBank = (variant: "personal" | "business" = "personal") => {
-    const isBusinessVariant = variant === "business";
-    const onTx = (txs: MoneylithTransaction[]) => upsertTransactionsList(txs, isBusinessVariant);
-    return <StepBank onTransactions={onTx} mode={isBusinessVariant ? "business" : "personal"} />;
-  };
-
   const renderVermogen = (variant: "personal" | "business" = "personal") => {
     const isBusinessVariant = variant === "business";
     const assetsSource = isBusinessVariant ? assetsBusiness : assets;
@@ -2055,8 +2046,6 @@ const App = () => {
     if (normalizedStep === "action") return renderAction("personal");
     if (normalizedStep === "vooruitblik") return renderAction(isBusinessView ? "business" : "personal");
     if (normalizedStep === "backup") return renderBackup();
-    if (normalizedStep === "bank") return renderBank("personal");
-    if (normalizedStep === "biz-bank") return renderBank("business");
     return null;
   };
 
