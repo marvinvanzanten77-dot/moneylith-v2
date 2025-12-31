@@ -35,6 +35,7 @@ export function StepBank({
   const [logs, setLogs] = useState<
     { ts: string; type: string; msg: string }[]
   >([]);
+  const [health, setHealth] = useState<string | null>(null);
 
   const pushLog = (type: string, msg: string) => {
     setLogs((prev) => [
@@ -47,7 +48,10 @@ export function StepBank({
     fetch(`${basePath}/institutions`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => setInstitutions(data || []))
-      .catch(() => {});
+      .catch((err) => {
+        setStatus("Banklijst ophalen mislukt.");
+        pushLog("error", `institutions: ${err?.message || "fetch failed"}`);
+      });
     refreshLinks();
   }, [basePath]);
 
@@ -56,6 +60,20 @@ export function StepBank({
       .then((r) => r.json())
       .then((data) => setLinks(data || []))
       .catch(() => {});
+  };
+
+  const checkHealth = async () => {
+    if (provider !== "real") {
+      setHealth("Health check alleen voor real-provider.");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/bank/health");
+      const data = await resp.json();
+      setHealth(JSON.stringify(data));
+    } catch (err: any) {
+      setHealth(err.message || "health check failed");
+    }
   };
 
   const handleConnect = async () => {
@@ -172,7 +190,9 @@ export function StepBank({
             {loading ? "Bezig..." : "Koppel bank"}
           </button>
         </div>
-        <p className="text-xs text-slate-400">Na koppelen word je teruggestuurd en kun je handmatig syncen.</p>
+        <p className="text-xs text-slate-400">
+          Na koppelen word je teruggestuurd en kun je handmatig syncen. {institutions.length === 0 ? "Geen banken gevonden; controleer je omgeving of gebruik mock." : ""}
+        </p>
         {provider !== "real" && (
           <div className="flex flex-wrap gap-2 text-[11px] text-slate-200">
             <button
@@ -182,6 +202,19 @@ export function StepBank({
             >
               Simuleer succes callback
             </button>
+          </div>
+        )}
+        {provider === "real" && (
+          <div className="flex flex-wrap gap-2 text-[11px] text-slate-200">
+            <button
+              type="button"
+              onClick={checkHealth}
+              className="rounded-md border border-slate-600 px-2 py-1 hover:border-amber-400 hover:text-amber-200"
+              disabled={loading}
+            >
+              Health check
+            </button>
+            {health && <span className="text-slate-300">Health: {health}</span>}
           </div>
         )}
       </div>
