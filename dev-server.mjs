@@ -21,6 +21,8 @@ app.use(bodyParser.json({ limit: "2mb" }));
 const PORT = process.env.PORT || 3000;
 const MODEL = "gpt-4.1-mini";
 const isProd = process.env.VERCEL_ENV === "production";
+const decideProviderServerSide = () =>
+  isProd ? "real" : process.env.BANK_PROVIDER || "mock";
 
 // In-memory store voor banklinks (tijdelijk)
 const bankStore = {
@@ -207,6 +209,23 @@ app.get("/api/bank/health", async (_req, res) => {
   } catch (err) {
     return res.status(500).json({ ok: false, reason: err.message || "token_failed" });
   }
+});
+
+// Runtime check (no secrets)
+app.get("/api/bank/runtime-check", (_req, res) => {
+  const envLengths = {
+    GC_SECRET_ID_len: (process.env.GC_SECRET_ID || "").length,
+    GC_SECRET_KEY_len: (process.env.GC_SECRET_KEY || "").length,
+    GC_REDIRECT_URL_len: (process.env.GC_REDIRECT_URL || "").length,
+    GC_USER_LANGUAGE_len: (process.env.GC_USER_LANGUAGE || "").length,
+  };
+  res.json({
+    vercel: process.env.VERCEL || null,
+    vercel_env: process.env.VERCEL_ENV || null,
+    node_env: process.env.NODE_ENV || null,
+    provider_seen_by_server: decideProviderServerSide(),
+    env_lengths: envLengths,
+  });
 });
 
 // ===== Mock bank routes (for preview/dev) =====
