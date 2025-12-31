@@ -1,4 +1,4 @@
-﻿import type { AnalysisResult } from "./analysis";
+import type { AnalysisResult } from "./analysis";
 import type {
   IncomeItem,
   FixedCostManualItem,
@@ -24,7 +24,7 @@ type RawContext = {
 
 type ExtraRawContext = { label: string; raw: RawContext };
 
-const formatCurrency = (v: number) => `ƒ,ª${Math.round(v).toLocaleString("nl-NL")}`;
+const formatCurrency = (v: number) => `€ ${Math.round(v).toLocaleString("nl-NL")}`;
 
 function buildRawSection(raw?: RawContext): string[] {
   if (!raw) return [];
@@ -45,7 +45,7 @@ function buildRawSection(raw?: RawContext): string[] {
   if (raw.debts?.length) {
     lines.push("Schulden:");
     raw.debts.slice(0, 10).forEach((d) =>
-      lines.push(`- ${d.naam}: saldo ${formatCurrency(d.saldo || 0)}, min pm ${formatCurrency(d.minBetaling || 0)}`)
+      lines.push(`- ${d.naam}: saldo ${formatCurrency(d.saldo || 0)}, min pm ${formatCurrency(d.minBetaling || 0)}`),
     );
   }
   if (raw.assets?.length) {
@@ -63,11 +63,23 @@ function buildRawSection(raw?: RawContext): string[] {
     const totalIn = raw.transactions.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
     const totalOut = raw.transactions.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
     lines.push(
-      `Transacties: ${raw.transactions.length} stuks, in: ${formatCurrency(totalIn)}, uit: ${formatCurrency(Math.abs(totalOut))}`
+      `Transacties: ${raw.transactions.length} stuks, in: ${formatCurrency(totalIn)}, uit: ${formatCurrency(Math.abs(totalOut))}`,
     );
   }
 
   return lines;
+}
+
+function buildMissingSection(raw?: RawContext): string[] {
+  if (!raw) return [];
+  const missing: string[] = [];
+  if (!raw.incomes?.length) missing.push("inkomen");
+  if (!raw.fixed?.length) missing.push("vaste lasten");
+  if (!raw.debts?.length) missing.push("schulden");
+  if (!raw.assets?.length) missing.push("vermogen/buffers");
+  if (!raw.buckets?.length) missing.push("potjes");
+  if (!raw.transactions?.length) missing.push("transacties/imports");
+  return missing.length ? [`Ontbrekende invoer: ${missing.join(", ")}.`] : [];
 }
 
 export function buildMoneylithPrompt(
@@ -114,6 +126,12 @@ export function buildMoneylithPrompt(
     lines.push(...rawSection);
   }
 
+  const missing = buildMissingSection(raw);
+  if (missing.length) {
+    lines.push("");
+    lines.push(...missing);
+  }
+
   if (extras && extras.length) {
     extras.forEach((extra) => {
       const extraSection = buildRawSection(extra.raw);
@@ -121,41 +139,28 @@ export function buildMoneylithPrompt(
       lines.push("");
       lines.push(`== Extra context (${extra.label}) ==`);
       lines.push(...extraSection);
+      const missingExtra = buildMissingSection(extra.raw);
+      if (missingExtra.length) lines.push(...missingExtra);
     });
   }
 
   const user = [
-    `Je bent een nuchtere financieel sparringpartner.`,
-    `Je reageert in het Nederlands, kort en concreet.`,
-    ``,
-    `Hier is de geanalyseerde situatie uit Moneylith:`,
-    ``,
+    `Context uit Moneylith (snapshots, doelen, potjes, transacties):`,
     ...lines,
     ``,
-    `Op basis hiervan:`,
-    `1. Geef in 3 tot 5 bullets wat hier NU het belangrijkste is om op te focussen.`,
-    `2. Geef AcAcn kernadvies in maximaal 3 zinnen.`,
-    `3. Als er iets urgent is, noem dat expliciet als "WAARSCHUWING: ...".`,
-    `4. Maak onderscheid tussen de korte termijn (0–3 maanden) en middellange termijn (3–24 maanden).`,
-    ``,
-    `Sluit af met een JSON-blok tussen <ACTIONS_JSON> en </ACTIONS_JSON>. Gebruik alleen dit schema; laat velden leeg als je het niet zeker weet:`,
-    `<ACTIONS_JSON>`,
-    `{`,
-    `  "income": { "label": "", "amount": 0, "cadence": "monthly|weekly|yearly|unknown", "confidence": 0 },`,
-    `  "fixedCosts": [{ "name": "", "amount": 0, "cadence": "monthly|weekly|yearly|unknown", "confidence": 0 }],`,
-    `  "debts": [{ "name": "", "amount": 0, "confidence": 0 }],`,
-    `  "goals": [{ "name": "", "target": 0, "deadline": "YYYY-MM-DD", "confidence": 0 }],`,
-    `  "notes": []`,
-    `}`,
-    `</ACTIONS_JSON>`,
+    `Hanteer deze regels bij het beantwoorden van de gebruikersvraag:`,
+    `- Antwoord in gewoon Nederlands, plain text.`,
+    `- Geef geen advies tenzij de gebruiker er expliciet om vraagt; beschrijf en analyseer wat er nu speelt.`,
+    `- Vermijd code, JSON en templates tenzij de gebruiker expliciet om "code" of "implementatie" vraagt. Als je code zou geven, herschrijf naar gewone taal.`,
+    `- Als data ontbreekt, benoem dat en maak geen aannames.`,
+    `- Dit antwoord is gebaseerd op de data die nu bekend is; meer ingevoerde data = scherper inzicht.`,
   ].join("\n");
 
   const system = [
-    `Je bent de AI-adviseur van de app Moneylith.`,
-    `Je krijgt al een voorbewerkte analyse (scores, niveaus, teksten).`,
-    `Je hoeft geen berekeningen over te doen, alleen te interpreteren en helder te verwoorden.`,
-    `Wees direct, eerlijk en to the point. Geen smalltalk, geen excuses, geen disclaimer-spam.`,
-    `Je geeft geen juridisch of fiscaal advies, alleen praktische financiële duiding.`,
+    `Je bent de AI van Moneylith. Spreek altijd in plain text (geen code, geen JSON) en houd het kort en feitelijk.`,
+    `Geen advies of stappenplan tenzij de gebruiker er expliciet om vraagt.`,
+    `Als er toch code in je output sluipt, herschrijf je dit direct naar gewone taal.`,
+    `Baseer je uitsluitend op de meegegeven Moneylith-context en benoem ontbrekende data in plaats van te raden.`,
   ].join("\n");
 
   return { system, user };
