@@ -189,9 +189,13 @@ async function handleRuntimeCheck(res: VercelResponse) {
 }
 
 function getActionFromUrl(url?: string | null): string {
-  if (!url) return "";
-  const path = url.replace(/^\/api\/bank\/?/, "").split("?")[0];
-  return path.split("/")[0] || "";
+  try {
+    const u = new URL(url ?? "/", "http://localhost");
+    const path = u.pathname.replace(/^\/api\/bank\/?/, "");
+    return path.split("/")[0] || "";
+  } catch {
+    return "";
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
