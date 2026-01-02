@@ -277,6 +277,7 @@ const App = () => {
     ...businessTabs.map((t) => t.key),
   ]);
   const [helpMode, setHelpMode] = useState(false);
+  const [showModeBanner, setShowModeBanner] = useState(true);
   const [helpTooltip, setHelpTooltip] = useState<{ label: string; desc: string; x: number; y: number } | null>(null);
   const [introSeen, setIntroSeen] = useLocalStorage<boolean>("moneylith.intro.seen", false);
   const [selectedMonth, setSelectedMonth] = useLocalStorage<MonthId>("selected-month", "2025-12");
@@ -2287,40 +2288,42 @@ const App = () => {
               Stap: {activeTabs.find((s) => s.key === currentStep)?.label}
             </div>
           </div>
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-xs ${
-              isBusiness
-                ? "border-blue-400/40 bg-blue-950/40 text-blue-50"
-                : "border-amber-300/50 bg-amber-500/10 text-amber-50"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              {isBusiness ? (
-                <div className="space-y-1">
-                  <p className="font-semibold text-sm">Zakelijke modus</p>
-                  <p>Tabs richten zich op cashflow, verplichtingen en zakelijk kapitaal. Persoonlijke data blijft apart.</p>
-                  <p className="text-[11px] text-slate-200">
-                    Verschillen: vaste lasten/inkomen komen uit je zakelijke stromen; strategie en vooruitblik rekenen alleen je zakelijke cijfers.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="font-semibold text-sm">Persoonlijke modus</p>
-                  <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
-                  <p className="text-[11px] text-slate-200">
-                    Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.
-                  </p>
-                </div>
-              )}
-              <button
-                type="button"
-                className={`text-[11px] underline ${isBusiness ? "text-blue-100" : "text-amber-100"}`}
-                onClick={() => setHelpMode(false)}
-              >
-                Verberg
-              </button>
+          {showModeBanner && (
+            <div
+              className={`mb-4 rounded-xl border px-4 py-3 text-xs ${
+                isBusiness
+                  ? "border-blue-400/40 bg-blue-950/40 text-blue-50"
+                  : "border-amber-300/50 bg-amber-500/10 text-amber-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                {isBusiness ? (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm">Zakelijke modus</p>
+                    <p>Tabs richten zich op cashflow, verplichtingen en zakelijk kapitaal. Persoonlijke data blijft apart.</p>
+                    <p className="text-[11px] text-slate-200">
+                      Verschillen: vaste lasten/inkomen komen uit je zakelijke stromen; strategie en vooruitblik rekenen alleen je zakelijke cijfers.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm">Persoonlijke modus</p>
+                    <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
+                    <p className="text-[11px] text-slate-200">
+                      Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.
+                    </p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={`text-[11px] underline ${isBusiness ? "text-blue-100" : "text-amber-100"}`}
+                  onClick={() => setShowModeBanner(false)}
+                >
+                  Verberg
+                </button>
+              </div>
             </div>
-          </div>
+          )}
           <div className="space-y-4">{renderContent()}</div>
         </section>
 
