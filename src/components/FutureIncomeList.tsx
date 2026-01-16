@@ -98,7 +98,7 @@ export function FutureIncomeList({
                 <span className="text-xs font-semibold text-slate-600">Naam</span>
                 <input
                   type="text"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
                   value={item.naam}
                   onChange={(e) => updateItem(item.id, { naam: e.target.value })}
                   placeholder="Bijv. bonus, vakantiegeld"
@@ -108,7 +108,7 @@ export function FutureIncomeList({
                 <span className="text-xs font-semibold text-slate-600">Bedrag</span>
                 <input
                   type="number"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
                   value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
                   onChange={(e) => updateItem(item.id, { bedrag: Number(e.target.value) })}
                   placeholder="0"
@@ -119,7 +119,7 @@ export function FutureIncomeList({
                 <span className="text-xs font-semibold text-slate-600">Datum</span>
                 <input
                   type="date"
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
                   value={toIsoDate(item.datum)}
                   onChange={(e) => updateItem(item.id, { datum: e.target.value })}
                 />
