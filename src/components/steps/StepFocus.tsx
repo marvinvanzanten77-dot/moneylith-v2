@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "../../utils/format";
 import { parseDateNlToIso } from "../../utils/date";
 import { projectGoal } from "../../logic/goals";
-import type { FinancialSnapshot, MoneylithBucket, MoneylithGoal } from "../../types";
+import type { FinancialSnapshot, FutureIncomeItem, MoneylithBucket, MoneylithGoal } from "../../types";
 import type { AiActions } from "../../logic/extractActions";
 import { buildGoalsPatchesFromActions, canApplyGoalsSuggestions } from "../../logic/applyGoalsSuggestions";
 
@@ -14,6 +14,7 @@ type StepFocusProps = {
   onUpdateGoal?: (id: string, patch: Partial<MoneylithGoal>) => void;
   onDeleteGoal?: (id: string) => void;
   buckets?: MoneylithBucket[];
+  futureIncomes?: FutureIncomeItem[];
   variant?: "personal" | "business";
   readOnly?: boolean;
   mode?: "personal" | "business";
@@ -27,6 +28,7 @@ export function StepFocus({
   onUpdateGoal,
   onDeleteGoal,
   buckets = [],
+  futureIncomes = [],
   variant = "personal",
   readOnly = false,
   mode = "personal",
@@ -75,8 +77,23 @@ export function StepFocus({
     () => selectedBuckets.reduce((sum, b) => sum + (Number.isFinite(b.monthlyAvg) ? b.monthlyAvg : 0), 0),
     [selectedBuckets],
   );
+  const futureIncomeBeforeDeadline = useMemo(() => {
+    if (!futureIncomes.length || !deadlineInput.trim()) return 0;
+    const iso = parseDateNlToIso(deadlineInput);
+    if (!iso) return 0;
+    const now = new Date();
+    const deadlineDate = new Date(iso);
+    return futureIncomes.reduce((sum, item) => {
+      const amount = Number(item.bedrag ?? 0);
+      if (!Number.isFinite(amount) || amount <= 0) return sum;
+      const date = new Date(item.datum);
+      if (Number.isNaN(date.getTime())) return sum;
+      if (date < now || date > deadlineDate) return sum;
+      return sum + amount;
+    }, 0);
+  }, [futureIncomes, deadlineInput]);
   const monthlyHint = useMemo(() => {
-    const remaining = Math.max(0, formState.targetAmount - formState.currentAmount);
+    const remaining = Math.max(0, formState.targetAmount - formState.currentAmount - futureIncomeBeforeDeadline);
     if (!deadlineInput.trim()) return null;
     const iso = parseDateNlToIso(deadlineInput);
     if (!iso) return null;
@@ -86,8 +103,8 @@ export function StepFocus({
       (deadlineDate.getFullYear() - now.getFullYear()) * 12 + (deadlineDate.getMonth() - now.getMonth()) + 1;
     if (!Number.isFinite(months) || months <= 0) return { error: "Deadline ligt in het verleden of is ongeldig." };
     const perMonth = remaining / months;
-    return { months, perMonth };
-  }, [formState.targetAmount, formState.currentAmount, deadlineInput]);
+    return { months, perMonth, futureIncome: futureIncomeBeforeDeadline };
+  }, [formState.targetAmount, formState.currentAmount, deadlineInput, futureIncomeBeforeDeadline]);
 
   const activeGoals = goals.filter((g) => g.isActive);
   const projections = useMemo(() => new Map(activeGoals.map((g) => [g.id, projectGoal(g)])), [activeGoals]);
@@ -485,6 +502,9 @@ export function StepFocus({
               {monthlyHint && !monthlyHint.error && (
                 <p className="mt-1 text-[11px] text-amber-200">
                   Nodig: {formatCurrency(monthlyHint.perMonth)} per maand voor ~{monthlyHint.months} maand(en).
+                  {monthlyHint.futureIncome && monthlyHint.futureIncome > 0
+                    ? ` Inclusief toekomstige inkomsten: ${formatCurrency(monthlyHint.futureIncome)}.`
+                    : ""}
                 </p>
               )}
             </label>

@@ -25,6 +25,7 @@ export function AiAnalyzeButton({ mode = "personal", tab, label = "Analyseer", c
       debts: src.debts,
       assets: src.assets as any,
       buckets: src.buckets,
+      futureIncomes: src.futureIncome,
       transactions: src.transactions,
       netFree: src.totals.netFree,
     };

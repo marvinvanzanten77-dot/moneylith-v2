@@ -68,6 +68,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
     debts: src.debts,
     assets: src.assets as any,
     buckets: src.buckets,
+    futureIncomes: src.futureIncome,
     transactions: src.transactions,
     netFree: src.totals.netFree,
   });

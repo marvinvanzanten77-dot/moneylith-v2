@@ -111,6 +111,14 @@ export type IncomeItem = {
   opmerking?: string;
 };
 
+export type FutureIncomeItem = {
+  id: string;
+  naam: string;
+  bedrag: number;
+  datum: string; // ISO date (YYYY-MM-DD)
+  opmerking?: string;
+};
+
 export type UserIntent = {
   optimizeCosts?: boolean;
   primaryGoal:

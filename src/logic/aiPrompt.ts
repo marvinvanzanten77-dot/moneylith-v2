@@ -5,6 +5,7 @@ import type {
   SchuldItem,
   MoneylithBucket,
   MoneylithTransaction,
+  FutureIncomeItem,
 } from "../types";
 
 export interface MoneylithAiPayload {
@@ -18,6 +19,7 @@ type RawContext = {
   debts?: SchuldItem[];
   assets?: { id: string; naam: string; bedrag: number }[];
   buckets?: MoneylithBucket[];
+  futureIncomes?: FutureIncomeItem[];
   transactions?: MoneylithTransaction[];
   netFree?: number;
 };
@@ -51,6 +53,13 @@ function buildRawSection(raw?: RawContext): string[] {
   if (raw.assets?.length) {
     lines.push("Vermogen/buffers:");
     raw.assets.slice(0, 10).forEach((a) => lines.push(`- ${a.naam}: ${formatCurrency(a.bedrag || 0)}`));
+  }
+  if (raw.futureIncomes?.length) {
+    lines.push("Toekomstige inkomsten:");
+    raw.futureIncomes.slice(0, 10).forEach((i) => {
+      const date = i.datum ? ` (${i.datum})` : "";
+      lines.push(`- ${i.naam || "inkomen"}: ${formatCurrency(i.bedrag || 0)}${date}`);
+    });
   }
   if (raw.buckets?.length) {
     lines.push("Potjes (variabel):");

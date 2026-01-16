@@ -5,6 +5,7 @@ import type {
   FixedCostItem,
   FixedCostManualItem,
   IncomeItem,
+  FutureIncomeItem,
   MoneylithAccount,
   AccountStatementMeta,
   MoneylithBucket,
@@ -30,6 +31,8 @@ const useDomainData = (prefix: "personal" | "business") => {
   const fixedItemsKey = prefix === "personal" ? "fixed-cost-items" : "fixed-cost-items-business";
   const debtsKey = prefix === "personal" ? "moneylith.personal.debts" : "moneylith.business.debts";
   const assetsKey = prefix === "personal" ? "moneylith.personal.assets" : "moneylith.business.assets";
+  const futureIncomeKey =
+    prefix === "personal" ? "moneylith.personal.futureIncome" : "moneylith.business.futureIncome";
   const transactionsKey =
     prefix === "personal" ? "moneylith.personal.transactions" : "moneylith.business.transactions";
   const bucketsKey = prefix === "personal" ? "moneylith.personal.buckets" : "moneylith.business.buckets";
@@ -43,6 +46,7 @@ const useDomainData = (prefix: "personal" | "business") => {
   const [fixedCostItems] = useLocalStorage<FixedCostItem[]>(fixedItemsKey, []);
   const [debts] = useLocalStorage<SchuldItem[]>(debtsKey, []);
   const [assets] = useLocalStorage<{ id: string; naam: string; bedrag: number }[]>(assetsKey, []);
+  const [futureIncome] = useLocalStorage<FutureIncomeItem[]>(futureIncomeKey, []);
   const [transactions] = useLocalStorage<MoneylithTransaction[]>(transactionsKey, []);
   const [buckets] = useLocalStorage<MoneylithBucket[]>(bucketsKey, []);
   const [statements] = useLocalStorage<AccountStatementMeta[]>(statementsKey, []);
@@ -101,6 +105,7 @@ const useDomainData = (prefix: "personal" | "business") => {
     fixedCostItems,
     debts,
     assets,
+    futureIncome,
     transactions,
     buckets,
     statements,

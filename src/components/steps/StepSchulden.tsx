@@ -2,7 +2,7 @@
 
 import { SchuldenkaartCard, type SchuldItem } from "../SchuldenkaartCard";
 
-import type { FinancialSnapshot } from "../../types";
+import type { FinancialSnapshot, FutureIncomeItem } from "../../types";
 
 import type { AiActions } from "../../logic/extractActions";
 
@@ -34,6 +34,8 @@ interface StepSchuldenProps {
 
 
   debtSummary?: { totalDebt: number; totalMinPayment: number; debtCount: number };
+
+  futureIncomes?: FutureIncomeItem[];
 
 
   debts?: SchuldItem[];
@@ -71,6 +73,7 @@ export function StepSchulden({
 
   debtSummary,
 
+  futureIncomes = [],
 
   debts = [],
 
@@ -313,6 +316,23 @@ export function StepSchulden({
 
   );
 
+  const futureIncomeByMonth = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!futureIncomes.length) return map;
+    const start = new Date();
+    futureIncomes.forEach((item) => {
+      const amount = Number(item.bedrag ?? 0);
+      if (!Number.isFinite(amount) || amount <= 0) return;
+      const date = new Date(item.datum);
+      if (Number.isNaN(date.getTime())) return;
+      const monthIndex =
+        (date.getFullYear() - start.getFullYear()) * 12 + (date.getMonth() - start.getMonth()) + 1;
+      if (monthIndex < 1) return;
+      map.set(monthIndex, (map.get(monthIndex) || 0) + amount);
+    });
+    return map;
+  }, [futureIncomes]);
+
   const computeFullpayBudget = () => {
     const raw = capacityForView;
     if (!Number.isFinite(raw) || raw <= 0) return 0;
@@ -342,9 +362,10 @@ export function StepSchulden({
     const monthPayment = Object.values(effective)
       .filter((p) => p.month === earliest)
       .reduce((sum, p) => sum + (p.minPayment || 0), 0);
-    const freeAfter = Math.max(0, computeFullpayBudget() - monthPayment);
+    const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(earliest) || 0);
+    const freeAfter = Math.max(0, monthBudget - monthPayment);
     return { earliest, monthPayment, freeAfter, maxMonth };
-  }, [selectedStrategy, strategyProposals, acceptedProposals]);
+  }, [selectedStrategy, strategyProposals, acceptedProposals, futureIncomeByMonth]);
 
   const totalDebt = simulation.totalDebtStart;
 
@@ -983,7 +1004,7 @@ export function StepSchulden({
     if (strategy.key === "fullpay") {
 
       // Volledige schulden aflossen per maand op basis van vrije ruimte (inkomen - vaste lasten), groot -> klein.
-      const monthlyBudget = computeFullpayBudget();
+      const baseMonthlyBudget = computeFullpayBudget();
       const order = [...debts].filter((d) => (d.saldo ?? 0) > 0).sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
       let monthCounter = 1;
       const start = new Date();
@@ -991,7 +1012,7 @@ export function StepSchulden({
       order.forEach((d) => {
         const amount = Math.max(0, d.saldo || 0);
         if (amount === 0) return;
-        if (monthlyBudget <= 0) {
+        if (baseMonthlyBudget <= 0) {
           proposals[d.id] = {
             minPayment: amount,
             monthsToClear: 1,
@@ -1003,15 +1024,18 @@ export function StepSchulden({
         }
 
         const payMonth = monthCounter;
+        const extraIncome = futureIncomeByMonth.get(payMonth) || 0;
+        const monthlyBudget = baseMonthlyBudget + extraIncome;
         const leftover = Math.max(0, monthlyBudget - amount);
         const monthLabel = formatMonthLabel(start, payMonth);
+        const extraNote = extraIncome > 0 ? ` Inclusief toekomstig inkomen: ${formatCurrency(extraIncome)}.` : "";
         proposals[d.id] = {
           minPayment: amount,
           monthsToClear: 1,
           note:
             amount > monthlyBudget
-              ? `Volledig aflossen in ${monthLabel}. Let op: bedrag is hoger dan maandbudget (${formatCurrency(monthlyBudget)}).`
-              : `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.`,
+              ? `Volledig aflossen in ${monthLabel}. Let op: bedrag is hoger dan maandbudget (${formatCurrency(monthlyBudget)}).${extraNote}`
+              : `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.${extraNote}`,
           strategyKey: "fullpay",
           month: payMonth,
           freeAfter: leftover,

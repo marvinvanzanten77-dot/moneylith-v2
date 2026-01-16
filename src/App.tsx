@@ -17,6 +17,7 @@ import { StepBackup } from "./components/steps/StepBackup";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { detectRecurringCandidates } from "./utils/recurring";
+import { FutureIncomeList } from "./components/FutureIncomeList";
 import type {
   FixedCostItem,
   MonthId,
@@ -30,6 +31,7 @@ import type {
   IncomeItem,
   FixedCostManualItem,
   SchuldItem,
+  FutureIncomeItem,
 } from "./types";
 import { deriveBuckets, mergeWithUserOverrides } from "./logic/buckets";
 import { useObserver } from "./hooks/useObserver";
@@ -289,6 +291,14 @@ const App = () => {
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
   const [incomeItemsBusiness, setIncomeItemsBusiness] = useLocalStorage<IncomeItem[]>("moneylith.business.income", []);
+  const [futureIncomeItems, setFutureIncomeItems] = useLocalStorage<FutureIncomeItem[]>(
+    "moneylith.personal.futureIncome",
+    []
+  );
+  const [futureIncomeItemsBusiness, setFutureIncomeItemsBusiness] = useLocalStorage<FutureIncomeItem[]>(
+    "moneylith.business.futureIncome",
+    []
+  );
   const [fixedCostManualItems, setFixedCostManualItems] = useLocalStorage<FixedCostManualItem[]>(
     "moneylith.personal.fixedCosts",
     []
@@ -1641,9 +1651,11 @@ const App = () => {
   const renderFundament = (variant: "personal" | "business" = "personal", businessMode?: "cashflow" | "fundament") => {
     const isBusinessVariant = variant === "business";
     const incomeItemsSource = isBusinessVariant ? incomeItemsBusiness : incomeItems;
+    const futureIncomeSource = isBusinessVariant ? futureIncomeItemsBusiness : futureIncomeItems;
     const fixedManualSource = isBusinessVariant ? fixedCostManualItemsBusiness : fixedCostManualItems;
     const fixedItemsSource = isBusinessVariant ? mergedFixedCostItemsBusiness : mergedFixedCostItems;
     const setIncomeItemsFn = isBusinessVariant ? setIncomeItemsBusiness : setIncomeItems;
+    const setFutureIncomeFn = isBusinessVariant ? setFutureIncomeItemsBusiness : setFutureIncomeItems;
     const setFixedManualFn = isBusinessVariant ? setFixedCostManualItemsBusiness : setFixedCostManualItems;
     const setFixedItemsFn = isBusinessVariant ? setFixedCostItemsBusiness : setFixedCostItems;
     const setNetIncomeFn = isBusinessVariant ? setNetIncomeBusiness : setNetIncome;
@@ -1663,6 +1675,10 @@ const App = () => {
     const incomeHelp = isBusinessVariant
       ? "Bijvoorbeeld: uren, projecten, licenties, abonnementen, productverkopen."
       : undefined;
+    const futureIncomeHeading = "Toekomstige inkomsten";
+    const futureIncomeSubheading = "Eenmalige bedragen met datum";
+    const futureIncomeHelp =
+      "Deze bedragen tellen alleen mee in de maand van binnenkomst en worden gebruikt in schulden en doelen.";
     const fixedHeading = isBusinessVariant ? "Vaste bedrijfskosten" : "Vaste lasten";
     const fixedSubheading = isBusinessVariant ? "Overzicht van je vaste bedrijfskosten" : "Overzicht van je vaste lasten";
     const fixedHelp = isBusinessVariant
@@ -1781,6 +1797,14 @@ const App = () => {
           totalLabel={isBusinessVariant ? "Totaal omzet" : undefined}
         />
         {incomeHelp && <p className="text-xs text-slate-200">{incomeHelp}</p>}
+        <FutureIncomeList
+          items={futureIncomeSource}
+          onItemsChange={setFutureIncomeFn}
+          heading={futureIncomeHeading}
+          subheading={futureIncomeSubheading}
+          helpText={futureIncomeHelp}
+          emptyLabel={isBusinessVariant ? "Nog geen toekomstige inkomsten toegevoegd." : undefined}
+        />
         <FixedCostsList
           items={fixedManualSource}
           onItemsChange={setFixedManualFn}
@@ -1840,6 +1864,7 @@ const App = () => {
           variant={variant}
           mode={isBusinessVariant ? "business" : "personal"}
           actions={aiActionsForMode}
+          futureIncomes={isBusinessVariant ? futureIncomeItemsBusiness : futureIncomeItems}
         />
       </div>
     );
@@ -1945,6 +1970,7 @@ const App = () => {
     const summary = isBusinessVariant ? debtsSummaryBusiness : debtsSummary;
     const setSummaryFn = isBusinessVariant ? setDebtsSummaryBusiness : setDebtsSummary;
     const aiActionsForMode = isBusinessVariant ? aiActionsBusiness : aiActionsPersonal;
+    const futureIncomesForMode = isBusinessVariant ? futureIncomeItemsBusiness : futureIncomeItems;
 
     return (
       <StepSchulden
@@ -1957,6 +1983,7 @@ const App = () => {
         readOnly={false}
         mode={isBusinessVariant ? "business" : "personal"}
         actions={aiActionsForMode}
+        futureIncomes={futureIncomesForMode}
       />
     );
   };
