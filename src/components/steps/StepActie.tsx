@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
+import { numberInputValue, parseNumberInput } from "../../utils/numberInput";
 import type { FinancialSnapshot, FinanceMode } from "../../types";
 
 type ScenarioKey = "baseline" | "upside" | "worst";
@@ -211,8 +212,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={upside.extraIncomePerMonth}
-                onChange={(e) => setUpside((p) => ({ ...p, extraIncomePerMonth: Number(e.target.value) || 0 }))}
+                value={numberInputValue(upside.extraIncomePerMonth)}
+                onChange={(e) => setUpside((p) => ({ ...p, extraIncomePerMonth: parseNumberInput(e.target.value) }))}
               />
             </label>
             <label className="text-xs text-slate-300">
@@ -220,8 +221,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={upside.savingsPerMonth}
-                onChange={(e) => setUpside((p) => ({ ...p, savingsPerMonth: Number(e.target.value) || 0 }))}
+                value={numberInputValue(upside.savingsPerMonth)}
+                onChange={(e) => setUpside((p) => ({ ...p, savingsPerMonth: parseNumberInput(e.target.value) }))}
               />
             </label>
           </div>
@@ -236,8 +237,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={worst.shockAmount}
-                onChange={(e) => setWorst((p) => ({ ...p, shockAmount: Number(e.target.value) || 0 }))}
+                value={numberInputValue(worst.shockAmount)}
+                onChange={(e) => setWorst((p) => ({ ...p, shockAmount: parseNumberInput(e.target.value) }))}
               />
             </label>
             <label className="text-xs text-slate-300">
@@ -245,8 +246,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-32 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={worst.shockPerMonth}
-                onChange={(e) => setWorst((p) => ({ ...p, shockPerMonth: Number(e.target.value) || 0 }))}
+                value={numberInputValue(worst.shockPerMonth)}
+                onChange={(e) => setWorst((p) => ({ ...p, shockPerMonth: parseNumberInput(e.target.value) }))}
               />
             </label>
             <label className="text-xs text-slate-300">
@@ -254,8 +255,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-24 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={worst.shockDurationMonths}
-                onChange={(e) => setWorst((p) => ({ ...p, shockDurationMonths: Number(e.target.value) || 0 }))}
+                value={numberInputValue(worst.shockDurationMonths)}
+                onChange={(e) => setWorst((p) => ({ ...p, shockDurationMonths: parseNumberInput(e.target.value) }))}
               />
             </label>
             <label className="text-xs text-slate-300">
@@ -263,8 +264,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
               <input
                 type="number"
                 className="mt-1 w-24 rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-50"
-                value={worst.shockStartMonth}
-                onChange={(e) => setWorst((p) => ({ ...p, shockStartMonth: Number(e.target.value) || 0 }))}
+                value={numberInputValue(worst.shockStartMonth)}
+                onChange={(e) => setWorst((p) => ({ ...p, shockStartMonth: parseNumberInput(e.target.value) }))}
               />
             </label>
           </div>

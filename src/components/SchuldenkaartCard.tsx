@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 import { parseDateNlToIso } from "../utils/date";
 
 type SchuldenSummary = {
@@ -214,8 +215,8 @@ export const SchuldenkaartCard = ({
                         min={0}
                         step={1}
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={Number.isFinite(item.saldo) ? item.saldo : ""}
-                        onChange={(e) => updateItem(item.id, { saldo: parseFloat(e.target.value) || 0 })}
+                        value={numberInputValue(item.saldo)}
+                        onChange={(e) => updateItem(item.id, { saldo: parseNumberInput(e.target.value) })}
                         placeholder="0"
                         readOnly={isReadOnly}
                       />
@@ -227,8 +228,8 @@ export const SchuldenkaartCard = ({
                         min={0}
                         step={1}
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={Number.isFinite(item.minimaleMaandlast) ? item.minimaleMaandlast : ""}
-                        onChange={(e) => updateItem(item.id, { minimaleMaandlast: parseFloat(e.target.value) || 0 })}
+                        value={numberInputValue(item.minimaleMaandlast)}
+                        onChange={(e) => updateItem(item.id, { minimaleMaandlast: parseNumberInput(e.target.value) })}
                         placeholder="0"
                         readOnly={isReadOnly}
                       />

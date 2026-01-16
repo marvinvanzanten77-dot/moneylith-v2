@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
+import { numberInputValue, parseNumberInput } from "../../utils/numberInput";
 import { parseDateNlToIso } from "../../utils/date";
 import { projectGoal } from "../../logic/goals";
 import type { FinancialSnapshot, FutureIncomeItem, MoneylithBucket, MoneylithGoal } from "../../types";
@@ -461,8 +462,8 @@ export function StepFocus({
               <input
                 type="number"
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
-                value={formState.targetAmount}
-                onChange={(e) => setFormState((p) => ({ ...p, targetAmount: Number(e.target.value) || 0 }))}
+                value={numberInputValue(formState.targetAmount)}
+                onChange={(e) => setFormState((p) => ({ ...p, targetAmount: parseNumberInput(e.target.value) }))}
                 readOnly={isReadOnly}
               />
             </label>
@@ -471,8 +472,8 @@ export function StepFocus({
               <input
                 type="number"
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm"
-                value={formState.currentAmount}
-                onChange={(e) => setFormState((p) => ({ ...p, currentAmount: Number(e.target.value) || 0 }))}
+                value={numberInputValue(formState.currentAmount)}
+                onChange={(e) => setFormState((p) => ({ ...p, currentAmount: parseNumberInput(e.target.value) }))}
                 readOnly={isReadOnly}
               />
             </label>

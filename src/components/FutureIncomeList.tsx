@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { FutureIncomeItem } from "../types";
 import { formatCurrency } from "../utils/format";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 
 interface FutureIncomeListProps {
   onSumChange?: (sum: number) => void;
@@ -109,8 +110,8 @@ export function FutureIncomeList({
                 <input
                   type="number"
                   className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                  value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
-                  onChange={(e) => updateItem(item.id, { bedrag: Number(e.target.value) })}
+                  value={numberInputValue(item.bedrag)}
+                  onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value) })}
                   placeholder="0"
                   min={0}
                 />

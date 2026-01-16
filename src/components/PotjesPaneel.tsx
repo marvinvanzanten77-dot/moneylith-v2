@@ -1,4 +1,4 @@
-﻿import type { ChangeEvent } from "react";
+import type { ChangeEvent } from "react";
 import { lazy, Suspense } from "react";
 import { POT_CATEGORIE_OPTIONS, getPotCategorieLabel } from "../data/potCategorieOptions";
 import { POTJES, createZeroLimits, getDefaultPotjes } from "../data/potjes";
@@ -215,9 +215,9 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
                     <input
                       type="number"
                       className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      value={hasOverride ? overrideLimit : ""}
+                      value={numberInputValue(hasOverride ? overrideLimit : 0)}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
+                        const val = parseNumberInput(e.target.value);
                         if (isNaN(val)) {
                           setOverrideLimit(NaN as any);
                         } else {
@@ -239,7 +239,7 @@ const PotjesPaneel = ({ selectedMonth }: Props) => {
                       type="number"
                       inputMode="decimal"
                       className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      value={Number.isFinite(spent) ? spent : 0}
+                      value={numberInputValue(spent)}
                       onChange={handleSpendChange}
                     />
                     {effectiveLimit === 0 ? (

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { formatCurrency } from "../utils/format";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 import type { IncomeItem } from "../types";
 
 interface IncomeListProps {
@@ -170,8 +171,8 @@ export function IncomeList({
                         min={0}
                         step={1}
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
-                        onChange={(e) => updateItem(item.id, { bedrag: parseFloat(e.target.value) || 0 })}
+                        value={numberInputValue(item.bedrag)}
+                        onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value) })}
                         placeholder="0"
                         readOnly={isReadOnly}
                       />

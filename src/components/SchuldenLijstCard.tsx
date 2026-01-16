@@ -1,4 +1,5 @@
-﻿import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 import type { SchuldItem } from "../types";
 
 const newId = () => {
@@ -76,16 +77,16 @@ export function SchuldenLijstCard() {
                   <input
                     type="number"
                     className="w-24 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-right"
-                    value={isNaN(schuld.openBedrag) ? "" : schuld.openBedrag}
-                    onChange={(e) => updateSchuld(schuld.id, { openBedrag: parseFloat(e.target.value) || 0 })}
+                    value={numberInputValue(schuld.openBedrag)}
+                    onChange={(e) => updateSchuld(schuld.id, { openBedrag: parseNumberInput(e.target.value) })}
                   />
                 </td>
                 <td className="px-3 py-2 align-top text-right">
                   <input
                     type="number"
                     className="w-24 rounded-md border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-right"
-                    value={isNaN(schuld.minBetaling ?? 0) ? "" : schuld.minBetaling ?? ""}
-                    onChange={(e) => updateSchuld(schuld.id, { minBetaling: parseFloat(e.target.value) || 0 })}
+                    value={numberInputValue(schuld.minBetaling ?? 0)}
+                    onChange={(e) => updateSchuld(schuld.id, { minBetaling: parseNumberInput(e.target.value) })}
                   />
                 </td>
                 <td className="px-3 py-2 align-top text-center">

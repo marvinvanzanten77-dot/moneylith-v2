@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 
 interface AssetSummary {
   totalAssets: number;
@@ -178,8 +179,8 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
                       min={0}
                       step={0.01}
                       className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                      value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
-                      onChange={(e) => updateItem(item.id, { bedrag: parseFloat(e.target.value) || 0 })}
+                      value={numberInputValue(item.bedrag)}
+                      onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value) })}
                       placeholder="0"
                       readOnly={isReadOnly}
                     />

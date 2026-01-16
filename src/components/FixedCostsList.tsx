@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { FixedCostManualItem } from "../types";
 import { formatCurrency } from "../utils/format";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 
 interface FixedCostsListProps {
   onSumChange?: (sum: number) => void;
@@ -173,8 +174,8 @@ export function FixedCostsList({
                         min={0}
                         step={1}
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={Number.isFinite(item.bedrag) ? item.bedrag : ""}
-                        onChange={(e) => updateItem(item.id, { bedrag: parseFloat(e.target.value) || 0 })}
+                        value={numberInputValue(item.bedrag)}
+                        onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value) })}
                         placeholder="0"
                         readOnly={isReadOnly}
                       />
