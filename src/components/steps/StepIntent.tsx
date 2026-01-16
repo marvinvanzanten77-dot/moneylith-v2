@@ -192,40 +192,6 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
           )}
         </label>
 
-        <div className="rounded-lg border border-slate-200 bg-white/70 p-3 text-xs text-slate-700">
-          <p className="font-semibold text-slate-900">Controleer je invoer</p>
-          <ul className="mt-1 space-y-1">
-            <li>
-              Strategie:{" "}
-              <span className="font-semibold">
-                {strategyOptions.find((o) => o.value === value.primaryGoal)?.label ?? "nog niet gekozen"}
-              </span>
-            </li>
-            <li>
-              Drukpunten:{" "}
-              <span className="font-semibold">
-                {value.mainPressure && value.mainPressure.length
-                  ? value.mainPressure
-                      .map((p) => pressureOptions.find((o) => o.value === p)?.label ?? p)
-                      .join(", ")
-                  : "geen selectie"}
-              </span>
-            </li>
-            <li>
-              Horizon:{" "}
-              <span className="font-semibold">
-                {horizonOptions.find((o) => o.value === value.timeHorizon)?.label ?? "nog niet gekozen"}
-              </span>
-            </li>
-            <li>
-              AI-stijl:{" "}
-              <span className="font-semibold">
-                {aiToneOptions.find((o) => o.value === value.aiStyle)?.label ?? "nog niet gekozen"}
-              </span>
-            </li>
-          </ul>
-          <p className="mt-1 text-[11px] text-slate-500">Klopt dit voor nu? Je kunt later altijd terug om het aan te passen.</p>
-        </div>
       </div>
     </div>
   );
