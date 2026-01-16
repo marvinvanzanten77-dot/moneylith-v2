@@ -362,8 +362,9 @@ export function StepSchulden({
     const monthPayment = Object.values(effective)
       .filter((p) => p.month === earliest)
       .reduce((sum, p) => sum + (p.minPayment || 0), 0);
+    const directFree = Object.values(effective).find((p) => p.month === earliest && typeof p.freeAfter === "number")?.freeAfter;
     const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(earliest) || 0);
-    const freeAfter = Math.max(0, monthBudget - monthPayment);
+    const freeAfter = typeof directFree === "number" ? Math.max(0, directFree) : Math.max(0, monthBudget - monthPayment);
     return { earliest, monthPayment, freeAfter, maxMonth };
   }, [selectedStrategy, strategyProposals, acceptedProposals, futureIncomeByMonth]);
 
@@ -1004,47 +1005,99 @@ export function StepSchulden({
     if (strategy.key === "fullpay") {
 
       // Volledige schulden aflossen per maand op basis van vrije ruimte (inkomen - vaste lasten), groot -> klein.
+      // Als een maandbudget niet genoeg is, schuif naar een latere maand met voldoende capaciteit. Als die ontbreekt: sparen.
       const baseMonthlyBudget = computeFullpayBudget();
       const order = [...debts].filter((d) => (d.saldo ?? 0) > 0).sort((a, b) => (b.saldo || 0) - (a.saldo || 0));
-      let monthCounter = 1;
       const start = new Date();
+      const maxMonths = 120;
+      let monthPointer = 1;
+      let carry = 0;
+
+      const getMonthBudget = (month: number) => baseMonthlyBudget + (futureIncomeByMonth.get(month) || 0);
 
       order.forEach((d) => {
         const amount = Math.max(0, d.saldo || 0);
         if (amount === 0) return;
-        if (baseMonthlyBudget <= 0) {
+
+        if (baseMonthlyBudget <= 0 && futureIncomeByMonth.size === 0) {
           proposals[d.id] = {
             minPayment: amount,
             monthsToClear: 1,
             note: "Geen vrij te besteden budget berekend voor fullpay.",
             strategyKey: "fullpay",
           };
-          monthCounter += 1;
+          monthPointer += 1;
           return;
         }
 
-        const payMonth = monthCounter;
+        let payMonth: number | null = null;
+        let monthBudget = 0;
+        let savingsMonths = 0;
+        let savedTotal = carry;
+
+        for (let m = monthPointer; m <= maxMonths; m += 1) {
+          const budget = getMonthBudget(m);
+          if (budget + carry >= amount) {
+            payMonth = m;
+            monthBudget = budget;
+            break;
+          }
+        }
+
+        if (payMonth === null) {
+          for (let m = monthPointer; m <= maxMonths; m += 1) {
+            const budget = getMonthBudget(m);
+            savedTotal += budget;
+            if (savedTotal >= amount) {
+              payMonth = m;
+              monthBudget = budget;
+              savingsMonths = m - monthPointer;
+              break;
+            }
+          }
+        }
+
+        if (payMonth === null) {
+          proposals[d.id] = {
+            minPayment: amount,
+            monthsToClear: null,
+            note: "Onvoldoende maandcapaciteit om deze schuld volledig af te lossen. Vul eerst inkomen/lasten aan.",
+            strategyKey: "fullpay",
+          };
+          monthPointer += 1;
+          return;
+        }
+
         const extraIncome = futureIncomeByMonth.get(payMonth) || 0;
-        const monthlyBudget = baseMonthlyBudget + extraIncome;
-        const leftover = Math.max(0, monthlyBudget - amount);
-        const monthLabel = formatMonthLabel(start, payMonth);
         const extraNote = extraIncome > 0 ? ` Inclusief toekomstig inkomen: ${formatCurrency(extraIncome)}.` : "";
+        const monthLabel = formatMonthLabel(start, payMonth);
+        const totalAvailable = savingsMonths > 0 ? savedTotal : carry + monthBudget;
+        const leftover = Math.max(0, totalAvailable - amount);
+        const monthsSkipped = payMonth - monthPointer;
+        const waitNote =
+          monthsSkipped > 0
+            ? `Wacht ${monthsSkipped} maand${monthsSkipped === 1 ? "" : "en"} en los af in ${monthLabel}.`
+            : `Volledig aflossen in ${monthLabel}.`;
+        const saveNote =
+          savingsMonths > 0
+            ? `Spaar ${savingsMonths} maand${savingsMonths === 1 ? "" : "en"} en los af in ${monthLabel}.`
+            : waitNote;
+
         proposals[d.id] = {
           minPayment: amount,
           monthsToClear: 1,
-          note:
-            amount > monthlyBudget
-              ? `Volledig aflossen in ${monthLabel}. Let op: bedrag is hoger dan maandbudget (${formatCurrency(monthlyBudget)}).${extraNote}`
-              : `Volledig aflossen in ${monthLabel}. Restbudget na betaling: ${formatCurrency(leftover)}.${extraNote}`,
+          note: `${saveNote} Restbudget na betaling: ${formatCurrency(leftover)}.${extraNote}`,
           strategyKey: "fullpay",
           month: payMonth,
           freeAfter: leftover,
           monthLabel,
         };
-        monthCounter += 1;
+
+        carry = leftover;
+        monthPointer = payMonth + 1;
       });
 
-    } else if (strategy.key === "steady") {
+    } else if (strategy.key === "steady") { {
 
       // Gelijkmatig tempo over 12 maanden
 
