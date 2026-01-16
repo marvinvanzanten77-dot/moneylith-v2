@@ -152,9 +152,6 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
               </div>
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span>{formatCurrency(Number.isFinite(item.bedrag) ? Math.max(0, item.bedrag) : 0)}</span>
-                <span className="text-xs text-slate-500" aria-hidden>
-                  {isExpanded ? "â–²" : "â–¼"}
-                </span>
               </div>
             </button>
 

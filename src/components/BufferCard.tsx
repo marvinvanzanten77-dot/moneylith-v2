@@ -1,4 +1,5 @@
 ﻿import { useLocalStorage } from "../hooks/useLocalStorage";
+import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 
 export function BufferCard() {
   const [bufferTarget, setBufferTarget] = useLocalStorage<number>("buffer-target", 0);
@@ -20,8 +21,8 @@ export function BufferCard() {
           <input
             type="number"
             className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-            value={safeTarget || ""}
-            onChange={(e) => setBufferTarget(parseFloat(e.target.value) || 0)}
+            value={numberInputValue(safeTarget)}
+            onChange={(e) => setBufferTarget(parseNumberInput(e.target.value))}
           />
         </div>
         <div>
@@ -29,8 +30,8 @@ export function BufferCard() {
           <input
             type="number"
             className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-            value={safeCurrent || ""}
-            onChange={(e) => setBufferCurrent(parseFloat(e.target.value) || 0)}
+            value={numberInputValue(safeCurrent)}
+            onChange={(e) => setBufferCurrent(parseNumberInput(e.target.value))}
           />
         </div>
       </div>
