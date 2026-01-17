@@ -1097,7 +1097,7 @@ export function StepSchulden({
         monthPointer = payMonth + 1;
       });
 
-    } else if (strategy.key === "steady") { {
+    } else if (strategy.key === "steady") {
 
       // Gelijkmatig tempo over 12 maanden
 
