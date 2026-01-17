@@ -218,6 +218,11 @@ export function StepSchulden({
   );
 
 
+  const [fullpayOverrides, setFullpayOverrides] = useLocalStorage<Record<string, number>>(
+    `moneylith.${variant}.debts.fullpayMonths`,
+    {},
+  );
+
   const [selectedStrategy, setSelectedStrategy] = useLocalStorage<StrategyKey | null>(
 
     `moneylith.${variant}.debts.selectedStrategy`,
@@ -233,6 +238,8 @@ export function StepSchulden({
   const [undoVisible, setUndoVisible] = useState(false);
 
   const didHydrateStrategy = useRef(false);
+
+  const didApplyFullpayOverrides = useRef(false);
 
   const [strategyProposals, setStrategyProposals] = useState<
 
@@ -347,6 +354,19 @@ export function StepSchulden({
     const d = new Date(start);
     d.setMonth(d.getMonth() + Math.max(0, monthNumber - 1));
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  const applyFullpayOverride = (proposal: { minPayment: number; note: string; month?: number; monthLabel?: string; freeAfter?: number }, month: number) => {
+    const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(month) || 0);
+    const monthLabel = formatMonthLabel(new Date(), month);
+    const freeAfter = Math.max(0, monthBudget - (proposal.minPayment || 0));
+    return {
+      ...proposal,
+      month,
+      monthLabel,
+      freeAfter,
+      note: `Handmatig ingepland voor ${monthLabel}. Restbudget na betaling: ${formatCurrency(freeAfter)}.`,
+    };
   };
 
   const fullpayMonthStats = useMemo(() => {
@@ -1202,6 +1222,17 @@ export function StepSchulden({
 
     setStrategyProposals(proposals);
     setAcceptedProposals(new Set());
+    if (strategy.key === "fullpay") {
+      const nextOverrides = Object.fromEntries(
+        Object.entries(proposals)
+          .filter(([, p]) => p.month)
+          .map(([id, p]) => [id, p.month as number]),
+      );
+      setFullpayOverrides(nextOverrides);
+      didApplyFullpayOverrides.current = false;
+    } else if (Object.keys(fullpayOverrides).length) {
+      setFullpayOverrides({});
+    }
 
     setView("list");
 
@@ -1236,14 +1267,17 @@ export function StepSchulden({
       nextIds.forEach((id, index) => {
         const slot = monthSlots[index];
         if (!slot || !next[id]) return;
-        const monthLabel = formatMonthLabel(start, slot);
-        next[id] = {
-          ...next[id],
-          month: slot,
-          monthLabel,
-          note: `Handmatig ingepland voor ${monthLabel}.`,
-        };
-        delete next[id].freeAfter;
+        next[id] = applyFullpayOverride(next[id], slot);
+      });
+      return next;
+    });
+
+    setFullpayOverrides((prev) => {
+      const next = { ...prev };
+      nextIds.forEach((id, index) => {
+        const slot = monthSlots[index];
+        if (!slot) return;
+        next[id] = slot;
       });
       return next;
     });
@@ -1251,22 +1285,14 @@ export function StepSchulden({
 
   const updateFullpayProposalMonth = (debtId: string, month: number) => {
     if (isReadOnly || selectedStrategy !== "fullpay") return;
-    const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(month) || 0);
-    const monthLabel = formatMonthLabel(new Date(), month);
     setStrategyProposals((prev) => {
       const next = { ...prev };
       const proposal = next[debtId];
       if (!proposal) return prev;
-      const freeAfter = Math.max(0, monthBudget - (proposal.minPayment || 0));
-      next[debtId] = {
-        ...proposal,
-        month,
-        monthLabel,
-        freeAfter,
-        note: `Handmatig ingepland voor ${monthLabel}. Restbudget na betaling: ${formatCurrency(freeAfter)}.`,
-      };
+      next[debtId] = applyFullpayOverride(proposal, month);
       return next;
     });
+    setFullpayOverrides((prev) => ({ ...prev, [debtId]: month }));
   };
 
 
@@ -1281,6 +1307,26 @@ export function StepSchulden({
     didHydrateStrategy.current = true;
     applyStrategyToDebts(strategy);
   }, [selectedStrategy, mergedStrategies, strategyProposals]);
+
+  useEffect(() => {
+    if (selectedStrategy !== "fullpay") {
+      didApplyFullpayOverrides.current = false;
+      return;
+    }
+    if (didApplyFullpayOverrides.current) return;
+    if (!Object.keys(fullpayOverrides).length) return;
+    if (!Object.keys(strategyProposals).length) return;
+    didApplyFullpayOverrides.current = true;
+    setStrategyProposals((prev) => {
+      const next = { ...prev };
+      Object.entries(fullpayOverrides).forEach(([id, month]) => {
+        const proposal = next[id];
+        if (!proposal) return;
+        next[id] = applyFullpayOverride(proposal, Number(month));
+      });
+      return next;
+    });
+  }, [selectedStrategy, fullpayOverrides, strategyProposals, futureIncomeByMonth]);
 
   const applyProposalToDebt = (debtId: string) => {
     if (isReadOnly) return;
