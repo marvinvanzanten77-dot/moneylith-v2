@@ -29,6 +29,8 @@ type SchuldenkaartCardProps = {
   onReorder?: (sourceId: string, targetId: string) => void;
   fullpayMonthOptions?: { value: number; label: string }[];
   onUpdateFullpayMonth?: (id: string, month: number) => void;
+  proposalEditEnabled?: boolean;
+  onUpdateProposal?: (id: string, patch: { minPayment?: number; note?: string }) => void;
   proposals?: Record<
     string,
     {
@@ -58,6 +60,8 @@ export const SchuldenkaartCard = ({
   onReorder,
   fullpayMonthOptions = [],
   onUpdateFullpayMonth,
+  proposalEditEnabled = false,
+  onUpdateProposal,
   proposals = {},
   acceptedIds = new Set<string>(),
   onAcceptProposal,
@@ -280,6 +284,18 @@ export const SchuldenkaartCard = ({
                           ))}
                         </select>
                       </label>
+                    ) : proposalEditEnabled && proposal ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-slate-600">Voorstel (bedrag)</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-800 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                          value={numberInputValue(proposal.minPayment)}
+                          onChange={(e) => onUpdateProposal?.(item.id, { minPayment: parseNumberInput(e.target.value) })}
+                        />
+                      </div>
                     ) : (
                       <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
@@ -305,6 +321,17 @@ export const SchuldenkaartCard = ({
                         />
                       </label>
                     )}
+                    {proposalEditEnabled && proposal ? (
+                      <label className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">
+                        <span className="text-[11px] font-semibold text-slate-600">Voorstel (opmerking)</span>
+                        <input
+                          type="text"
+                          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm text-amber-900 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                          value={proposal.note ?? ""}
+                          onChange={(e) => onUpdateProposal?.(item.id, { note: e.target.value })}
+                        />
+                      </label>
+                    ) : null}
                     <label className="flex flex-col gap-1 md:col-span-2">
                       <span className="text-[11px] font-semibold text-slate-600">Opmerking</span>
                       <textarea

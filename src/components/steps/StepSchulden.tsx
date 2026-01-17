@@ -237,6 +237,8 @@ export function StepSchulden({
 
   const [undoVisible, setUndoVisible] = useState(false);
 
+  const [proposalEditMode, setProposalEditMode] = useState(false);
+
   const didHydrateStrategy = useRef(false);
 
   const didApplyFullpayOverrides = useRef(false);
@@ -1401,8 +1403,23 @@ export function StepSchulden({
       Object.keys(strategyProposals).forEach((id) => next.add(id));
       return next;
     });
+
+    if (proposalEditMode) {
+      setProposalEditMode(false);
+      runAiStrategies();
+    }
   };
 
+
+
+  const updateProposal = (debtId: string, patch: { minPayment?: number; note?: string }) => {
+    if (isReadOnly) return;
+    setStrategyProposals((prev) => {
+      const proposal = prev[debtId];
+      if (!proposal) return prev;
+      return { ...prev, [debtId]: { ...proposal, ...patch } };
+    });
+  };
 
 
   const clearAiNotes = () => {
@@ -1414,6 +1431,7 @@ export function StepSchulden({
     setStrategyProposals({});
 
     setAcceptedProposals(new Set());
+    setProposalEditMode(false);
 
     const reset = debts.map((d) => ({ ...d }));
 
@@ -1697,29 +1715,22 @@ export function StepSchulden({
 
 
                   {hasPendingProposals && !isReadOnly && (
-
-
-                    <button
-
-
-                      type="button"
-
-
-                      onClick={applyAllProposals}
-
-
-                      className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-amber-400"
-
-
-                    >
-
-
-                      Accepteer alle voorstellen
-
-
-                    </button>
-
-
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={applyAllProposals}
+                        className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-amber-400"
+                      >
+                        {proposalEditMode ? "Accepteer voorstel" : "Accepteer alle voorstellen"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProposalEditMode((prev) => !prev)}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-50"
+                      >
+                        {proposalEditMode ? "Stop wijzigen" : "Wijzig voorstel"}
+                      </button>
+                    </div>
                   )}
 
 
@@ -1766,6 +1777,8 @@ export function StepSchulden({
                 onReorder={reorderFullpayProposals}
                 fullpayMonthOptions={fullpayMonthOptions}
                 onUpdateFullpayMonth={updateFullpayProposalMonth}
+                proposalEditEnabled={proposalEditMode}
+                onUpdateProposal={updateProposal}
 
 
                 onAcceptProposal={applyProposalToDebt}
