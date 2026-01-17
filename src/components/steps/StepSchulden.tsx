@@ -1656,7 +1656,7 @@ export function StepSchulden({
               <div className="mb-3 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
 
 
-                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategie?n en donut; wissel naar <span className="font-semibold">Analyse</span> voor strategie?n en donut; terug naar lijst om bedragen te bewerken.
+                Je zit nu in lijstweergave. Wissel naar <span className="font-semibold">Analyse</span> voor strategie?n en donut; terug naar lijst om bedragen te bewerken.
 
 
               </div>
