@@ -218,6 +218,11 @@ export function StepSchulden({
   );
 
 
+  const [proposalEdits, setProposalEdits] = useLocalStorage<Record<string, { minPayment?: number; note?: string }>>(
+    `moneylith.${variant}.debts.proposalEdits`,
+    {},
+  );
+
   const [fullpayOverrides, setFullpayOverrides] = useLocalStorage<Record<string, number>>(
     `moneylith.${variant}.debts.fullpayMonths`,
     {},
@@ -369,6 +374,24 @@ export function StepSchulden({
       freeAfter,
       note: `Handmatig ingepland voor ${monthLabel}. Restbudget na betaling: ${formatCurrency(freeAfter)}.`,
     };
+  };
+
+  const applyProposalEdits = (base: Record<string, { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey; month?: number; freeAfter?: number; monthLabel?: string }>) => {
+    if (!Object.keys(proposalEdits).length) return base;
+    const next = { ...base };
+    Object.entries(proposalEdits).forEach(([id, patch]) => {
+      const proposal = next[id];
+      if (!proposal) return;
+      const updated = { ...proposal };
+      if (typeof patch.minPayment === "number" && Number.isFinite(patch.minPayment)) {
+        updated.minPayment = Math.max(0, patch.minPayment);
+      }
+      if (typeof patch.note === "string") {
+        updated.note = patch.note;
+      }
+      next[id] = updated;
+    });
+    return next;
   };
 
   const fullpayMonthStats = useMemo(() => {
@@ -1222,11 +1245,12 @@ export function StepSchulden({
 
     }
 
-    setStrategyProposals(proposals);
+    const nextProposals = applyProposalEdits(proposals);
+    setStrategyProposals(nextProposals);
     setAcceptedProposals(new Set());
     if (strategy.key === "fullpay") {
       const nextOverrides = Object.fromEntries(
-        Object.entries(proposals)
+        Object.entries(nextProposals)
           .filter(([, p]) => p.month)
           .map(([id, p]) => [id, p.month as number]),
       );
@@ -1364,19 +1388,16 @@ export function StepSchulden({
 
 
     setStrategyProposals((prev) => {
-
-
       const next = { ...prev };
-
-
       delete next[debtId];
-
-
       return next;
-
-
     });
-
+    setProposalEdits((prev) => {
+      if (!prev[debtId]) return prev;
+      const next = { ...prev };
+      delete next[debtId];
+      return next;
+    });
 
   };
 
@@ -1419,6 +1440,7 @@ export function StepSchulden({
       if (!proposal) return prev;
       return { ...prev, [debtId]: { ...proposal, ...patch } };
     });
+    setProposalEdits((prev) => ({ ...prev, [debtId]: { ...prev[debtId], ...patch } }));
   };
 
 
@@ -1432,6 +1454,7 @@ export function StepSchulden({
 
     setAcceptedProposals(new Set());
     setProposalEditMode(false);
+    setProposalEdits({});
 
     const reset = debts.map((d) => ({ ...d }));
 
