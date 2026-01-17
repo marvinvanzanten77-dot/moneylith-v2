@@ -370,6 +370,19 @@ export function StepSchulden({
     return { earliest, monthPayment, freeAfter, maxMonth };
   }, [selectedStrategy, strategyProposals, acceptedProposals, futureIncomeByMonth]);
 
+  const fullpayMonthOptions = useMemo(() => {
+    if (selectedStrategy !== "fullpay") return [];
+    const months = Object.values(strategyProposals)
+      .map((p) => p.month)
+      .filter((m): m is number => typeof m === "number" && m > 0);
+    const maxMonth = months.length ? Math.max(...months) : 12;
+    const start = new Date();
+    return Array.from({ length: Math.max(12, maxMonth) }, (_, idx) => {
+      const value = idx + 1;
+      return { value, label: formatMonthLabel(start, value) };
+    });
+  }, [selectedStrategy, strategyProposals]);
+
   const totalDebt = simulation.totalDebtStart;
 
   const totalMinPayment = debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0);
@@ -1236,6 +1249,26 @@ export function StepSchulden({
     });
   };
 
+  const updateFullpayProposalMonth = (debtId: string, month: number) => {
+    if (isReadOnly || selectedStrategy !== "fullpay") return;
+    const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(month) || 0);
+    const monthLabel = formatMonthLabel(new Date(), month);
+    setStrategyProposals((prev) => {
+      const next = { ...prev };
+      const proposal = next[debtId];
+      if (!proposal) return prev;
+      const freeAfter = Math.max(0, monthBudget - (proposal.minPayment || 0));
+      next[debtId] = {
+        ...proposal,
+        month,
+        monthLabel,
+        freeAfter,
+        note: `Handmatig ingepland voor ${monthLabel}. Restbudget na betaling: ${formatCurrency(freeAfter)}.`,
+      };
+      return next;
+    });
+  };
+
 
 
 
@@ -1685,6 +1718,8 @@ export function StepSchulden({
                   Object.values(strategyProposals).some((p) => p.strategyKey === "fullpay" && p.month)
                 }
                 onReorder={reorderFullpayProposals}
+                fullpayMonthOptions={fullpayMonthOptions}
+                onUpdateFullpayMonth={updateFullpayProposalMonth}
 
 
                 onAcceptProposal={applyProposalToDebt}

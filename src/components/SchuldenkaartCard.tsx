@@ -27,6 +27,8 @@ type SchuldenkaartCardProps = {
   readOnly?: boolean;
   reorderEnabled?: boolean;
   onReorder?: (sourceId: string, targetId: string) => void;
+  fullpayMonthOptions?: { value: number; label: string }[];
+  onUpdateFullpayMonth?: (id: string, month: number) => void;
   proposals?: Record<
     string,
     {
@@ -54,6 +56,8 @@ export const SchuldenkaartCard = ({
   readOnly = false,
   reorderEnabled = false,
   onReorder,
+  fullpayMonthOptions = [],
+  onUpdateFullpayMonth,
   proposals = {},
   acceptedIds = new Set<string>(),
   onAcceptProposal,
@@ -257,12 +261,25 @@ export const SchuldenkaartCard = ({
                       />
                     </label>
                     {proposal?.strategyKey === "fullpay" && proposal.month ? (
-                      <div className="flex flex-col gap-1">
+                      <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Maand (fullpay voorstel)</span>
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-800">
-                          {proposal.monthLabel ?? `Maand ${proposal.month}`}
-                        </div>
-                      </div>
+                        <select
+                          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm font-semibold text-amber-800 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                          value={proposal.month}
+                          disabled={isReadOnly || fullpayMonthOptions.length === 0}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            if (!Number.isFinite(next) || next <= 0) return;
+                            onUpdateFullpayMonth?.(item.id, next);
+                          }}
+                        >
+                          {fullpayMonthOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     ) : (
                       <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
