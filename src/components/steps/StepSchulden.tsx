@@ -232,6 +232,8 @@ export function StepSchulden({
 
   const [undoVisible, setUndoVisible] = useState(false);
 
+  const didHydrateStrategy = useRef(false);
+
   const [strategyProposals, setStrategyProposals] = useState<
 
     Record<
@@ -1236,6 +1238,16 @@ export function StepSchulden({
 
 
 
+
+  useEffect(() => {
+    if (didHydrateStrategy.current) return;
+    if (!selectedStrategy) return;
+    if (Object.keys(strategyProposals).length > 0) return;
+    const strategy = mergedStrategies.find((item) => item.key === selectedStrategy);
+    if (!strategy) return;
+    didHydrateStrategy.current = true;
+    applyStrategyToDebts(strategy);
+  }, [selectedStrategy, mergedStrategies, strategyProposals]);
 
   const applyProposalToDebt = (debtId: string) => {
     if (isReadOnly) return;
