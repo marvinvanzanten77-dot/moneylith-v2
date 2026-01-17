@@ -1192,6 +1192,48 @@ export function StepSchulden({
 
   };
 
+  const reorderFullpayProposals = (sourceId: string, targetId: string) => {
+    if (isReadOnly || selectedStrategy !== "fullpay") return;
+    const current = debts
+      .filter((d) => typeof strategyProposals[d.id]?.month === "number")
+      .sort(
+        (a, b) =>
+          (strategyProposals[a.id]?.month ?? 9999) - (strategyProposals[b.id]?.month ?? 9999),
+      );
+    const ids = current.map((d) => d.id);
+    const sourceIndex = ids.indexOf(sourceId);
+    const targetIndex = ids.indexOf(targetId);
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
+
+    const nextIds = [...ids];
+    const [moved] = nextIds.splice(sourceIndex, 1);
+    nextIds.splice(targetIndex, 0, moved);
+
+    const monthSlots = current
+      .map((d) => strategyProposals[d.id]?.month)
+      .filter((m): m is number => typeof m === "number")
+      .sort((a, b) => a - b);
+    if (!monthSlots.length) return;
+
+    const start = new Date();
+    setStrategyProposals((prev) => {
+      const next = { ...prev };
+      nextIds.forEach((id, index) => {
+        const slot = monthSlots[index];
+        if (!slot || !next[id]) return;
+        const monthLabel = formatMonthLabel(start, slot);
+        next[id] = {
+          ...next[id],
+          month: slot,
+          monthLabel,
+          note: `Handmatig ingepland voor ${monthLabel}.`,
+        };
+        delete next[id].freeAfter;
+      });
+      return next;
+    });
+  };
+
 
 
 
@@ -1625,6 +1667,12 @@ export function StepSchulden({
 
                 proposals={strategyProposals}
                 acceptedIds={acceptedProposals}
+                reorderEnabled={
+                  selectedStrategy === "fullpay" &&
+                  !isReadOnly &&
+                  Object.values(strategyProposals).some((p) => p.strategyKey === "fullpay" && p.month)
+                }
+                onReorder={reorderFullpayProposals}
 
 
                 onAcceptProposal={applyProposalToDebt}

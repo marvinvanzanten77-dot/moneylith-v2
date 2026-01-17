@@ -25,6 +25,8 @@ type SchuldenkaartCardProps = {
   onSummaryChange?: (summary: SchuldenSummary) => void;
   variant?: "personal" | "business";
   readOnly?: boolean;
+  reorderEnabled?: boolean;
+  onReorder?: (sourceId: string, targetId: string) => void;
   proposals?: Record<
     string,
     {
@@ -50,6 +52,8 @@ export const SchuldenkaartCard = ({
   onSummaryChange,
   variant = "personal",
   readOnly = false,
+  reorderEnabled = false,
+  onReorder,
   proposals = {},
   acceptedIds = new Set<string>(),
   onAcceptProposal,
@@ -163,6 +167,24 @@ export const SchuldenkaartCard = ({
               className={`rounded-xl border bg-white shadow-sm transition-all duration-200 ${
                 isExpanded ? "border-amber-400 ring-2 ring-amber-100" : "border-slate-200 hover:border-amber-200"
               }`}
+              draggable={reorderEnabled}
+              onDragStart={(event) => {
+                if (!reorderEnabled) return;
+                event.dataTransfer.setData("text/plain", item.id);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(event) => {
+                if (!reorderEnabled) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                if (!reorderEnabled) return;
+                event.preventDefault();
+                const sourceId = event.dataTransfer.getData("text/plain");
+                if (!sourceId || sourceId === item.id) return;
+                onReorder?.(sourceId, item.id);
+              }}
             >
               <button
                 type="button"
