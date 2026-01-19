@@ -1249,12 +1249,12 @@ export function StepSchulden({
     setStrategyProposals(nextProposals);
     setAcceptedProposals(new Set());
     if (strategy.key === "fullpay") {
-      const nextOverrides = Object.fromEntries(
+      const computedOverrides = Object.fromEntries(
         Object.entries(nextProposals)
           .filter(([, p]) => p.month)
           .map(([id, p]) => [id, p.month as number]),
       );
-      setFullpayOverrides(nextOverrides);
+      setFullpayOverrides((prev) => (Object.keys(prev).length ? prev : computedOverrides));
       didApplyFullpayOverrides.current = false;
     } else if (Object.keys(fullpayOverrides).length) {
       setFullpayOverrides({});
