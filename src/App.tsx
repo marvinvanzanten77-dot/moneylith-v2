@@ -13,6 +13,7 @@ import { StepVermogen } from "./components/steps/StepVermogen";
 import { StepRitme } from "./components/steps/StepRitme";
 import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften } from "./components/steps/StepAfschriften";
+import { StepBank } from "./components/steps/StepBank";
 import { StepBackup } from "./components/steps/StepBackup";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
 import { useLocalStorage } from "./hooks/useLocalStorage";
@@ -120,6 +121,7 @@ const personalTabs: TabConfig[] = [
   { key: "vermogen", label: "Vermogen", desc: "Sparen, buffers, bezittingen" },
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
+  { key: "bank", label: "Bank", desc: "PSD2 bankkoppeling" },
   { key: "afschriften", label: "Patronen", desc: "Maandelijkse afschriften" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
@@ -2063,6 +2065,7 @@ const App = () => {
     if (normalizedStep === "verplichtingen") return renderSchulden("business");
     if (normalizedStep === "rekeningen") return renderRekeningen("personal");
     if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
+    if (normalizedStep === "bank") return <StepBank />;
     if (normalizedStep === "inbox") return renderInbox("personal");
     if (normalizedStep === "biz-inbox") return renderInbox("business");
     if (normalizedStep === "afschriften") return renderAfschriften("personal");
@@ -2183,6 +2186,7 @@ const App = () => {
     vermogen: "Voeg vermogen/buffers toe om runway en financiële veerkracht te zien.",
     focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
+    bank: "Koppel je bank via TrueLayer (sandbox) en haal rekeningen op.",
     afschriften: "Upload bankafschriften (CSV/XLSX/PDF). AI haalt patronen/potjes uit je uitgaven.",
     inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
