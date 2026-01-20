@@ -1378,6 +1378,7 @@ export function StepSchulden({
       next.add(debtId);
       return next;
     });
+    persistFullpayOrder();
   };
 
 
@@ -1403,6 +1404,20 @@ export function StepSchulden({
 
 
 
+  const persistFullpayOrder = () => {
+    if (selectedStrategy !== "fullpay") return;
+    setFullpayOverrides((prev) => {
+      if (Object.keys(prev).length) return prev;
+      const next = { ...prev };
+      Object.entries(strategyProposals).forEach(([id, p]) => {
+        if (p.strategyKey === "fullpay" && typeof p.month === "number") {
+          next[id] = p.month;
+        }
+      });
+      return next;
+    });
+  };
+
   const applyAllProposals = () => {
     if (isReadOnly) return;
     if (!Object.keys(strategyProposals).length) return;
@@ -1424,6 +1439,7 @@ export function StepSchulden({
       Object.keys(strategyProposals).forEach((id) => next.add(id));
       return next;
     });
+    persistFullpayOrder();
 
     if (proposalEditMode) {
       setProposalEditMode(false);
