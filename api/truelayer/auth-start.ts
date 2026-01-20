@@ -10,6 +10,11 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const clientId = getEnv("TRUELAYER_CLIENT_ID");
   const redirectUri = getEnv("TRUELAYER_REDIRECT_URI") || "http://localhost:3000/api/truelayer/callback";
+  const env = (getEnv("TRUELAYER_ENV") || "sandbox").toLowerCase();
+  const authBase =
+    env === "production" || env === "prod"
+      ? "https://auth.truelayer.com"
+      : "https://auth.truelayer-sandbox.com";
 
   if (!clientId) {
     res.status(400).json({ error: "Missing TRUELAYER_CLIENT_ID" });
@@ -30,7 +35,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   });
 
   res.status(200).json({
-    url: `https://auth.truelayer.com/?${params.toString()}`,
+    url: `${authBase}/?${params.toString()}`,
     state,
   });
 }
