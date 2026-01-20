@@ -15,6 +15,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     env === "production" || env === "prod"
       ? "https://auth.truelayer.com"
       : "https://auth.truelayer-sandbox.com";
+  const scopes = getEnv("TRUELAYER_SCOPES") || "info accounts transactions";
+  const providers = getEnv("TRUELAYER_PROVIDERS");
 
   if (!clientId) {
     res.status(400).json({ error: "Missing TRUELAYER_CLIENT_ID" });
@@ -23,16 +25,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const state = crypto.randomUUID();
   const nonce = crypto.randomUUID();
-  const scope = "info accounts transactions";
-
   const params = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope,
+    scope: scopes,
     state,
     nonce,
   });
+  if (providers) {
+    params.set("providers", providers);
+  }
 
   res.status(200).json({
     url: `${authBase}/?${params.toString()}`,
