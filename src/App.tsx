@@ -276,7 +276,6 @@ const App = () => {
   }, []);
 
   const [onboardingMode, setOnboardingMode] = useLocalStorage<"bank" | "manual" | null>("moneylith.onboarding.mode", null);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
