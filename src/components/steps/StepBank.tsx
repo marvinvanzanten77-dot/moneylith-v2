@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import type { SchuldItem, IncomeItem, FixedCostManualItem, MoneylithBucket } from "../../types";
+import { analyzeBankTransactions, fetchBankTransactions } from "../../logic/bankAnalysis";
 
 type TLAccount = {
   account_id: string;
@@ -14,6 +16,14 @@ type TLAccountsResponse = {
 
 const ACCOUNTS_KEY = "moneylith.personal.truelayer.accounts";
 
+interface StepBankProps {
+  onAutoFillDebts?: (debts: SchuldItem[]) => void;
+  onAutoFillIncomes?: (incomes: IncomeItem[]) => void;
+  onAutoFillFixedCosts?: (costs: FixedCostManualItem[]) => void;
+  onAutoFillBuckets?: (buckets: MoneylithBucket[]) => void;
+  onboardingMode?: "bank" | "manual" | null;
+}
+
 const safeJson = async (res: Response) => {
   const text = await res.text();
   if (!text) return {};
@@ -24,12 +34,20 @@ const safeJson = async (res: Response) => {
   }
 };
 
-export const StepBank = () => {
+export const StepBank = ({
+  onAutoFillDebts,
+  onAutoFillIncomes,
+  onAutoFillFixedCosts,
+  onAutoFillBuckets,
+  onboardingMode,
+}: StepBankProps = {}) => {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [accounts, setAccounts] = useState<TLAccount[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -89,6 +107,10 @@ export const StepBank = () => {
         setStatus(`Token exchange mislukt: ${tokenData?.error || tokenRes.status}`);
         return;
       }
+      
+      // Store access token for later use
+      setAccessToken(tokenData.access_token);
+
       const accountsRes = await fetch("/api/truelayer/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,10 +125,62 @@ export const StepBank = () => {
       setAccounts(results);
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(results));
       setStatus(`Accounts opgehaald: ${results.length}`);
+
+      // If in bank mode, trigger auto-analysis
+      if (onboardingMode === "bank" && results.length > 0) {
+        await triggerBankAnalysis(results, tokenData.access_token);
+      }
     } catch (error) {
       setStatus("Accounts ophalen mislukt: netwerkfout");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerBankAnalysis = async (accts: TLAccount[], token: string) => {
+    if (!onAutoFillDebts && !onAutoFillIncomes && !onAutoFillFixedCosts) {
+      return; // No callbacks provided
+    }
+
+    setAnalyzing(true);
+    setStatus("AI analyseert je transacties...");
+
+    try {
+      const accountIds = accts.map((a) => a.account_id);
+      const transactions = await fetchBankTransactions(accountIds, token);
+
+      if (transactions.length === 0) {
+        setStatus("Geen transacties gevonden.");
+        return;
+      }
+
+      const analysis = await analyzeBankTransactions(transactions, token);
+
+      // Auto-fill data via callbacks
+      if (onAutoFillDebts && analysis.suggestedDebts.length > 0) {
+        onAutoFillDebts(analysis.suggestedDebts);
+      }
+      if (onAutoFillIncomes && analysis.suggestedIncomes.length > 0) {
+        onAutoFillIncomes(analysis.suggestedIncomes);
+      }
+      if (onAutoFillFixedCosts && analysis.suggestedFixedCosts.length > 0) {
+        onAutoFillFixedCosts(analysis.suggestedFixedCosts);
+      }
+      if (onAutoFillBuckets && analysis.suggestedBuckets.length > 0) {
+        onAutoFillBuckets(analysis.suggestedBuckets);
+      }
+
+      setStatus(
+        `✅ Analyse voltooid! ${analysis.suggestedDebts.length} schulden, ` +
+        `${analysis.suggestedIncomes.length} inkomsten, ` +
+        `${analysis.suggestedFixedCosts.length} vaste lasten, ` +
+        `${analysis.suggestedBuckets.length} potjes geïdentificeerd.`
+      );
+    } catch (error) {
+      console.error("Bank analysis error:", error);
+      setStatus("Analyse mislukt. Probeer handmatig in te vullen.");
+    } finally {
+      setAnalyzing(false);
     }
   };
 

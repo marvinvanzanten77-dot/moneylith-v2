@@ -32,7 +32,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml).*)",
+      "source": "/((?!api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml|@vite|@react-refresh|@id|@fs|src|node_modules).*)",
       "destination": "/index.html"
     }
   ]

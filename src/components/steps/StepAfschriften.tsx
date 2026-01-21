@@ -27,6 +27,7 @@ interface StepAfschriftenProps {
   variant?: "personal" | "business";
   storagePrefix?: string;
   excludeLabels?: string[];
+  onboardingMode?: "bank" | "manual" | null;
 }
 
 export function StepAfschriften({
@@ -47,6 +48,7 @@ export function StepAfschriften({
   variant = "personal",
   storagePrefix,
   excludeLabels = [],
+  onboardingMode = null,
 }: StepAfschriftenProps) {
   const bucketPrefix = storagePrefix ?? (variant === "business" ? "moneylith.business" : "moneylith.personal");
   const bucketStorageKey = `${bucketPrefix}.aiBuckets`;
@@ -757,124 +759,158 @@ export function StepAfschriften({
         </div>
 
         <div className="xl:col-span-1 space-y-4">
-          <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-50">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-50">Afschrift toevoegen</h2>
-              <p className="text-xs text-slate-400">
-                Selecteer rekening, maand en jaar en voeg een bestand toe (CSV/XLSX - PDF wordt beperkt ondersteund).
-              </p>
-            </div>
-            <label className="text-xs text-slate-300">
-              Rekening*
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
-              >
-                <option value="">-- kies rekening --</option>
-                {activeAccountOptions.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
-              <button
-                type="button"
-                className="rounded-md border border-slate-600 px-2 py-1 hover:border-amber-400 hover:text-amber-200"
-                onClick={loadDemoFile}
-              >
-                Gebruik demo-afschrift
-              </button>
-              {uploadSummary && <span className="text-slate-300">{uploadSummary}</span>}
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
-              <label>
-                Maand*
-                <input
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={month}
-                  onChange={(e) => setMonth(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
-                />
-              </label>
-              <label>
-                Jaar*
-                <input
-                  type="number"
-                  min={2000}
-                  max={2100}
-                  value={year}
-                  onChange={(e) => setYear(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
-                />
-              </label>
-            </div>
-            <label className="text-xs text-slate-300">
-              Bestand
-              <input
-                type="file"
-                accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
-                multiple
-                onChange={async (e) => {
-                  await handleFileList(e.target.files);
-                }}
-                className="mt-1 w-full text-xs text-slate-200"
-              />
-            </label>
-            <button
-              type="button"
-              className="mt-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-60"
-              onClick={handleSubmit}
-              disabled={!accountId}
-            >
-              Afschrift toevoegen
-            </button>
+          {onboardingMode === "bank" ? (
+            // Bank mode: only show Bank analyse button
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-50">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-50">Bank Analyse</h2>
+                <p className="text-xs text-slate-400">
+                  Klik onderaan om je banktransacties te analyseren en patronen automatisch in te vullen.
+                </p>
+              </div>
 
-            <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
-              <div className="flex items-center justify-between">
-                <span>AI-analyse</span>
+              <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
+                <div className="flex items-center justify-between">
+                  <span>Patronen herkennen</span>
+                  <button
+                    type="button"
+                    onClick={runAiAnalysis}
+                    disabled={!hasUploads || aiLoading}
+                    className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-semibold text-slate-900 disabled:opacity-50 hover:bg-amber-400"
+                  >
+                    {aiLoading ? "Analyseren..." : "Analyseer transacties"}
+                  </button>
+                </div>
+                <TurnstileWidget
+                  key={`afschriften-turnstile-${turnstileNonce}`}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  theme="dark"
+                />
+                {aiError && <p className="text-red-400">{aiError}</p>}
+                {aiStatus && <p className="text-slate-300">{aiStatus}</p>}
+                {!aiStatus && !aiError && <p className="text-slate-400">Wacht op analyse.</p>}
+              </div>
+            </div>
+          ) : (
+            // Manual mode: show file upload
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-50">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-50">Afschrift toevoegen</h2>
+                <p className="text-xs text-slate-400">
+                  Selecteer rekening, maand en jaar en voeg een bestand toe (CSV/XLSX - PDF wordt beperkt ondersteund).
+                </p>
+              </div>
+              <label className="text-xs text-slate-300">
+                Rekening*
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+                >
+                  <option value="">-- kies rekening --</option>
+                  {activeAccountOptions.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
                 <button
                   type="button"
-                  onClick={runAiAnalysis}
-              disabled={!hasUploads || aiLoading}
-                  className="rounded-lg bg-purple-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  className="rounded-md border border-slate-600 px-2 py-1 hover:border-amber-400 hover:text-amber-200"
+                  onClick={loadDemoFile}
                 >
-                  {aiLoading ? "Analyseren..." : "Analyseer met AI"}
+                  Gebruik demo-afschrift
                 </button>
+                {uploadSummary && <span className="text-slate-300">{uploadSummary}</span>}
               </div>
-              <TurnstileWidget
-                key={`afschriften-turnstile-${turnstileNonce}`}
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
-                onVerify={(token) => setTurnstileToken(token)}
-                theme="dark"
-              />
-              {aiError && <p className="text-red-400">{aiError}</p>}
-              {aiStatus && <p className="text-slate-300">{aiStatus}</p>}
-              {!aiStatus && !aiError && <p className="text-slate-400">Wacht op analyse.</p>}
-              {fileName && (
-                <p className="text-[11px] text-slate-500">
-                  Bestand geladen: {fileName} (
-                  {filePayloads.some((p) => p.content && p.content.length > 0)
-                    ? "inhoud beschikbaar"
-                    : "inhoud onbekend of niet leesbaar"})
-                </p>
-              )}
-              {fileNote && (
-                <p className="text-[11px] text-slate-500">
-                  {fileNote}
-                </p>
-              )}
-              {aiAnalysisDoneAt && (
-                <p className="text-[11px] text-slate-500">Laatste analyse: {new Date(aiAnalysisDoneAt).toLocaleString()}</p>
-              )}
-              <p className="text-[11px] text-slate-400">Volledig AI-antwoord en aanvullende chat zie je in de AI-gids rechts.</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                <label>
+                  Maand*
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={month}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+                  />
+                </label>
+                <label>
+                  Jaar*
+                  <input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-50"
+                  />
+                </label>
+              </div>
+              <label className="text-xs text-slate-300">
+                Bestand
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt"
+                  multiple
+                  onChange={async (e) => {
+                    await handleFileList(e.target.files);
+                  }}
+                  className="mt-1 w-full text-xs text-slate-200"
+                />
+              </label>
+              <button
+                type="button"
+                className="mt-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-60"
+                onClick={handleSubmit}
+                disabled={!accountId}
+              >
+                Afschrift toevoegen
+              </button>
 
+              <div className="mt-4 space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
+                <div className="flex items-center justify-between">
+                  <span>AI-analyse</span>
+                  <button
+                    type="button"
+                    onClick={runAiAnalysis}
+                    disabled={!hasUploads || aiLoading}
+                    className="rounded-lg bg-purple-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {aiLoading ? "Analyseren..." : "Analyseer met AI"}
+                  </button>
+                </div>
+                <TurnstileWidget
+                  key={`afschriften-turnstile-${turnstileNonce}`}
+                  siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  theme="dark"
+                />
+                {aiError && <p className="text-red-400">{aiError}</p>}
+                {aiStatus && <p className="text-slate-300">{aiStatus}</p>}
+                {!aiStatus && !aiError && <p className="text-slate-400">Wacht op analyse.</p>}
+                {fileName && (
+                  <p className="text-[11px] text-slate-500">
+                    Bestand geladen: {fileName} (
+                    {filePayloads.some((p) => p.content && p.content.length > 0)
+                      ? "inhoud beschikbaar"
+                      : "inhoud onbekend of niet leesbaar"})
+                  </p>
+                )}
+                {fileNote && (
+                  <p className="text-[11px] text-slate-500">
+                    {fileNote}
+                  </p>
+                )}
+                {aiAnalysisDoneAt && (
+                  <p className="text-[11px] text-slate-500">Laatste analyse: {new Date(aiAnalysisDoneAt).toLocaleString()}</p>
+                )}
+                <p className="text-[11px] text-slate-400">Volledig AI-antwoord en aanvullende chat zie je in de AI-gids rechts.</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

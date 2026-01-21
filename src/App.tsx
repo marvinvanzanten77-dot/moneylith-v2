@@ -5,6 +5,7 @@ import { VermogenCard } from "./components/VermogenCard";
 import { AiAssistantCard } from "./components/AiAssistantCard";
 import { FixedCostsWizard } from "./components/FixedCostsWizard";
 import { IncomeList } from "./components/IncomeList";
+import { OnboardingChoice } from "./components/OnboardingChoice";
 import { StepIntent } from "./components/steps/StepIntent";
 import { StepFocus } from "./components/steps/StepFocus";
 import { StepVooruitblik } from "./components/steps/StepActie";
@@ -274,6 +275,8 @@ const App = () => {
     }
   }, []);
 
+  const [onboardingMode, setOnboardingMode] = useLocalStorage<"bank" | "manual" | null>("moneylith.onboarding.mode", null);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
@@ -326,6 +329,25 @@ const App = () => {
       }
     };
   }, [helpMode]);
+
+  // Onboarding logic: set initial step based on onboarding mode
+  useEffect(() => {
+    if (onboardingMode === "bank") {
+      setCurrentStep("bank");
+    } else if (onboardingMode === "manual") {
+      setCurrentStep("intent");
+    }
+  }, [onboardingMode]);
+
+  const handleOnboardingChoice = (choice: "bank" | "manual" | null) => {
+    setOnboardingMode(choice);
+  };
+
+  // Show onboarding screen if no choice made yet
+  if (!onboardingMode) {
+    return <OnboardingChoice onChoice={handleOnboardingChoice} />;
+  }
+
   const [debtsSummary, setDebtsSummary] = useState<DebtSummary>({ totalDebt: 0, totalMinPayment: 0, debtCount: 0 });
   const [debtsSummaryBusiness, setDebtsSummaryBusiness] = useState<DebtSummary>({
     totalDebt: 0,
@@ -2034,6 +2056,7 @@ const App = () => {
         onAiActionsChange={handleAiActionsChange}
         fixedCostLabels={fixedLabels}
         excludeLabels={excludeLabels}
+        onboardingMode={onboardingMode}
       />
     );
   };
@@ -2065,7 +2088,15 @@ const App = () => {
     if (normalizedStep === "verplichtingen") return renderSchulden("business");
     if (normalizedStep === "rekeningen") return renderRekeningen("personal");
     if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
-    if (normalizedStep === "bank") return <StepBank />;
+    if (normalizedStep === "bank") return (
+      <StepBank
+        onAutoFillDebts={setDebts}
+        onAutoFillIncomes={setIncomeItems}
+        onAutoFillFixedCosts={setFixedCostManualItems}
+        onAutoFillBuckets={setStoredBuckets}
+        onboardingMode={onboardingMode}
+      />
+    );
     if (normalizedStep === "inbox") return renderInbox("personal");
     if (normalizedStep === "biz-inbox") return renderInbox("business");
     if (normalizedStep === "afschriften") return renderAfschriften("personal");
