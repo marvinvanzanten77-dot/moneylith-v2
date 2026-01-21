@@ -160,7 +160,7 @@ export async function fetchBankTransactions(
 
     // Fetch transactions for each account
     for (const accountId of accountIds) {
-      const res = await fetch("/api/truelayer/transactions", {
+      const res = await fetch("/api/truelayer?truelayer=transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ access_token: accessToken, account_id: accountId }),

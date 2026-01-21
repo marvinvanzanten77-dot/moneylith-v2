@@ -76,7 +76,7 @@ export const StepBank = ({
     setStatus(null);
     setError(null);
     try {
-      const res = await fetch("/api/truelayer/auth-start", { method: "POST" });
+      const res = await fetch("/api/truelayer?truelayer=auth-start", { method: "POST" });
       const data = await safeJson(res);
       if (!res.ok || !data?.url) {
         setError({
@@ -112,7 +112,7 @@ export const StepBank = ({
     setStatus(null);
     setError(null);
     try {
-      const tokenRes = await fetch("/api/truelayer/token", {
+      const tokenRes = await fetch("/api/truelayer?truelayer=token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: codeInput.trim() }),
@@ -130,7 +130,7 @@ export const StepBank = ({
       // Store access token for later use
       setAccessToken(tokenData.access_token);
 
-      const accountsRes = await fetch("/api/truelayer/accounts", {
+      const accountsRes = await fetch("/api/truelayer?truelayer=accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ access_token: tokenData.access_token }),
