@@ -44,17 +44,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const txData = await txRes.json();
     if (!txRes.ok) {
+      // Log detailed error
+      console.error("❌ TrueLayer Transactions Fetch Failed:", {
+        status: txRes.status,
+        accountId: account_id,
+        error: txData?.error,
+        description: txData?.error_description,
+        timestamp: new Date().toISOString(),
+      });
+
+      // User-friendly error messages
+      let userMessage = "Failed to fetch transactions";
+      if (txRes.status === 401) {
+        userMessage = "Access token invalid or expired. Please reconnect your bank.";
+      } else if (txRes.status === 403) {
+        userMessage = "Access denied to this account. Please check permissions.";
+      } else if (txRes.status === 404) {
+        userMessage = "Account not found. Please try again.";
+      }
+
       res.status(txRes.status).json({
-        error: txData?.error || "Failed to fetch transactions",
-        error_description: txData?.error_description,
+        error: userMessage,
+        code: txData?.error || "transaction_fetch_failed",
+        retry: txRes.status >= 500, // Retry for server errors
       });
       return;
     }
 
+    console.log(`✅ Fetched ${txData?.transactions?.length || 0} transactions for account ${account_id}`);
     // Return transaction data
     res.status(200).json(txData);
   } catch (error) {
-    console.error("Transactions fetch error:", error);
-    res.status(500).json({ error: "Failed to fetch transactions" });
+    console.error("❌ Transactions Fetch Error:", {
+      message: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+    
+    res.status(500).json({
+      error: "Failed to fetch transactions - please try again",
+      code: "transaction_fetch_error",
+      retry: true,
+    });
   }
 }

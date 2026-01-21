@@ -45,6 +45,7 @@ export const StepBank = ({
   const [codeInput, setCodeInput] = useState("");
   const [accounts, setAccounts] = useState<TLAccount[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; code?: string; retry?: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -73,17 +74,27 @@ export const StepBank = ({
   const handleAuthStart = async () => {
     setLoading(true);
     setStatus(null);
+    setError(null);
     try {
       const res = await fetch("/api/truelayer/auth-start", { method: "POST" });
       const data = await safeJson(res);
       if (!res.ok || !data?.url) {
-        setStatus(`Koppelen mislukt: ${data?.error || res.status}`);
+        setError({
+          message: `Koppelen mislukt: ${data?.error || res.status}`,
+          code: data?.code || "auth_start_failed",
+          retry: true,
+        });
         return;
       }
       setAuthUrl(String(data.url));
       window.open(String(data.url), "_blank");
+      setStatus("Autorisatiepagina geopend. Voltooi het process en kopieer je code.");
     } catch (error) {
-      setStatus("Koppelen mislukt: netwerkfout");
+      setError({
+        message: "Koppelen mislukt: netwerkfout. Controleer je internetverbinding.",
+        code: "network_error",
+        retry: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -91,11 +102,15 @@ export const StepBank = ({
 
   const handleExchange = async () => {
     if (!codeInput.trim()) {
-      setStatus("Plak eerst de code uit de callback.");
+      setError({
+        message: "Plak eerst de code uit de callback-pagina.",
+        retry: false,
+      });
       return;
     }
     setLoading(true);
     setStatus(null);
+    setError(null);
     try {
       const tokenRes = await fetch("/api/truelayer/token", {
         method: "POST",
@@ -104,7 +119,11 @@ export const StepBank = ({
       });
       const tokenData = await safeJson(tokenRes);
       if (!tokenRes.ok || !tokenData?.access_token) {
-        setStatus(`Token exchange mislukt: ${tokenData?.error || tokenRes.status}`);
+        setError({
+          message: tokenData?.error || `Token exchange mislukt (${tokenRes.status})`,
+          code: tokenData?.code || "token_exchange_failed",
+          retry: tokenData?.retry !== false,
+        });
         return;
       }
       
@@ -118,20 +137,28 @@ export const StepBank = ({
       });
       const accountsData = (await safeJson(accountsRes)) as TLAccountsResponse;
       if (!accountsRes.ok) {
-        setStatus(`Accounts ophalen mislukt: ${accountsData?.error || accountsRes.status}`);
+        setError({
+          message: accountsData?.error || `Accounts ophalen mislukt (${accountsRes.status})`,
+          code: accountsData?.code || "accounts_fetch_failed",
+          retry: true,
+        });
         return;
       }
       const results = Array.isArray(accountsData?.results) ? accountsData.results : [];
       setAccounts(results);
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(results));
-      setStatus(`Accounts opgehaald: ${results.length}`);
+      setStatus(`✅ Accounts opgehaald: ${results.length}`);
 
       // If in bank mode, trigger auto-analysis
       if (onboardingMode === "bank" && results.length > 0) {
         await triggerBankAnalysis(results, tokenData.access_token);
       }
     } catch (error) {
-      setStatus("Accounts ophalen mislukt: netwerkfout");
+      setError({
+        message: "Accounts ophalen mislukt: netwerkfout.",
+        code: "network_error",
+        retry: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -143,14 +170,19 @@ export const StepBank = ({
     }
 
     setAnalyzing(true);
-    setStatus("AI analyseert je transacties...");
+    setStatus("🔄 AI analyseert je transacties...");
+    setError(null);
 
     try {
       const accountIds = accts.map((a) => a.account_id);
       const transactions = await fetchBankTransactions(accountIds, token);
 
       if (transactions.length === 0) {
-        setStatus("Geen transacties gevonden.");
+        setError({
+          message: "Geen transacties gevonden. Dit kan normaal zijn voor een nieuw account.",
+          retry: false,
+        });
+        setStatus(null);
         return;
       }
 
@@ -178,7 +210,12 @@ export const StepBank = ({
       );
     } catch (error) {
       console.error("Bank analysis error:", error);
-      setStatus("Analyse mislukt. Probeer handmatig in te vullen.");
+      setError({
+        message: "Analyse mislukt. Je kunt handmatig je gegevens invullen.",
+        code: "analysis_failed",
+        retry: true,
+      });
+      setStatus(null);
     } finally {
       setAnalyzing(false);
     }
@@ -213,6 +250,28 @@ export const StepBank = ({
           Na toestaan kom je op de callback‑pagina. Kopieer de <span className="font-semibold">code</span> en plak die
           hieronder.
         </div>
+        
+        {error ? (
+          <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3">
+            <p className="text-sm font-medium text-red-900">❌ {error.message}</p>
+            {error.retry && (
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="mt-2 text-xs text-red-700 underline hover:text-red-900"
+              >
+                Probeer opnieuw
+              </button>
+            )}
+          </div>
+        ) : null}
+
+        {status ? (
+          <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3">
+            <p className="text-sm text-green-900">{status}</p>
+          </div>
+        ) : null}
+
         <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
           <input
             type="text"
@@ -225,9 +284,9 @@ export const StepBank = ({
             type="button"
             onClick={handleExchange}
             className="rounded-full border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
-            disabled={loading}
+            disabled={loading || analyzing}
           >
-            Accounts ophalen
+            {analyzing ? "Analyseren..." : "Accounts ophalen"}
           </button>
         </div>
         {status ? <p className="mt-2 text-xs text-slate-600">{status}</p> : null}

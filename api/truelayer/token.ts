@@ -63,15 +63,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const raw = await tokenRes.text();
     const payload = raw ? JSON.parse(raw) : {};
     if (!tokenRes.ok) {
+      // Log detailed error for debugging
+      console.error("❌ TrueLayer Token Exchange Failed:", {
+        status: tokenRes.status,
+        error: payload?.error,
+        description: payload?.error_description,
+        timestamp: new Date().toISOString(),
+      });
+
+      // User-friendly error messages
+      let userMessage = "Token exchange failed";
+      if (payload?.error === "invalid_grant") {
+        userMessage = "Authorization code expired or invalid. Please retry bank login.";
+      } else if (payload?.error === "invalid_client") {
+        userMessage = "Client configuration error. Please contact support.";
+      }
+
       res.status(tokenRes.status).json({
-        error: payload?.error || "Token exchange failed",
-        error_description: payload?.error_description || raw,
+        error: userMessage,
+        code: payload?.error || "token_exchange_failed",
+        retry: true, // Signal to client that retry is possible
       });
       return;
     }
 
+    console.log("✅ Token exchange successful");
     res.status(200).json(payload);
   } catch (error) {
-    res.status(500).json({ error: "Token exchange error" });
+    console.error("❌ Token Exchange Error:", {
+      message: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+    
+    res.status(500).json({
+      error: "Token exchange error - please try again",
+      code: "token_exchange_error",
+      retry: true,
+    });
   }
 }
