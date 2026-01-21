@@ -342,11 +342,6 @@ const App = () => {
     setOnboardingMode(choice);
   };
 
-  // Show onboarding screen if no choice made yet
-  if (!onboardingMode) {
-    return <OnboardingChoice onChoice={handleOnboardingChoice} />;
-  }
-
   const [debtsSummary, setDebtsSummary] = useState<DebtSummary>({ totalDebt: 0, totalMinPayment: 0, debtCount: 0 });
   const [debtsSummaryBusiness, setDebtsSummaryBusiness] = useState<DebtSummary>({
     totalDebt: 0,
@@ -2074,6 +2069,11 @@ const App = () => {
     }
     return <StepInbox items={inboxItems} onItemsChange={setInboxItems} onApplySuggestions={applyInboxSuggestions} />;
   };
+
+  // Show onboarding screen if no choice made yet (after all hooks!)
+  if (!onboardingMode) {
+    return <OnboardingChoice onChoice={handleOnboardingChoice} />;
+  }
 
   const renderContent = () => {
     const normalizedStep = normalizeStep(currentStep);
