@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getApiBase } from "./bankAuth.js";
+// No-op touch: keeps pipeline trigger explicit for deploy verification.
 
 type TlAccount = {
   account_id: string;
