@@ -29,13 +29,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     state,
   });
 
-  const providers = getEnv("TRUELAYER_PROVIDERS") || "nl";
-  if (providers) {
-    params.set("providers", providers);
+  const countryId = (getEnv("TRUELAYER_COUNTRY_ID") || "NL").toUpperCase();
+  params.set("country_id", countryId);
+
+  // Providers are optional; when omitted, TrueLayer shows providers for the chosen country.
+  // If this is set, pass it through exactly as configured.
+  const providers = getEnv("TRUELAYER_PROVIDERS");
+  if (providers && providers.trim()) {
+    params.set("providers", providers.trim());
   }
 
   const url = `${getAuthBase()}/?${params.toString()}`;
-  console.log("[bank.connect] redirecting to consent", { redirectUri, providers });
+  console.log("[bank.connect] redirecting to consent", {
+    authBase: getAuthBase(),
+    redirectUri,
+    countryId,
+    providers: providers || null,
+  });
   res.redirect(302, url);
 }
 
