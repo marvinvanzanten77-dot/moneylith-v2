@@ -12,7 +12,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const clientId = getEnv("TRUELAYER_CLIENT_ID");
   const proto = (req.headers["x-forwarded-proto"] as string) || "https";
   const host = (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost:3000";
-  const redirectUri = getEnv("TRUELAYER_REDIRECT_URI") || `${proto}://${host}/api/bank/callback`;
+  const expectedCallbackPath = "/api/bank/callback";
+  const computedRedirectUri = `${proto}://${host}${expectedCallbackPath}`;
+  const configuredRedirectUri = (getEnv("TRUELAYER_REDIRECT_URI") || "").trim();
+  let redirectUri = configuredRedirectUri || computedRedirectUri;
+  try {
+    const parsed = new URL(redirectUri);
+    if (parsed.pathname !== expectedCallbackPath) {
+      console.warn("[bank.connect] invalid TRUELAYER_REDIRECT_URI path, falling back to computed callback", {
+        configuredRedirectUri,
+        expectedCallbackPath,
+      });
+      redirectUri = computedRedirectUri;
+    }
+  } catch {
+    if (configuredRedirectUri) {
+      console.warn("[bank.connect] invalid TRUELAYER_REDIRECT_URI value, falling back to computed callback", {
+        configuredRedirectUri,
+      });
+    }
+    redirectUri = computedRedirectUri;
+  }
   if (!clientId) {
     res.status(500).json({ error: "Missing TRUELAYER_CLIENT_ID" });
     return;
@@ -34,9 +54,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Providers are optional; when omitted, TrueLayer shows providers for the chosen country.
   // If this is set, pass it through exactly as configured.
-  const providers = getEnv("TRUELAYER_PROVIDERS");
-  if (providers && providers.trim()) {
-    params.set("providers", providers.trim());
+  const providers = (getEnv("TRUELAYER_PROVIDERS") || "").trim();
+  if (providers && providers.toLowerCase() !== "nl") {
+    params.set("providers", providers);
+  } else if (providers.toLowerCase() === "nl") {
+    console.warn("[bank.connect] ignoring TRUELAYER_PROVIDERS=nl; use country_id=NL instead");
   }
 
   const url = `${getAuthBase()}/?${params.toString()}`;
@@ -44,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     authBase: getAuthBase(),
     redirectUri,
     countryId,
-    providers: providers || null,
+    providers: providers && providers.toLowerCase() !== "nl" ? providers : null,
   });
   res.redirect(302, url);
 }
