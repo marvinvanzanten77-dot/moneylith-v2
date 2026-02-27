@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ensureValidToken, persistTokens, readTokens } from "../utils/bankAuth.js";
-import { runBankSync } from "../utils/bankSync.js";
+import { ensureValidToken, persistTokens, readTokens } from "../../server/utils/bankAuth.js";
+import { runBankSync } from "../../server/utils/bankSync.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST" && req.method !== "GET") {
@@ -38,3 +38,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(502).json({ error: "Bank sync failed" });
   }
 }
+

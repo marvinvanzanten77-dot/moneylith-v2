@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { consumeOauthState, exchangeCodeForToken, persistTokens } from "../utils/bankAuth.js";
-import { runBankSync } from "../utils/bankSync.js";
+import { consumeOauthState, exchangeCodeForToken, persistTokens } from "../../server/utils/bankAuth.js";
+import { runBankSync } from "../../server/utils/bankSync.js";
 
 const getEnv = (key: string) => process.env[key] || "";
 
@@ -55,3 +55,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.redirect(302, "/?bank=error");
   }
 }
+

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { generateState, getAuthBase, persistOauthState } from "../utils/bankAuth.js";
+import { generateState, getAuthBase, persistOauthState } from "../../server/utils/bankAuth.js";
 
 const getEnv = (key: string) => process.env[key] || "";
 
@@ -38,3 +38,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log("[bank.connect] redirecting to consent", { redirectUri, providers });
   res.redirect(302, url);
 }
+

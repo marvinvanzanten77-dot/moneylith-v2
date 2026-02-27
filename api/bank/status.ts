@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ensureValidToken, persistTokens, readTokens } from "../utils/bankAuth.js";
+import { ensureValidToken, persistTokens, readTokens } from "../../server/utils/bankAuth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -30,3 +30,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({ connected: false });
   }
 }
+

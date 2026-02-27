@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { rateLimit } from "./utils/rateLimit.js";
+import { rateLimit } from "../server/utils/rateLimit.js";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -67,3 +67,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({ error: "AI-proxy fout", detail: String(error) });
   }
 }
+

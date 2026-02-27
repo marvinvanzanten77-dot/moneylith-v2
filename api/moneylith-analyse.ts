@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
-import { rateLimit } from "./utils/rateLimit.js";
-import { verifyTurnstile } from "./utils/verifyTurnstile.js";
-import { auditLog } from "./utils/audit.js";
+import { rateLimit } from "../server/utils/rateLimit.js";
+import { verifyTurnstile } from "../server/utils/verifyTurnstile.js";
+import { auditLog } from "../server/utils/audit.js";
 
 const MODEL = "gpt-4o-mini";
 
@@ -122,3 +122,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
+
