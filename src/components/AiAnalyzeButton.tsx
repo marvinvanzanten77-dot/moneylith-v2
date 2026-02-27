@@ -4,6 +4,7 @@ import { analyseObservation } from "../logic/analysis";
 import { buildMoneylithPrompt } from "../logic/aiPrompt";
 import { useAiOrchestrator, type TabKey } from "../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../logic/aiMessageBus";
+import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
 
 type Props = {
   mode?: "personal" | "business";
@@ -11,11 +12,21 @@ type Props = {
   label?: string;
   className?: string;
   onSuccess?: () => void;
+  onSetAiAnalysisRaw?: (raw: string) => void;
+  appSnapshot?: MoneylithSnapshot;
 };
 
-export function AiAnalyzeButton({ mode = "personal", tab, label = "Analyseer", className, onSuccess }: Props) {
+export function AiAnalyzeButton({
+  mode = "personal",
+  tab,
+  label = "Analyseer",
+  className,
+  onSuccess,
+  onSetAiAnalysisRaw,
+  appSnapshot,
+}: Props) {
   const [loading, setLoading] = useState(false);
-  const observation = useObserver(mode);
+  const observation = useObserver(mode, appSnapshot);
   const analysis = useMemo(() => analyseObservation(observation, mode), [observation, mode]);
   const rawContext = useMemo(() => {
     const src = mode === "business" ? observation.business : observation.personal;
@@ -30,17 +41,16 @@ export function AiAnalyzeButton({ mode = "personal", tab, label = "Analyseer", c
       netFree: src.totals.netFree,
     };
   }, [mode, observation]);
-  const aiPayload = useMemo(() => (analysis ? buildMoneylithPrompt(analysis, rawContext) : null), [analysis, rawContext]);
+  const aiPayload = useMemo(
+    () => (analysis ? buildMoneylithPrompt(analysis, rawContext, undefined, appSnapshot) : null),
+    [analysis, appSnapshot, rawContext],
+  );
   const { runAi } = useAiOrchestrator({
     mode,
     appendMessage: appendAiMessage,
     setLoading,
     onRawContent: (raw) => {
-      try {
-        localStorage.setItem("moneylith.personal.aiAnalysisRaw", raw);
-      } catch {
-        // ignore
-      }
+      onSetAiAnalysisRaw?.(raw);
     },
   });
 
@@ -50,6 +60,7 @@ export function AiAnalyzeButton({ mode = "personal", tab, label = "Analyseer", c
       tab,
       system: aiPayload.system,
       user: aiPayload.user,
+      snapshot: appSnapshot,
     });
     onSuccess?.();
   };

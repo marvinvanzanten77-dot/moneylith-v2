@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { formatCurrency } from "../../utils/format";
 import type { FinancialSnapshot } from "../../types";
 import { AiAnalyzeButton } from "../AiAnalyzeButton";
+import type { MoneylithSnapshot } from "../../core/moneylithSnapshot";
 
 interface RitmeProps {
   financialSnapshot?: FinancialSnapshot | null;
@@ -13,6 +14,7 @@ interface RitmeProps {
   aiAnalysisDone?: boolean;
   onRunFullAi?: () => void;
   onBucketsRefresh?: () => void;
+  appSnapshot?: MoneylithSnapshot;
   spendBuckets: {
     id: string;
     name: string;
@@ -34,6 +36,7 @@ export function StepRitme({
   aiAnalysisDone = false,
   onRunFullAi,
   onBucketsRefresh,
+  appSnapshot,
 }: RitmeProps) {
   const snapshot = financialSnapshot ?? null;
   const netFreeDisplay = snapshot?.netFree ?? 0;
@@ -95,6 +98,7 @@ export function StepRitme({
               mode={mode}
               label="AI: analyseer afschriften"
               onSuccess={onBucketsRefresh ?? onRunFullAi}
+              appSnapshot={appSnapshot}
             />
             {onRunFullAi && (
               <button

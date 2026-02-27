@@ -7,6 +7,7 @@ import type {
   MoneylithTransaction,
   FutureIncomeItem,
 } from "../types";
+import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
 
 export interface MoneylithAiPayload {
   system: string;
@@ -95,6 +96,7 @@ export function buildMoneylithPrompt(
   analysis: AnalysisResult,
   raw?: RawContext,
   extras?: ExtraRawContext[],
+  snapshot?: MoneylithSnapshot,
 ): MoneylithAiPayload {
   const { mode, overallLevel, overallScore, tabs } = analysis;
 
@@ -151,6 +153,19 @@ export function buildMoneylithPrompt(
       const missingExtra = buildMissingSection(extra.raw);
       if (missingExtra.length) lines.push(...missingExtra);
     });
+  }
+
+  if (snapshot) {
+    lines.push("");
+    lines.push("== Snapshot meta ==");
+    if (snapshot.meta?.selectedMonth) lines.push(`Geselecteerde maand: ${snapshot.meta.selectedMonth}`);
+    lines.push(`Bank gekoppeld: ${snapshot.meta?.bank?.connected ? "ja" : "nee"}`);
+    if (snapshot.meta?.bank?.lastSyncAt) lines.push(`Laatste bank-sync: ${snapshot.meta.bank.lastSyncAt}`);
+    const msgCount = snapshot.ai?.messages?.length ?? 0;
+    lines.push(`AI chatgeschiedenis: ${msgCount} bericht(en)`);
+    if (msgCount > 0) {
+      snapshot.ai.messages.slice(-5).forEach((m) => lines.push(`- [${m.role}] ${m.content.slice(0, 140)}`));
+    }
   }
 
   const user = [

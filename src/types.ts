@@ -65,6 +65,8 @@ export type MoneylithTransaction = {
   description: string;
   counterparty?: string;
   category?: string | null;
+  external_id?: string;
+  source?: "bank" | "csv" | "manual" | "inbox";
 };
 
 // Backward compatibility alias
@@ -161,6 +163,7 @@ export interface MoneylithAccount {
   isPrimary?: boolean;
   startBalance?: number;
   active: boolean;
+  source?: "bank" | "manual";
 }
 
 export interface AccountStatementMeta {

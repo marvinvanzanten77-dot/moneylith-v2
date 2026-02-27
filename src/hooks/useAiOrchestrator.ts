@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { appendAiMessage } from "../logic/aiMessageBus";
 import { extractActionsFromContent, type AiActions } from "../logic/extractActions";
+import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
 
 export type TabKey =
   | "ai-analyse"
@@ -18,7 +19,7 @@ export type TabKey =
 
 interface OrchestratorArgs {
   mode: "personal" | "business";
-  appendMessage: (msg: { role: "user" | "assistant"; content: string }) => void;
+  appendMessage: (msg: { role: "user" | "assistant" | "system"; content: string }) => void;
   setLoading: (v: boolean) => void;
   setLastActions?: (actions: AiActions | null) => void;
   onRawContent?: (raw: string) => void;
@@ -30,9 +31,10 @@ interface RunAiInput {
   user: string;
   displayUserMessage?: string;
   turnstileToken?: string;
+  snapshot?: MoneylithSnapshot;
 }
 
-async function postAnalyse(body: { system: string; user: string; turnstileToken?: string }) {
+async function postAnalyse(body: { system: string; user: string; turnstileToken?: string; snapshot?: MoneylithSnapshot }) {
   // Only use the known backend route; the old hyphenated path caused 404 noise in Vite dev.
   const endpoints = ["/api/moneylith/analyse"];
   let lastError: Error | null = null;
@@ -59,7 +61,7 @@ async function postAnalyse(body: { system: string; user: string; turnstileToken?
 
 export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActions, onRawContent }: OrchestratorArgs) {
   const runAi = useCallback(
-    async ({ tab, system, user, displayUserMessage, turnstileToken }: RunAiInput): Promise<string | null> => {
+    async ({ tab, system, user, displayUserMessage, turnstileToken, snapshot }: RunAiInput): Promise<string | null> => {
       setLoading(true);
       const userContent = displayUserMessage ?? `AI analyse voor: ${tab}`;
       // Voor schulden-analyse willen we geen chat spam; suppressUserMessage=true kan hiervoor gebruikt worden.
@@ -71,7 +73,7 @@ export function useAiOrchestrator({ mode, appendMessage, setLoading, setLastActi
         }
       }
       try {
-        const data = await postAnalyse({ system, user, turnstileToken });
+        const data = await postAnalyse({ system, user, turnstileToken, snapshot });
         if (data.error) {
           throw new Error(data.error);
         }

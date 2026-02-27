@@ -3,6 +3,7 @@ import { POTJES, getDefaultPotjes } from "../data/potjes";
 import { SCHULDENPLAN } from "../data/schuldenplan";
 import type { MonthId } from "../types";
 import type { MonthlySpendingChartDatum } from "./charts/MonthlySpendingStackedChart";
+import { persistGateway } from "../storage/persistGateway";
 
 const MonthlySpendingStackedChart = lazy(() =>
   import("./charts/MonthlySpendingStackedChart").then((m) => ({
@@ -28,7 +29,7 @@ const MONTHS: { id: MonthId; label: string }[] = [
 
 const readNumber = (key: string) => {
   if (typeof window === "undefined") return 0;
-  const raw = window.localStorage.getItem(key);
+  const raw = persistGateway.get(key);
   if (!raw) return 0;
   const parsed = parseFloat(raw);
   return Number.isNaN(parsed) ? 0 : parsed;
@@ -38,7 +39,7 @@ export function AnalyticsCard() {
   const storedPotjes = (() => {
     if (typeof window === "undefined") return POTJES;
     try {
-      const raw = window.localStorage.getItem("potjes-config");
+      const raw = persistGateway.get("potjes-config");
       if (!raw) return POTJES;
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return POTJES;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAiOrchestrator } from "../../hooks/useAiOrchestrator";
 import { appendAiMessage } from "../../logic/aiMessageBus";
 import { TurnstileWidget } from "../TurnstileWidget";
+import { extractTextFromImageFile, extractTextFromPdfFile } from "../../utils/documentExtract";
 
 export type InboxItemStatus = "nieuw" | "geanalyseerd";
 
@@ -177,41 +178,16 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
         }
 
         if (isPdf) {
-          setFileNote("PDF-tekstextractie wordt uitgevoerd...");
-          const data = await file.arrayBuffer();
-          const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-          const { getDocument, GlobalWorkerOptions } = pdfjs as any;
-          GlobalWorkerOptions.workerSrc = new URL(
-            /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
-            import.meta.url
-          ).toString();
-          const doc = await getDocument({ data }).promise;
-          const maxPages = Math.min(doc.numPages, 6);
-          let text = "";
-          for (let i = 1; i <= maxPages; i += 1) {
-            const page = await doc.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = content.items
-              .map((item: any) => (item?.str ? String(item.str) : ""))
-              .join(" ");
-            text += `${pageText}\n`;
-          }
-          if (doc.numPages > maxPages) {
-            text += `\n[PDF beperkt tot ${maxPages} pagina's]`;
-          }
-          handleText(text, "PDF-tekstextractie uitgevoerd");
+          setFileNote("PDF-analyse (tekst + OCR fallback) wordt uitgevoerd...");
+          const result = await extractTextFromPdfFile(file, { maxPages: 6 });
+          handleText(result.text, result.note);
           return;
         }
 
         if (isImage) {
           setFileNote("OCR wordt uitgevoerd...");
-          const { createWorker } = await import("tesseract.js");
-          const worker = await createWorker();
-          await worker.loadLanguage("eng+nl");
-          await worker.initialize("eng+nl");
-          const result = await worker.recognize(file);
-          await worker.terminate();
-          handleText(result.data.text || "", "OCR via afbeelding");
+          const result = await extractTextFromImageFile(file);
+          handleText(result.text, result.note);
           return;
         }
 
@@ -636,41 +612,16 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
                     }
 
                     if (isPdf) {
-                      setFileNote("PDF-tekstextractie wordt uitgevoerd...");
-                      const data = await file.arrayBuffer();
-                      const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-                      const { getDocument, GlobalWorkerOptions } = pdfjs as any;
-                      GlobalWorkerOptions.workerSrc = new URL(
-                        /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
-                        import.meta.url
-                      ).toString();
-                      const doc = await getDocument({ data }).promise;
-                      const maxPages = Math.min(doc.numPages, 6);
-                      let text = "";
-                      for (let i = 1; i <= maxPages; i += 1) {
-                        const page = await doc.getPage(i);
-                        const content = await page.getTextContent();
-                        const pageText = content.items
-                          .map((item: any) => (item?.str ? String(item.str) : ""))
-                          .join(" ");
-                        text += `${pageText}\n`;
-                      }
-                      if (doc.numPages > maxPages) {
-                        text += `\n[PDF beperkt tot ${maxPages} pagina's]`;
-                      }
-                      handleText(text, "PDF-tekstextractie uitgevoerd");
+                      setFileNote("PDF-analyse (tekst + OCR fallback) wordt uitgevoerd...");
+                      const result = await extractTextFromPdfFile(file, { maxPages: 6 });
+                      handleText(result.text, result.note);
                       return;
                     }
 
                     if (isImage) {
                       setFileNote("OCR wordt uitgevoerd...");
-                      const { createWorker } = await import("tesseract.js");
-                      const worker = await createWorker();
-                      await worker.loadLanguage("eng+nl");
-                      await worker.initialize("eng+nl");
-                      const result = await worker.recognize(file);
-                      await worker.terminate();
-                      handleText(result.data.text || "", "OCR via afbeelding");
+                      const result = await extractTextFromImageFile(file);
+                      handleText(result.text, result.note);
                       return;
                     }
 

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useLocalStorage } from "./useLocalStorage";
+import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
 import type {
   FinanceMode,
   FixedCostItem,
@@ -126,17 +127,79 @@ const useDomainData = (prefix: "personal" | "business") => {
   };
 };
 
-export const useObserver = (mode: FinanceMode = "personal") => {
+export const useObserver = (mode: FinanceMode = "personal", appSnapshot?: MoneylithSnapshot) => {
   const personal = useDomainData("personal");
   const business = useDomainData("business");
+  const fromSnapshot = useMemo(() => {
+    if (!appSnapshot) return null;
+    const toModeObservation = (
+      domain: MoneylithSnapshot["personal"],
+      defaults: ReturnType<typeof useDomainData>,
+    ): ModeObservation => {
+      const income = Array.isArray(domain.income) ? (domain.income as IncomeItem[]) : defaults.income;
+      const fixedCostManualItems = Array.isArray(domain.fixedCosts)
+        ? (domain.fixedCosts as FixedCostManualItem[])
+        : defaults.fixedCostManualItems;
+      const debts = Array.isArray(domain.debts) ? (domain.debts as SchuldItem[]) : defaults.debts;
+      const assets = Array.isArray(domain.assets) ? (domain.assets as { id: string; naam: string; bedrag: number }[]) : defaults.assets;
+      const transactions = Array.isArray(domain.transactions)
+        ? (domain.transactions as MoneylithTransaction[])
+        : defaults.transactions;
+      const buckets = Array.isArray(domain.aiBuckets) ? (domain.aiBuckets as MoneylithBucket[]) : defaults.buckets;
+      const statements = Array.isArray(domain.statements)
+        ? (domain.statements as AccountStatementMeta[])
+        : defaults.statements;
+      const accounts = Array.isArray(domain.accounts) ? (domain.accounts as MoneylithAccount[]) : defaults.accounts;
+      const goals = Array.isArray(domain.goals) ? (domain.goals as MoneylithGoal[]) : defaults.goals;
+      const snapshot = buildSnapshotV2({
+        income,
+        fixedCosts: { manual: fixedCostManualItems, auto: [] },
+        debts,
+        assets,
+        goals,
+      });
+      const totalIncome = income.reduce((sum, i) => sum + (Number(i?.bedrag) || 0), 0);
+      const fixedCosts = fixedCostManualItems.reduce((sum, i) => sum + (Number(i?.bedrag) || 0), 0);
+      const totalDebt = debts.reduce((sum, d) => sum + (Number(d?.saldo) || 0), 0);
+      const minPayment = debts.reduce((sum, d) => sum + (Number(d?.minimaleMaandlast) || 0), 0);
+      const assetsTotal = assets.reduce((sum, a) => sum + (Number(a?.bedrag) || 0), 0);
+      const netFree = totalIncome - fixedCosts;
+      return {
+        income,
+        fixedCostManualItems,
+        fixedCostItems: defaults.fixedCostItems,
+        debts,
+        assets,
+        futureIncome: defaults.futureIncome,
+        transactions,
+        buckets,
+        statements,
+        accounts,
+        goals,
+        netIncome: totalIncome,
+        manualFixedCosts: fixedCosts,
+        totals: {
+          income: totalIncome,
+          fixedCosts,
+          debt: totalDebt,
+          minPayment,
+          assets: assetsTotal,
+          netFree,
+        },
+        snapshot,
+        status: defaults.status,
+      };
+    };
+    return {
+      mode,
+      personal: toModeObservation(appSnapshot.personal, personal),
+      business: toModeObservation(appSnapshot.business, business),
+    };
+  }, [appSnapshot, business, mode, personal]);
 
   return useMemo(
-    () => ({
-      mode,
-      personal,
-      business,
-    }),
-    [mode, personal, business],
+    () => fromSnapshot ?? { mode, personal, business },
+    [business, fromSnapshot, mode, personal],
   );
 };
 
@@ -146,6 +209,7 @@ export interface ModeObservation {
   fixedCostItems: FixedCostItem[];
   debts: SchuldItem[];
   assets: { id: string; naam: string; bedrag: number }[];
+  futureIncome: FutureIncomeItem[];
   transactions: MoneylithTransaction[];
   buckets: MoneylithBucket[];
   statements: AccountStatementMeta[];

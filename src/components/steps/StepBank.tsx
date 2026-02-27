@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import type { SchuldItem, IncomeItem, FixedCostManualItem, MoneylithBucket } from "../../types";
-import { analyzeBankTransactions, fetchBankTransactions } from "../../logic/bankAnalysis";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FixedCostManualItem, IncomeItem, MoneylithAccount, MoneylithBucket, MoneylithTransaction, SchuldItem } from "../../types";
+import { analyzeBankTransactions } from "../../logic/bankAnalysis";
+import { persistGateway } from "../../storage/persistGateway";
 
-type TLAccount = {
+type SyncAccount = {
   account_id: string;
   display_name?: string;
   account_type?: string;
@@ -10,28 +11,70 @@ type TLAccount = {
   iban?: string;
 };
 
-type TLAccountsResponse = {
-  results?: TLAccount[];
+type SyncTransaction = {
+  external_id: string;
+  account_id: string;
+  date: string;
+  amount: number;
+  description: string;
+  counterparty?: string;
+  category?: string | null;
 };
 
-const ACCOUNTS_KEY = "moneylith.personal.truelayer.accounts";
+type SyncResponse = {
+  ok?: boolean;
+  connected?: boolean;
+  expires_at?: string;
+  accounts?: SyncAccount[];
+  transactions?: SyncTransaction[];
+};
+
+type BankUiState = "disconnected" | "connecting" | "syncing" | "connected" | "failed";
 
 interface StepBankProps {
   onAutoFillDebts?: (debts: SchuldItem[]) => void;
   onAutoFillIncomes?: (incomes: IncomeItem[]) => void;
   onAutoFillFixedCosts?: (costs: FixedCostManualItem[]) => void;
   onAutoFillBuckets?: (buckets: MoneylithBucket[]) => void;
+  onSyncAccounts?: (accounts: MoneylithAccount[]) => void;
+  onSyncTransactions?: (transactions: MoneylithTransaction[]) => void;
+  onConnectionChange?: (connected: boolean) => void;
+  onPurgeBankData?: () => void;
   onboardingMode?: "bank" | "manual" | null;
 }
 
-const safeJson = async (res: Response) => {
-  const text = await res.text();
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { error: text };
-  }
+const mapAccountType = (input?: string): MoneylithAccount["type"] => {
+  const v = (input || "").toLowerCase();
+  if (v.includes("savings")) return "spaarrekening";
+  if (v.includes("cash")) return "contant";
+  return "betaalrekening";
+};
+
+const mapAccounts = (accounts: SyncAccount[]): MoneylithAccount[] => {
+  return accounts.map((a, idx) => ({
+    id: a.account_id,
+    name: a.display_name || `Rekening ${idx + 1}`,
+    type: mapAccountType(a.account_type),
+    iban: a.iban || undefined,
+    active: true,
+    isPrimary: idx === 0,
+    description: [a.account_type, a.currency].filter(Boolean).join(" | ") || undefined,
+    source: "bank",
+  }));
+};
+
+const mapTransactions = (rows: SyncTransaction[]): MoneylithTransaction[] => {
+  return rows.map((tx) => ({
+    id: tx.external_id,
+    accountId: tx.account_id,
+    date: tx.date,
+    amount: tx.amount,
+    description: tx.description,
+    counterparty: tx.counterparty,
+    category: tx.category,
+    external_id: tx.external_id,
+    source: "bank",
+  })) as MoneylithTransaction[];
 };
 
 export const StepBank = ({
@@ -39,187 +82,144 @@ export const StepBank = ({
   onAutoFillIncomes,
   onAutoFillFixedCosts,
   onAutoFillBuckets,
+  onSyncAccounts,
+  onSyncTransactions,
+  onConnectionChange,
+  onPurgeBankData,
   onboardingMode,
 }: StepBankProps = {}) => {
-  const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [codeInput, setCodeInput] = useState("");
-  const [accounts, setAccounts] = useState<TLAccount[]>([]);
+  const [state, setState] = useState<BankUiState>("disconnected");
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<{ message: string; code?: string; retry?: boolean } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<SyncAccount[]>([]);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(ACCOUNTS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setAccounts(parsed);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
+  const loading = state === "syncing";
   const hasAccounts = accounts.length > 0;
 
   const hint = useMemo(() => {
-    if (hasAccounts) return "Gekoppeld. Je kunt opnieuw koppelen om te verversen.";
-    return "Koppel je bank via TrueLayer (sandbox) en haal rekeningen op.";
-  }, [hasAccounts]);
+    if (state === "connected" || hasAccounts) return "Bank gekoppeld. Je kunt opnieuw synchroniseren om te verversen.";
+    if (state === "syncing") return "Synchronisatie bezig...";
+    if (state === "failed") return "Koppeling of synchronisatie mislukt.";
+    return "Koppel je bank via TrueLayer Hosted Consent Screen.";
+  }, [hasAccounts, state]);
 
-  const handleAuthStart = async () => {
-    setLoading(true);
-    setStatus(null);
-    setError(null);
+  const hydrateConnectionStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/truelayer?truelayer=auth-start", { method: "POST" });
-      const data = await safeJson(res);
-      if (!res.ok || !data?.url) {
-        setError({
-          message: `Koppelen mislukt: ${data?.error || res.status}`,
-          code: data?.code || "auth_start_failed",
-          retry: true,
-        });
-        return;
+      const resp = await fetch("/api/bank/status", { method: "GET" });
+      const data = (await resp.json().catch(() => ({}))) as SyncResponse;
+      if (!resp.ok || !data.connected) {
+        setState("disconnected");
+        setAccounts([]);
+        onConnectionChange?.(false);
+        onPurgeBankData?.();
+        setStatus("Niet gekoppeld.");
+        return false;
       }
-      setAuthUrl(String(data.url));
-      window.open(String(data.url), "_blank");
-      setStatus("Autorisatiepagina geopend. Voltooi het process en kopieer je code.");
-    } catch (error) {
-      setError({
-        message: "Koppelen mislukt: netwerkfout. Controleer je internetverbinding.",
-        code: "network_error",
-        retry: true,
-      });
-    } finally {
-      setLoading(false);
+      setState("connected");
+      onConnectionChange?.(true);
+      setStatus(data.expires_at ? `Verbonden (token geldig tot ${new Date(data.expires_at).toLocaleString()}).` : "Verbonden.");
+      return true;
+    } catch {
+      setState("failed");
+      setError("Verbindingsstatus ophalen mislukt.");
+      return false;
     }
-  };
+  }, [onConnectionChange, onPurgeBankData]);
 
-  const handleExchange = async () => {
-    if (!codeInput.trim()) {
-      setError({
-        message: "Plak eerst de code uit de callback-pagina.",
-        retry: false,
-      });
-      return;
-    }
-    setLoading(true);
-    setStatus(null);
+  const runSync = useCallback(async () => {
+    setState("syncing");
     setError(null);
+    setStatus("Synchroniseren...");
     try {
-      const tokenRes = await fetch("/api/truelayer?truelayer=token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeInput.trim() }),
-      });
-      const tokenData = await safeJson(tokenRes);
-      if (!tokenRes.ok || !tokenData?.access_token) {
-        setError({
-          message: tokenData?.error || `Token exchange mislukt (${tokenRes.status})`,
-          code: tokenData?.code || "token_exchange_failed",
-          retry: tokenData?.retry !== false,
-        });
-        return;
-      }
-      
-      // Store access token for later use
-      setAccessToken(tokenData.access_token);
-
-      const accountsRes = await fetch("/api/truelayer?truelayer=accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: tokenData.access_token }),
-      });
-      const accountsData = (await safeJson(accountsRes)) as TLAccountsResponse;
-      if (!accountsRes.ok) {
-        setError({
-          message: accountsData?.error || `Accounts ophalen mislukt (${accountsRes.status})`,
-          code: accountsData?.code || "accounts_fetch_failed",
-          retry: true,
-        });
-        return;
-      }
-      const results = Array.isArray(accountsData?.results) ? accountsData.results : [];
-      setAccounts(results);
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(results));
-      setStatus(`✅ Accounts opgehaald: ${results.length}`);
-
-      // If in bank mode, trigger auto-analysis
-      if (onboardingMode === "bank" && results.length > 0) {
-        await triggerBankAnalysis(results, tokenData.access_token);
-      }
-    } catch (error) {
-      setError({
-        message: "Accounts ophalen mislukt: netwerkfout.",
-        code: "network_error",
-        retry: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const triggerBankAnalysis = async (accts: TLAccount[], token: string) => {
-    if (!onAutoFillDebts && !onAutoFillIncomes && !onAutoFillFixedCosts) {
-      return; // No callbacks provided
-    }
-
-    setAnalyzing(true);
-    setStatus("🔄 AI analyseert je transacties...");
-    setError(null);
-
-    try {
-      const accountIds = accts.map((a) => a.account_id);
-      const transactions = await fetchBankTransactions(accountIds, token);
-
-      if (transactions.length === 0) {
-        setError({
-          message: "Geen transacties gevonden. Dit kan normaal zijn voor een nieuw account.",
-          retry: false,
-        });
+      const resp = await fetch("/api/bank/sync", { method: "POST" });
+      const data = (await resp.json().catch(() => ({}))) as SyncResponse & { error?: string };
+      if (!resp.ok || !data.ok) {
+        if (resp.status === 401) {
+          setState("disconnected");
+          onConnectionChange?.(false);
+          onPurgeBankData?.();
+          setError("Geen actieve bankkoppeling. Verbind opnieuw.");
+          setStatus(null);
+          return;
+        }
+        setState("failed");
+        setError(data.error || `Sync mislukt (${resp.status})`);
         setStatus(null);
         return;
       }
 
-      const analysis = await analyzeBankTransactions(transactions, token);
+      const syncedAccounts = Array.isArray(data.accounts) ? data.accounts : [];
+      const syncedTransactions = Array.isArray(data.transactions) ? data.transactions : [];
+      setAccounts(syncedAccounts);
 
-      // Auto-fill data via callbacks
-      if (onAutoFillDebts && analysis.suggestedDebts.length > 0) {
-        onAutoFillDebts(analysis.suggestedDebts);
-      }
-      if (onAutoFillIncomes && analysis.suggestedIncomes.length > 0) {
-        onAutoFillIncomes(analysis.suggestedIncomes);
-      }
-      if (onAutoFillFixedCosts && analysis.suggestedFixedCosts.length > 0) {
-        onAutoFillFixedCosts(analysis.suggestedFixedCosts);
-      }
-      if (onAutoFillBuckets && analysis.suggestedBuckets.length > 0) {
-        onAutoFillBuckets(analysis.suggestedBuckets);
+      onSyncAccounts?.(mapAccounts(syncedAccounts));
+      onSyncTransactions?.(mapTransactions(syncedTransactions));
+
+      if (onboardingMode === "bank" && syncedTransactions.length > 0) {
+        const analysis = await analyzeBankTransactions(
+          syncedTransactions.map((tx) => ({
+            date: tx.date,
+            description: tx.description,
+            amount: tx.amount,
+          })),
+          "",
+        );
+        if (analysis.suggestedDebts.length) onAutoFillDebts?.(analysis.suggestedDebts);
+        if (analysis.suggestedIncomes.length) onAutoFillIncomes?.(analysis.suggestedIncomes);
+        if (analysis.suggestedFixedCosts.length) onAutoFillFixedCosts?.(analysis.suggestedFixedCosts);
+        if (analysis.suggestedBuckets.length) onAutoFillBuckets?.(analysis.suggestedBuckets);
       }
 
-      setStatus(
-        `✅ Analyse voltooid! ${analysis.suggestedDebts.length} schulden, ` +
-        `${analysis.suggestedIncomes.length} inkomsten, ` +
-        `${analysis.suggestedFixedCosts.length} vaste lasten, ` +
-        `${analysis.suggestedBuckets.length} potjes geïdentificeerd.`
-      );
-    } catch (error) {
-      console.error("Bank analysis error:", error);
-      setError({
-        message: "Analyse mislukt. Je kunt handmatig je gegevens invullen.",
-        code: "analysis_failed",
-        retry: true,
-      });
+      setState("connected");
+      onConnectionChange?.(true);
+      persistGateway.set("moneylith.personal.bank.lastSync", new Date().toISOString());
+      setStatus(`Sync voltooid: ${syncedAccounts.length} rekening(en), ${syncedTransactions.length} transactie(s).`);
+    } catch (err) {
+      setState("failed");
+      setError("Synchronisatie mislukt. Probeer opnieuw.");
       setStatus(null);
-    } finally {
-      setAnalyzing(false);
     }
-  };
+  }, [onAutoFillBuckets, onAutoFillDebts, onAutoFillFixedCosts, onAutoFillIncomes, onConnectionChange, onPurgeBankData, onSyncAccounts, onSyncTransactions, onboardingMode]);
+
+  const runDisconnect = useCallback(async () => {
+    setError(null);
+    try {
+      const resp = await fetch("/api/bank/disconnect", { method: "POST" });
+      if (!resp.ok) {
+        setState("failed");
+        setError("Ontkoppelen mislukt.");
+        return;
+      }
+      setState("disconnected");
+      setAccounts([]);
+      onConnectionChange?.(false);
+      onPurgeBankData?.();
+      setStatus("Bankkoppeling ontkoppeld.");
+    } catch {
+      setState("failed");
+      setError("Ontkoppelen mislukt.");
+    }
+  }, [onConnectionChange, onPurgeBankData]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const bankStatus = params.get("bank");
+    if (bankStatus === "connected") {
+      setState("syncing");
+      void runSync();
+      params.delete("bank");
+      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+      window.history.replaceState({}, "", next);
+    } else if (bankStatus === "error" || bankStatus === "state_error") {
+      setState("failed");
+      setError("Bankkoppeling mislukt. Probeer opnieuw.");
+      params.delete("bank");
+      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+      window.history.replaceState({}, "", next);
+    } else {
+      void hydrateConnectionStatus();
+    }
+  }, [hydrateConnectionStatus, runSync]);
 
   return (
     <div className="space-y-4">
@@ -229,73 +229,50 @@ export const StepBank = ({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleAuthStart}
-            className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow hover:bg-amber-400 disabled:opacity-60"
+            onClick={() => {
+              setState("connecting");
+              setStatus("Doorsturen naar bank consent...");
+              window.location.href = "/api/bank/connect";
+            }}
+            className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow hover:bg-amber-400"
             disabled={loading}
           >
-            Koppel bank
+            Connect Bank
           </button>
-          {authUrl ? (
-            <a
-              href={authUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-amber-700 underline"
-            >
-              Open autorisatie link
-            </a>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => void runSync()}
+            className="rounded-full border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+            disabled={loading || state === "disconnected" || state === "connecting"}
+          >
+            {loading ? "Bezig..." : "Sync nu"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runDisconnect()}
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            disabled={loading || state === "disconnected"}
+          >
+            Disconnect
+          </button>
         </div>
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Na toestaan kom je op de callback‑pagina. Kopieer de <span className="font-semibold">code</span> en plak die
-          hieronder.
-        </div>
-        
+
         {error ? (
           <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3">
-            <p className="text-sm font-medium text-red-900">❌ {error.message}</p>
-            {error.retry && (
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                className="mt-2 text-xs text-red-700 underline hover:text-red-900"
-              >
-                Probeer opnieuw
-              </button>
-            )}
+            <p className="text-sm font-medium text-red-900">{error}</p>
           </div>
         ) : null}
-
         {status ? (
           <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3">
             <p className="text-sm text-green-900">{status}</p>
           </div>
         ) : null}
-
-        <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
-          <input
-            type="text"
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            placeholder="Plak callback code hier"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 md:flex-1"
-          />
-          <button
-            type="button"
-            onClick={handleExchange}
-            className="rounded-full border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
-            disabled={loading || analyzing}
-          >
-            {analyzing ? "Analyseren..." : "Accounts ophalen"}
-          </button>
-        </div>
-        {status ? <p className="mt-2 text-xs text-slate-600">{status}</p> : null}
       </div>
 
       <div className="card-shell p-4 text-slate-900">
         <h4 className="text-base font-semibold text-slate-900">Gekoppelde rekeningen</h4>
         {accounts.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-600">Nog geen accounts gekoppeld.</p>
+          <p className="mt-2 text-sm text-slate-600">Nog geen accounts gesynchroniseerd.</p>
         ) : (
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {accounts.map((acct) => (

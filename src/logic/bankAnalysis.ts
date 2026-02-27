@@ -49,19 +49,19 @@ ${txSummary}
 Geef JSON terug.`;
 
   try {
-    const response = await fetch("/api/ai-proxy", {
+    const response = await fetch("/api/moneylith/analyse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system: systemPrompt,
         user: userPrompt,
-        tab: "bank-analysis",
       }),
     });
 
-    const rawAnalysis = await response.text();
-    if (!response.ok) {
-      console.error("AI analysis failed:", rawAnalysis);
+    const payload = (await response.json().catch(() => ({}))) as { content?: string; error?: string };
+    const rawAnalysis = payload?.content || "";
+    if (!response.ok || !rawAnalysis) {
+      console.error("AI analysis failed:", payload?.error || response.status);
       return {
         suggestedDebts: [],
         suggestedIncomes: [],

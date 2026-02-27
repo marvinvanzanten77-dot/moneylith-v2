@@ -2,6 +2,7 @@
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import type { MonthId, SchuldenPlanItem, SchuldItem } from "../types";
 import { DebtOverTimeChart } from "./charts/DebtOverTimeChart";
+import { persistGateway } from "../storage/persistGateway";
 
 type Props = {
   selectedMonth: MonthId;
@@ -12,7 +13,7 @@ const currency = (value: number) => `€${value}`;
 const readSchuldenLijst = (): SchuldItem[] => {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem("schulden-lijst");
+    const raw = persistGateway.get("schulden-lijst");
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed as SchuldItem[];

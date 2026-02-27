@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { persistGateway } from "../storage/persistGateway";
 
 const DENYLIST_PREFIXES = ["sentry", "__sentry", "vercel", "vite", "react-devtools"];
 const DENYLIST_EXACT = ["moneylith_consent"];
@@ -17,10 +18,10 @@ const safeParse = (val: string) => {
 const collectSnapshot = () => {
   if (typeof window === "undefined") return {};
   const result: Record<string, unknown> = {};
-  for (let i = 0; i < window.localStorage.length; i += 1) {
-    const key = window.localStorage.key(i);
-    if (!key || !isExportableKey(key)) continue;
-    const val = window.localStorage.getItem(key);
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key || !isExportableKey(key)) continue;
+      const val = persistGateway.get(key);
     if (val === null) continue;
     result[key] = safeParse(val);
   }
@@ -55,7 +56,7 @@ export function BackupCard() {
   >(() => {
     if (typeof window === "undefined") return [];
     try {
-      const raw = window.localStorage.getItem("moneylith.backup.versions");
+      const raw = persistGateway.get("moneylith.backup.versions");
       if (raw) return JSON.parse(raw);
     } catch {
       /* ignore */
@@ -139,7 +140,7 @@ export function BackupCard() {
   const persistVersions = (next: typeof versions) => {
     setVersions(next);
     try {
-      window.localStorage.setItem("moneylith.backup.versions", JSON.stringify(next));
+      persistGateway.set("moneylith.backup.versions", next);
     } catch {
       /* ignore */
     }
@@ -209,7 +210,7 @@ export function BackupCard() {
       }
       Object.entries(parsed as Record<string, unknown>).forEach(([key, value]) => {
         if (!isExportableKey(key)) return;
-        window.localStorage.setItem(key, JSON.stringify(value));
+        persistGateway.set(key, value);
       });
       setImportStatus("Import voltooid. Pagina wordt ververst...");
       setImportError(null);

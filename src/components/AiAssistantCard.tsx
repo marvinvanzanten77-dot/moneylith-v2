@@ -6,16 +6,19 @@ import { useObserver } from "../hooks/useObserver";
 import { appendAiMessage, clearAiMessages, getAiMessages, subscribeToAiMessages } from "../logic/aiMessageBus";
 import type { AiActions } from "../logic/extractActions";
 import { TurnstileWidget } from "./TurnstileWidget";
+import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
 
 interface AiAssistantCardProps {
   mode?: "personal" | "business";
   actions?: AiActions | null;
   onActionsChange?: (actions: AiActions | null) => void;
+  onSetAiAnalysisRaw?: (raw: string) => void;
+  appSnapshot?: MoneylithSnapshot;
   [key: string]: unknown;
 }
 
-export function AiAssistantCard({ mode = "personal", actions, onActionsChange }: AiAssistantCardProps) {
-  const observation = useObserver(mode);
+export function AiAssistantCard({ mode = "personal", actions, onActionsChange, onSetAiAnalysisRaw, appSnapshot }: AiAssistantCardProps) {
+  const observation = useObserver(mode, appSnapshot);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [lastAiActions, setLastAiActions] = useState<AiActions | null>(actions ?? null);
@@ -37,12 +40,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
     setLoading: setAiLoading,
     setLastActions: setLastAiActions,
     onRawContent: (raw) => {
-      try {
-        const key = mode === "business" ? "moneylith.business.aiAnalysisRaw" : "moneylith.personal.aiAnalysisRaw";
-        localStorage.setItem(key, raw);
-      } catch {
-        // ignore
-      }
+      onSetAiAnalysisRaw?.(raw);
     },
   });
 
@@ -86,8 +84,8 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
     const extras = secondaryRaw
       ? [{ label: mode === "business" ? "persoonlijke context (alleen ter info)" : "zakelijke context (alleen ter info)", raw: secondaryRaw }]
       : undefined;
-    return analysis ? buildMoneylithPrompt(analysis, primaryRaw, extras) : null;
-  }, [analysis, primaryRaw, secondaryRaw, mode]);
+    return analysis ? buildMoneylithPrompt(analysis, primaryRaw, extras, appSnapshot) : null;
+  }, [analysis, appSnapshot, primaryRaw, secondaryRaw, mode]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -113,6 +111,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange }:
         user: `${aiPayload.user}\n\nVraag: ${question}`,
         displayUserMessage: question,
         turnstileToken: turnstileOptional ? undefined : turnstileToken,
+        snapshot: appSnapshot,
       });
       if (result) {
         setAiError(null);

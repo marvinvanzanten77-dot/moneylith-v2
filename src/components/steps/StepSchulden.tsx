@@ -2,7 +2,7 @@
 
 import { SchuldenkaartCard, type SchuldItem } from "../SchuldenkaartCard";
 
-import type { FinancialSnapshot, FutureIncomeItem } from "../../types";
+import type { FinancialSnapshot, FutureIncomeItem, MoneylithBucket } from "../../types";
 
 import type { AiActions } from "../../logic/extractActions";
 
@@ -19,7 +19,39 @@ import { TurnstileWidget } from "../TurnstileWidget";
 import { formatCurrency } from "../../utils/format";
 
 import { simulatePayoff, type StrategyKey } from "../../logic/debtSimulator";
-import type { MoneylithBucket } from "../../types";
+
+type StrategyCard = {
+  key: StrategyKey;
+  title: string;
+  summary: string;
+  pros: string[];
+  cons: string[];
+  recommended?: boolean;
+};
+
+export type DebtsUiState = {
+  uploadStatus: string | null;
+  pendingRows: SchuldItem[];
+  pendingFileName: string | null;
+  selectedStrategy: StrategyKey | null;
+  proposalEdits: Record<string, { minPayment?: number; note?: string }>;
+  includePatterns: boolean;
+  fullpayMonths: Record<string, number>;
+  view: "list" | "analysis";
+  strategies: StrategyCard[];
+};
+
+const DEFAULT_DEBTS_UI_STATE: DebtsUiState = {
+  uploadStatus: null,
+  pendingRows: [],
+  pendingFileName: null,
+  selectedStrategy: null,
+  proposalEdits: {},
+  includePatterns: false,
+  fullpayMonths: {},
+  view: "list",
+  strategies: [],
+};
 
 
 
@@ -52,9 +84,11 @@ interface StepSchuldenProps {
 
   mode?: "personal" | "business";
 
-
   actions?: AiActions | null;
 
+  debtsUiState?: DebtsUiState;
+
+  onDebtsUiStateChange?: (next: DebtsUiState | ((prev: DebtsUiState) => DebtsUiState)) => void;
 
 }
 
@@ -89,9 +123,12 @@ export function StepSchulden({
 
   mode = "personal",
 
-
   actions = null,
 
+
+    debtsUiState,
+
+  onDebtsUiStateChange,
 
 }: StepSchuldenProps) {
 
@@ -104,33 +141,38 @@ export function StepSchulden({
   const isReadOnly = readOnly === true;
 
   const bucketsKey = variant === "business" ? "moneylith.business.buckets" : "moneylith.personal.buckets";
- 
-  const storageKey = `moneylith.${variant}.debts.uploadStatus`;
-
-
-  const pendingRowsKey = `moneylith.${variant}.debts.pendingRows`;
-
-
-  const pendingNameKey = `moneylith.${variant}.debts.pendingFileName`;
-
-
-  const [uploadStatus, setUploadStatus] = useLocalStorage<string | null>(storageKey, null);
-
-
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-
-  const [pendingFileName, setPendingFileName] = useLocalStorage<string | null>(pendingNameKey, null);
-
-
-  const [pendingRows, setPendingRows] = useLocalStorage<SchuldItem[]>(pendingRowsKey, []);
   const [buckets] = useLocalStorage<MoneylithBucket[]>(bucketsKey, []);
+  const uiState = debtsUiState ?? DEFAULT_DEBTS_UI_STATE;
+  const applyDebtsUiPatch = (patch: Partial<DebtsUiState>) =>
+    onDebtsUiStateChange?.((prev) => ({ ...(prev ?? DEFAULT_DEBTS_UI_STATE), ...patch }));
+  const uploadStatus = uiState.uploadStatus;
+  const pendingFileName = uiState.pendingFileName;
+  const pendingRows = uiState.pendingRows;
+  const view = uiState.view;
+  const strategies = uiState.strategies;
+  const proposalEdits = uiState.proposalEdits;
+  const fullpayOverrides = uiState.fullpayMonths;
+  const selectedStrategy = uiState.selectedStrategy;
+  const includePatterns = uiState.includePatterns;
+  const setUploadStatus = (next: string | null) => applyDebtsUiPatch({ uploadStatus: next });
+  const setPendingFileName = (next: string | null) => applyDebtsUiPatch({ pendingFileName: next });
+  const setPendingRows = (next: SchuldItem[]) => applyDebtsUiPatch({ pendingRows: next });
+  const setView = (next: "list" | "analysis") => applyDebtsUiPatch({ view: next });
+  const setStrategies = (next: StrategyCard[]) => applyDebtsUiPatch({ strategies: next });
+  const setProposalEdits = (
+    next:
+      | Record<string, { minPayment?: number; note?: string }>
+      | ((prev: Record<string, { minPayment?: number; note?: string }>) => Record<string, { minPayment?: number; note?: string }>),
+  ) => applyDebtsUiPatch({ proposalEdits: typeof next === "function" ? next(proposalEdits) : next });
+  const setFullpayOverrides = (
+    next: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>),
+  ) => applyDebtsUiPatch({ fullpayMonths: typeof next === "function" ? next(fullpayOverrides) : next });
+  const setSelectedStrategy = (next: StrategyKey | null) => applyDebtsUiPatch({ selectedStrategy: next });
+  const setIncludePatterns = (next: boolean) => applyDebtsUiPatch({ includePatterns: next });
 
 
   const applyCheck = canApplyDebtsSuggestions({ mode, actions, currentDebts: debts });
-
-
-  const [view, setView] = useLocalStorage<"list" | "analysis">(`moneylith.${variant}.debts.view`, "list");
 
 
   const [aiLoading, setAiLoading] = useState(false);
@@ -144,23 +186,6 @@ export function StepSchulden({
 
   const [turnstileNonce, setTurnstileNonce] = useState(0);
 
-
-  type StrategyCard = {
-
-    key: StrategyKey;
-
-    title: string;
-
-    summary: string;
-
-    pros: string[];
-
-    cons: string[];
-
-    recommended?: boolean;
-
-
-  };
 
   const turnstileOptional =
 
@@ -205,37 +230,6 @@ export function StepSchulden({
     return Array.from(byKey.values());
   };
 
-
-  const [strategies, setStrategies] = useLocalStorage<StrategyCard[]>(
-
-
-    `moneylith.${variant}.debts.strategies`,
-
-
-    []
-
-
-  );
-
-
-  const [proposalEdits, setProposalEdits] = useLocalStorage<Record<string, { minPayment?: number; note?: string }>>(
-    `moneylith.${variant}.debts.proposalEdits`,
-    {},
-  );
-
-  const [fullpayOverrides, setFullpayOverrides] = useLocalStorage<Record<string, number>>(
-    `moneylith.${variant}.debts.fullpayMonths`,
-    {},
-  );
-
-  const [selectedStrategy, setSelectedStrategy] = useLocalStorage<StrategyKey | null>(
-
-    `moneylith.${variant}.debts.selectedStrategy`,
-
-    null
-
-  );
-
   const mergedStrategies = useMemo(() => mergeWithBaseStrategies(strategies), [strategies]);
 
   const [lastSnapshot, setLastSnapshot] = useState<SchuldItem[] | null>(null);
@@ -276,10 +270,6 @@ export function StepSchulden({
 
   >({});
   const [acceptedProposals, setAcceptedProposals] = useState<Set<string>>(new Set());
-  const [includePatterns, setIncludePatterns] = useLocalStorage<boolean>(
-    `moneylith.${variant}.debts.includePatterns`,
-    false,
-  );
   const hasPendingProposals = useMemo(
     () => Object.keys(strategyProposals).some((id) => !acceptedProposals.has(id)),
     [strategyProposals, acceptedProposals],
@@ -2347,6 +2337,10 @@ export function StepSchulden({
 
 
 }
+
+
+
+
 
 
 

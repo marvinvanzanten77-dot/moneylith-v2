@@ -9,11 +9,11 @@ import { OnboardingChoice } from "./components/OnboardingChoice";
 import { StepIntent } from "./components/steps/StepIntent";
 import { StepFocus } from "./components/steps/StepFocus";
 import { StepVooruitblik } from "./components/steps/StepActie";
-import { StepSchulden } from "./components/steps/StepSchulden";
+import { StepSchulden, type DebtsUiState } from "./components/steps/StepSchulden";
 import { StepVermogen } from "./components/steps/StepVermogen";
 import { StepRitme } from "./components/steps/StepRitme";
 import { StepRekeningen } from "./components/steps/StepRekeningen";
-import { StepAfschriften } from "./components/steps/StepAfschriften";
+import { StepAfschriften, type AiBucketItem } from "./components/steps/StepAfschriften";
 import { StepBank } from "./components/steps/StepBank";
 import { StepBackup } from "./components/steps/StepBackup";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
@@ -37,7 +37,6 @@ import type {
 } from "./types";
 import { deriveBuckets, mergeWithUserOverrides } from "./logic/buckets";
 import { useObserver } from "./hooks/useObserver";
-import type { FinanceMode } from "./state/financeRoot";
 import { extractPrefillSuggestions } from "./logic/aiPrefill";
 import { extractActionsFromContent } from "./logic/extractActions";
 import type { AiActions } from "./logic/extractActions";
@@ -50,6 +49,9 @@ import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
 import { AnalyticsGate } from "./components/AnalyticsGate";
 import LogoFull from "../logo/ChatGPT Image Dec 21, 2025, 01_47_34 PM.png";
+import { persistGateway } from "./storage/persistGateway";
+import { buildMoneylithSnapshot } from "./core/moneylithSnapshot";
+import { getMessages } from "./logic/aiMessageBus";
 
 const MONTHS: { id: MonthId; label: string }[] = [
   { id: "2025-12", label: "dec 2025" },
@@ -112,6 +114,18 @@ type SpendBucket = {
 };
 
 type Mode = "persoonlijk" | "zakelijk";
+
+const DEFAULT_DEBTS_UI_STATE: DebtsUiState = {
+  uploadStatus: null,
+  pendingRows: [],
+  pendingFileName: null,
+  selectedStrategy: null,
+  proposalEdits: {},
+  includePatterns: false,
+  fullpayMonths: {},
+  view: "list",
+  strategies: [],
+};
 
 type TabConfig = { key: StepKey; label: string; desc: string };
 
@@ -358,6 +372,10 @@ const App = () => {
     "moneylith.personal.transactions",
     []
   );
+  const [bankConnectedPersonal, setBankConnectedPersonal] = useLocalStorage<boolean>(
+    "moneylith.personal.bank.connected",
+    false
+  );
   const [transactionsBusiness, setTransactionsBusiness] = useLocalStorage<MoneylithTransaction[]>(
     "moneylith.business.transactions",
     []
@@ -377,6 +395,11 @@ const App = () => {
     null
   );
   const [aiAnalysisRaw, setAiAnalysisRaw] = useLocalStorage<string | null>("moneylith.personal.aiAnalysisRaw", null);
+  const [aiBucketsStoredPersonal, setAiBucketsStoredPersonal] = useLocalStorage<AiBucketItem[]>("moneylith.personal.aiBuckets", []);
+  const [fuelOverridesStoredPersonal, setFuelOverridesStoredPersonal] = useLocalStorage<Record<string, "fuel" | "shop">>(
+    "moneylith.personal.fuelOverrides",
+    {},
+  );
   const [aiAnalysisDoneBusiness, setAiAnalysisDoneBusiness] = useLocalStorage<boolean>(
     "moneylith.business.aiAnalysisDone",
     false
@@ -388,6 +411,19 @@ const App = () => {
   const [aiAnalysisRawBusiness, setAiAnalysisRawBusiness] = useLocalStorage<string | null>(
     "moneylith.business.aiAnalysisRaw",
     null
+  );
+  const [aiBucketsStoredBusiness, setAiBucketsStoredBusiness] = useLocalStorage<AiBucketItem[]>("moneylith.business.aiBuckets", []);
+  const [fuelOverridesStoredBusiness, setFuelOverridesStoredBusiness] = useLocalStorage<Record<string, "fuel" | "shop">>(
+    "moneylith.business.fuelOverrides",
+    {},
+  );
+  const [debtsUiState, setDebtsUiState] = useLocalStorage<DebtsUiState>(
+    "moneylith.personal.debts.uiState",
+    DEFAULT_DEBTS_UI_STATE,
+  );
+  const [debtsUiStateBusiness, setDebtsUiStateBusiness] = useLocalStorage<DebtsUiState>(
+    "moneylith.business.debts.uiState",
+    DEFAULT_DEBTS_UI_STATE,
   );
   const [aiActionsPersonal, setAiActionsPersonal] = useState<AiActions | null>(null);
   const [aiActionsBusiness, setAiActionsBusiness] = useState<AiActions | null>(null);
@@ -413,11 +449,16 @@ const App = () => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F7") {
+        const keys: string[] = [];
         try {
-          localStorage.clear();
+          for (let i = 0; i < window.localStorage.length; i += 1) {
+            const key = window.localStorage.key(i);
+            if (key) keys.push(key);
+          }
         } catch {
-          // ignore
+          // ignore key scan errors
         }
+        persistGateway.removeMany(keys);
         window.location.reload();
       }
     };
@@ -836,7 +877,87 @@ const App = () => {
       transactionsBusiness,
     ]
   );
-  const observation = useObserver(mode);
+  const moneylithSnapshot = useMemo(() => {
+    const rawLastSync = persistGateway.get("moneylith.personal.bank.lastSync");
+    let lastSyncAt: string | undefined;
+    if (rawLastSync) {
+      try {
+        const parsed = JSON.parse(rawLastSync);
+        if (typeof parsed === "string") lastSyncAt = parsed;
+      } catch {
+        // ignore malformed persisted lastSync
+      }
+    }
+    return buildMoneylithSnapshot({
+      meta: {
+        selectedMonth,
+        monthFocus,
+        bank: {
+          connected: bankConnectedPersonal,
+          lastSyncAt,
+        },
+      },
+      personal: {
+        accounts,
+        transactions,
+        income: incomeItems,
+        fixedCosts: fixedCostManualItems,
+        debts,
+        assets,
+        goals,
+        statements,
+        inbox: inboxItems,
+        aiBuckets: aiBucketsStoredPersonal,
+        fuelOverrides: fuelOverridesStoredPersonal,
+      },
+      business: {
+        accounts: accountsBusiness,
+        transactions: transactionsBusiness,
+        income: incomeItemsBusiness,
+        fixedCosts: fixedCostManualItemsBusiness,
+        debts: debtsBusiness,
+        assets: assetsBusiness,
+        goals: goalsBusiness,
+        statements: statementsBusiness,
+        inbox: inboxItemsBusiness,
+        aiBuckets: aiBucketsStoredBusiness,
+        fuelOverrides: fuelOverridesStoredBusiness,
+      },
+      ai: {
+        messages: getMessages(),
+        analysisRaw: aiAnalysisRaw,
+        analysisRawBusiness: aiAnalysisRawBusiness,
+      },
+    });
+  }, [
+    accounts,
+    accountsBusiness,
+    aiAnalysisRaw,
+    aiAnalysisRawBusiness,
+    aiBucketsStoredBusiness,
+    aiBucketsStoredPersonal,
+    bankConnectedPersonal,
+    debts,
+    debtsBusiness,
+    fixedCostManualItems,
+    fixedCostManualItemsBusiness,
+    fuelOverridesStoredBusiness,
+    fuelOverridesStoredPersonal,
+    goals,
+    goalsBusiness,
+    inboxItems,
+    inboxItemsBusiness,
+    incomeItems,
+    incomeItemsBusiness,
+    monthFocus,
+    selectedMonth,
+    statements,
+    statementsBusiness,
+    transactions,
+    transactionsBusiness,
+  ]);
+
+  const observation = useObserver(mode === "zakelijk" ? "business" : "personal", moneylithSnapshot);
   const activeTabs = useActiveTabs(mode);
 
   const [netIncome, setNetIncome] = useLocalStorage<number>("income-netto", 0);
@@ -1048,6 +1169,49 @@ const App = () => {
     });
     setFn(next);
   };
+
+  const purgePersonalBankData = useCallback(() => {
+    const bankAccountIds = new Set<string>();
+    accounts.forEach((a) => {
+      if (a.source === "bank") bankAccountIds.add(a.id);
+    });
+    try {
+      const legacyRaw = persistGateway.get("moneylith.personal.truelayer.accounts");
+      if (legacyRaw) {
+        const legacy = JSON.parse(legacyRaw) as Array<{ account_id?: string }>;
+        if (Array.isArray(legacy)) {
+          legacy.forEach((a) => {
+            if (a?.account_id) bankAccountIds.add(a.account_id);
+          });
+        }
+      }
+    } catch {
+      // ignore legacy parse errors
+    }
+
+    setTransactions((prev) =>
+      prev.filter((t) => t.source !== "bank" && !bankAccountIds.has(t.accountId))
+    );
+    setAccounts((prev) => prev.filter((a) => a.source !== "bank"));
+    persistGateway.removeMany(["moneylith.personal.truelayer.accounts", "moneylith.personal.bank.lastSync"]);
+  }, [accounts, setAccounts, setTransactions]);
+
+  useEffect(() => {
+    const hydrateBankStatus = async () => {
+      try {
+        const resp = await fetch("/api/bank/status", { method: "GET" });
+        const data = (await resp.json().catch(() => ({}))) as { connected?: boolean };
+        const connected = Boolean(resp.ok && data.connected);
+        setBankConnectedPersonal(connected);
+        if (!connected) {
+          purgePersonalBankData();
+        }
+      } catch {
+        setBankConnectedPersonal(false);
+      }
+    };
+    void hydrateBankStatus();
+  }, [purgePersonalBankData, setBankConnectedPersonal]);
 
   const deleteStatement = (id: string) => {
     setStatements((prev) => prev.filter((s) => s.id !== id));
@@ -1989,6 +2153,8 @@ const App = () => {
     const setSummaryFn = isBusinessVariant ? setDebtsSummaryBusiness : setDebtsSummary;
     const aiActionsForMode = isBusinessVariant ? aiActionsBusiness : aiActionsPersonal;
     const futureIncomesForMode = isBusinessVariant ? futureIncomeItemsBusiness : futureIncomeItems;
+    const uiState = isBusinessVariant ? debtsUiStateBusiness : debtsUiState;
+    const setUiState = isBusinessVariant ? setDebtsUiStateBusiness : setDebtsUiState;
 
     return (
       <StepSchulden
@@ -2002,6 +2168,8 @@ const App = () => {
         mode={isBusinessVariant ? "business" : "personal"}
         actions={aiActionsForMode}
         futureIncomes={futureIncomesForMode}
+        debtsUiState={uiState}
+        onDebtsUiStateChange={setUiState}
       />
     );
   };
@@ -2019,6 +2187,10 @@ const App = () => {
     const aiDone = isBusinessVariant ? aiAnalysisDoneBusiness : aiAnalysisDone;
     const aiDoneAt = isBusinessVariant ? aiAnalysisDoneAtBusiness : aiAnalysisDoneAt;
     const aiRaw = isBusinessVariant ? aiAnalysisRawBusiness : aiAnalysisRaw;
+    const bucketsState = isBusinessVariant ? aiBucketsStoredBusiness : aiBucketsStoredPersonal;
+    const setBucketsState = isBusinessVariant ? setAiBucketsStoredBusiness : setAiBucketsStoredPersonal;
+    const fuelOverrideState = isBusinessVariant ? fuelOverridesStoredBusiness : fuelOverridesStoredPersonal;
+    const setFuelOverrideState = isBusinessVariant ? setFuelOverridesStoredBusiness : setFuelOverridesStoredPersonal;
     const onComplete = isBusinessVariant ? handleAiAnalysisCompleteBusiness : handleAiAnalysisComplete;
     const fixedLabels = isBusinessVariant
       ? [
@@ -2046,6 +2218,10 @@ const App = () => {
         aiAnalysisDone={aiDone}
         aiAnalysisDoneAt={aiDoneAt}
         aiAnalysisRaw={aiRaw}
+        aiBuckets={bucketsState}
+        onAiBucketsChange={setBucketsState}
+        fuelOverrides={fuelOverrideState}
+        onFuelOverridesChange={setFuelOverrideState}
         onAiAnalysisComplete={onComplete}
         onAiActionsChange={handleAiActionsChange}
         fixedCostLabels={fixedLabels}
@@ -2093,6 +2269,15 @@ const App = () => {
         onAutoFillIncomes={setIncomeItems}
         onAutoFillFixedCosts={setFixedCostManualItems}
         onAutoFillBuckets={setStoredBuckets}
+        onSyncAccounts={(synced) =>
+          setAccounts((prev) => {
+            const nonBank = prev.filter((a) => a.source !== "bank");
+            return [...nonBank, ...synced];
+          })
+        }
+        onSyncTransactions={(synced) => upsertTransactionsList(synced, false)}
+        onConnectionChange={(connected) => setBankConnectedPersonal(connected)}
+        onPurgeBankData={purgePersonalBankData}
         onboardingMode={onboardingMode}
       />
     );
@@ -2270,17 +2455,19 @@ const App = () => {
             >
               Persoonlijk
             </button>
-            <button
-              type="button"
-              onClick={() => setMode("zakelijk")}
-              className={`flex-1 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                mode === "zakelijk"
-                  ? "bg-white text-slate-900 border-white"
-                  : "bg-white/10 text-slate-200 border-white/20 hover:bg-white/20"
-              }`}
-            >
-              Zakelijk
-            </button>
+            <div className="relative flex-1 group">
+              <button
+                type="button"
+                onClick={() => {}}
+                aria-disabled="true"
+                className="w-full rounded-full px-3 py-1 text-xs font-medium border border-white/20 bg-white/5 text-slate-400 cursor-not-allowed"
+              >
+                Zakelijk
+              </button>
+              <div className="pointer-events-none absolute -top-9 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-900 shadow group-hover:block">
+                Binnenkort beschikbaar
+              </div>
+            </div>
           </div>
           <div className="space-y-2">
             {activeTabs.map((step) => {
@@ -2417,7 +2604,14 @@ const App = () => {
         fixedCosts={fixedCosts}
         financialSnapshot={financialSnapshot}
         allowProactiveSavingsAdvice={financialSnapshot?.optimizeCosts ?? userIntent.optimizeCosts ?? false}
-        observation={observation}
+        appSnapshot={moneylithSnapshot}
+        onSetAiAnalysisRaw={(raw) => {
+          if (mode === "zakelijk") {
+            setAiAnalysisRawBusiness(raw);
+          } else {
+            setAiAnalysisRaw(raw);
+          }
+        }}
       />
     </aside>
   </div>

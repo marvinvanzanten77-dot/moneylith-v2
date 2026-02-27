@@ -8,6 +8,9 @@ import type { AiActions } from "../../logic/extractActions";
 import { TurnstileWidget } from "../TurnstileWidget";
 import { formatCurrency } from "../../utils/format";
 import { PotjeDetailView } from "../PotjeDetailView";
+import { extractTextFromPdfFile } from "../../utils/documentExtract";
+
+export type AiBucketItem = { id: string; label: string; monthlyAvg: number; count?: number };
 
 interface StepAfschriftenProps {
   accounts: MoneylithAccount[];
@@ -28,6 +31,10 @@ interface StepAfschriftenProps {
   storagePrefix?: string;
   excludeLabels?: string[];
   onboardingMode?: "bank" | "manual" | null;
+  aiBuckets?: AiBucketItem[];
+  onAiBucketsChange?: (next: AiBucketItem[]) => void;
+  fuelOverrides?: Record<string, "fuel" | "shop">;
+  onFuelOverridesChange?: (next: Record<string, "fuel" | "shop">) => void;
 }
 
 export function StepAfschriften({
@@ -49,9 +56,11 @@ export function StepAfschriften({
   storagePrefix,
   excludeLabels = [],
   onboardingMode = null,
+  aiBuckets = [],
+  onAiBucketsChange,
+  fuelOverrides = {},
+  onFuelOverridesChange,
 }: StepAfschriftenProps) {
-  const bucketPrefix = storagePrefix ?? (variant === "business" ? "moneylith.business" : "moneylith.personal");
-  const bucketStorageKey = `${bucketPrefix}.aiBuckets`;
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? "");
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -76,27 +85,15 @@ export function StepAfschriften({
     setLastActions: onAiActionsChange,
   });
 
-  const [aiBuckets, setAiBuckets] = useState<
-    { id: string; label: string; monthlyAvg: number; count?: number }[]
-  >(() => {
-    try {
-      const raw = localStorage.getItem(bucketStorageKey);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      /* ignore */
-    }
-    return [];
-  });
-  const fuelOverrideKey = `${bucketPrefix}.fuelOverrides`;
-  const [fuelOverrides, setFuelOverrides] = useState<Record<string, "fuel" | "shop">>(() => {
-    try {
-      const raw = localStorage.getItem(fuelOverrideKey);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      /* ignore */
-    }
-    return {};
-  });
+  const setAiBuckets = useCallback((next: AiBucketItem[]) => onAiBucketsChange?.(next), [onAiBucketsChange]);
+  const setFuelOverrides = useCallback(
+    (
+      next:
+        | Record<string, "fuel" | "shop">
+        | ((prev: Record<string, "fuel" | "shop">) => Record<string, "fuel" | "shop">),
+    ) => onFuelOverridesChange?.(typeof next === "function" ? next(fuelOverrides) : next),
+    [fuelOverrides, onFuelOverridesChange],
+  );
 
   const parseBucketsFromText = useCallback(
     (raw: string) => {
@@ -142,14 +139,6 @@ export function StepAfschriften({
     },
     [accountId, accounts, fileName]
   );
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(fuelOverrideKey, JSON.stringify(fuelOverrides));
-    } catch {
-      /* ignore */
-    }
-  }, [fuelOverrides, fuelOverrideKey]);
 
   useEffect(() => {
     if (aiAnalysisDone) {
@@ -380,16 +369,11 @@ export function StepAfschriften({
       if (parsed.length) {
         const max = Math.min(9, Math.max(6, parsed.length));
         setAiBuckets(parsed.slice(0, max));
-        try {
-          localStorage.setItem(bucketStorageKey, JSON.stringify(parsed.slice(0, max)));
-        } catch {
-          /* ignore */
-        }
       }
     } catch (err) {
       console.error("AI bucket analyse mislukt", err);
     }
-  }, [_transactions, bucketStorageKey, excludeLabels, fixedCostLabels, runAi]);
+  }, [_transactions, excludeLabels, fixedCostLabels, runAi, setAiBuckets]);
 
   const handleSubmit = () => {
     if (!accountId || filePayloads.length === 0) return;
@@ -476,11 +460,11 @@ export function StepAfschriften({
             return;
           }
 
-          if (isPdf) {
-            const text = await file.text();
-            handleText(text, "PDF (tekstextractie beperkt)");
-            return;
-          }
+        if (isPdf) {
+          const result = await extractTextFromPdfFile(file, { maxPages: 6 });
+          handleText(result.text, result.note ?? "PDF-tekstextractie/OCR uitgevoerd");
+          return;
+        }
 
           payloads.push({ name: file.name, content: "", note: "Bestandstype wordt nog niet ondersteund voor analyse." });
         } catch (err) {
@@ -594,26 +578,16 @@ export function StepAfschriften({
     const parsed = parseBucketsFromText(aiAnalysisRaw);
     if (parsed.length) {
       setAiBuckets(parsed);
-      try {
-        localStorage.setItem(bucketStorageKey, JSON.stringify(parsed));
-      } catch {
-        /* ignore */
-      }
     }
-  }, [aiAnalysisRaw, bucketStorageKey, parseBucketsFromText]);
+  }, [aiAnalysisRaw, parseBucketsFromText, setAiBuckets]);
 
   // Reset potjes als er geen uploads of analyse zijn (bijv. na F7 clear)
   useEffect(() => {
     const hasUploads = statements.length > 0;
     if (!hasUploads && !aiAnalysisDone && aiBuckets.length > 0) {
       setAiBuckets([]);
-      try {
-        localStorage.removeItem(bucketStorageKey);
-      } catch {
-        /* ignore */
-      }
     }
-  }, [aiAnalysisDone, aiBuckets.length, bucketStorageKey, statements.length]);
+  }, [aiAnalysisDone, aiBuckets.length, setAiBuckets, statements.length]);
 
   return (
     <div className="space-y-6">

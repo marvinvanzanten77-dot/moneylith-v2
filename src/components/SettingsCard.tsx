@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { persistGateway } from "../storage/persistGateway";
 
 const APP_KEYS_PREFIXES = ["potje-", "schuldenplan-"];
 const APP_KEYS_EXACT = [
@@ -28,7 +29,7 @@ export function SettingsCard() {
       const key = window.localStorage.key(i);
       if (!key) continue;
       if (!shouldInclude(key)) continue;
-      const val = window.localStorage.getItem(key);
+      const val = persistGateway.get(key);
       if (val !== null) {
         try {
           result[key] = JSON.parse(val);
@@ -66,7 +67,7 @@ export function SettingsCard() {
       if (typeof parsed !== "object" || parsed === null) return;
       Object.entries(parsed as Record<string, unknown>).forEach(([key, value]) => {
         if (!shouldInclude(key)) return;
-        window.localStorage.setItem(key, JSON.stringify(value));
+        persistGateway.set(key, value);
       });
       window.location.reload();
     } catch {
@@ -93,7 +94,7 @@ export function SettingsCard() {
         keysToRemove.push(key);
       }
     }
-    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+    persistGateway.removeMany(keysToRemove);
     window.location.reload();
   };
 
@@ -167,4 +168,7 @@ export function SettingsCard() {
     </div>
   );
 }
+
+
+
 
