@@ -11,6 +11,7 @@ type StepSettingsProps = {
   onShowModeBannerChange: (enabled: boolean) => void;
   onResetIntro: () => void;
   onOpenBackup: () => void;
+  preferredAuthMode?: "login" | "register" | null;
 };
 
 export function StepSettings({
@@ -22,6 +23,7 @@ export function StepSettings({
   onShowModeBannerChange,
   onResetIntro,
   onOpenBackup,
+  preferredAuthMode = null,
 }: StepSettingsProps) {
   return (
     <div className="space-y-4">
@@ -62,7 +64,7 @@ export function StepSettings({
         </div>
         {storageMode === "cloud" && (
           <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
-            <CloudAccountCard />
+            <CloudAccountCard preferredAuthMode={preferredAuthMode} />
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ import {
   verifyPassword,
 } from "../server/utils/cloudAuth.js";
 import { getCloudSnapshot, getCloudUser, setCloudSnapshot, setCloudUser } from "../server/utils/cloudStore.js";
+import { sendCloudRegistrationEmail } from "../server/utils/cloudMailer.js";
 
 const readBody = (req: VercelRequest) => {
   if (typeof req.body === "string") {
@@ -45,12 +46,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const password = String(body.password || "");
       const validationError = validateCredentials(email, password);
       if (validationError) {
+        if (email.includes("@")) {
+          void sendCloudRegistrationEmail({ to: email, outcome: "failed", reason: validationError });
+        }
         res.status(400).json({ ok: false, error: validationError });
         return;
       }
 
       const existing = await getCloudUser(email);
       if (existing) {
+        void sendCloudRegistrationEmail({ to: email, outcome: "failed", reason: "Account bestaat al." });
         res.status(409).json({ ok: false, error: "Account bestaat al." });
         return;
       }
@@ -58,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { salt, hash } = hashPassword(password);
       await setCloudUser(email, { email, salt, hash, createdAt: new Date().toISOString() });
       setCloudSession(res, email);
+      void sendCloudRegistrationEmail({ to: email, outcome: "success" });
       res.status(200).json({ ok: true, email });
       return;
     }
@@ -73,7 +79,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const existing = await getCloudUser(email);
-      if (!existing || !verifyPassword(password, existing.salt, existing.hash)) {
+      if (!existing) {
+        res.status(404).json({ ok: false, error: "Geen account gevonden. Maak eerst een account aan.", shouldRegister: true });
+        return;
+      }
+      if (!verifyPassword(password, existing.salt, existing.hash)) {
         res.status(401).json({ ok: false, error: "Inloggegevens ongeldig." });
         return;
       }
@@ -124,8 +134,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(405).json({ ok: false, error: "Unsupported action/method." });
   } catch (err) {
+    if (req.method === "POST" && action === "register") {
+      const body = readBody(req) as { email?: string };
+      const email = normalizeEmail(body.email);
+      if (email.includes("@")) {
+        void sendCloudRegistrationEmail({ to: email, outcome: "failed", reason: "Technische fout tijdens registreren." });
+      }
+    }
     console.error("[cloud] failure", { action, message: err instanceof Error ? err.message : String(err) });
     res.status(500).json({ ok: false, error: "Cloud actie mislukt." });
   }
 }
-

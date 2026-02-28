@@ -297,6 +297,7 @@ const App = () => {
     null,
   );
   const [storageMode, setStorageMode] = useLocalStorage<"local" | "cloud">("moneylith.storage.mode", "local");
+  const [settingsAuthMode, setSettingsAuthMode] = useState<"login" | "register" | null>(null);
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
@@ -2249,6 +2250,7 @@ const App = () => {
       onShowModeBannerChange={(enabled) => setShowModeBanner(enabled)}
       onResetIntro={() => setIntroSeen(false)}
       onOpenBackup={() => setCurrentStep(mode === "zakelijk" ? "biz-backup" : "backup")}
+      preferredAuthMode={settingsAuthMode}
     />
   );
   const renderInbox = (variant: "personal" | "business" = "personal") => {
@@ -2457,14 +2459,31 @@ const App = () => {
         >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings")}
-              className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
-              aria-label="Open instellingen"
-            >
-              Instellingen
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsAuthMode(null);
+                  setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings");
+                }}
+                className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
+                aria-label="Open instellingen"
+              >
+                Instellingen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStorageMode("cloud");
+                  setSettingsAuthMode("login");
+                  setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings");
+                }}
+                className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[10px] font-semibold text-blue-100 hover:border-blue-100 hover:text-white"
+                aria-label="Open login"
+              >
+                Login
+              </button>
+            </div>
           </div>
           <div className="mb-4 flex items-center gap-2">
             <button

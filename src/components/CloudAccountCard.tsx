@@ -4,7 +4,11 @@ import { persistGateway } from "../storage/persistGateway";
 
 type AuthMode = "login" | "register";
 
-export function CloudAccountCard() {
+type CloudAccountCardProps = {
+  preferredAuthMode?: AuthMode | null;
+};
+
+export function CloudAccountCard({ preferredAuthMode = null }: CloudAccountCardProps) {
   const cloudEnabled = import.meta.env.VITE_CLOUD_AUTH_ENABLED !== "false";
   const [mode, setMode] = useState<AuthMode>("register");
   const [email, setEmail] = useState("");
@@ -28,6 +32,11 @@ export function CloudAccountCard() {
     void readSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!preferredAuthMode) return;
+    setMode(preferredAuthMode);
+  }, [preferredAuthMode]);
 
   const collectLocalSnapshot = () => {
     const denyPrefixes = ["sentry", "__sentry", "vercel", "vite", "react-devtools"];
@@ -65,8 +74,18 @@ export function CloudAccountCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = (await resp.json().catch(() => ({}))) as { ok?: boolean; error?: string; email?: string };
+      const data = (await resp.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        email?: string;
+        shouldRegister?: boolean;
+      };
       if (!resp.ok || !data.ok) {
+        if (mode === "login" && data.shouldRegister) {
+          setMode("register");
+          setStatus("Geen account gevonden. Je bent doorgestuurd naar registreren.");
+          return;
+        }
         setStatus(data.error || "Cloud auth mislukt.");
         return;
       }
