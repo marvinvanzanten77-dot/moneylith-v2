@@ -1,6 +1,11 @@
 import { BackupCard } from "../BackupCard";
+import { CloudAccountCard } from "../CloudAccountCard";
 
-export function StepBackup() {
+type StepBackupProps = {
+  onboardingMode?: "bank" | "manual" | "cloud" | null;
+};
+
+export function StepBackup({ onboardingMode = null }: StepBackupProps) {
   return (
     <div className="space-y-6">
       <div className="mb-2 space-y-2">
@@ -12,6 +17,11 @@ export function StepBackup() {
       <div className="max-w-xl">
         <BackupCard />
       </div>
+      {onboardingMode === "cloud" && (
+        <div className="max-w-xl">
+          <CloudAccountCard />
+        </div>
+      )}
     </div>
   );
 }

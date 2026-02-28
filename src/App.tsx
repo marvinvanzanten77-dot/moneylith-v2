@@ -289,7 +289,10 @@ const App = () => {
     }
   }, []);
 
-  const [onboardingMode, setOnboardingMode] = useLocalStorage<"bank" | "manual" | null>("moneylith.onboarding.mode", null);
+  const [onboardingMode, setOnboardingMode] = useLocalStorage<"bank" | "manual" | "cloud" | null>(
+    "moneylith.onboarding.mode",
+    null,
+  );
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
@@ -347,12 +350,12 @@ const App = () => {
   useEffect(() => {
     if (onboardingMode === "bank") {
       setCurrentStep("bank");
-    } else if (onboardingMode === "manual") {
+    } else if (onboardingMode === "manual" || onboardingMode === "cloud") {
       setCurrentStep("intent");
     }
   }, [onboardingMode]);
 
-  const handleOnboardingChoice = (choice: "bank" | "manual" | null) => {
+  const handleOnboardingChoice = (choice: "bank" | "manual" | "cloud" | null) => {
     setOnboardingMode(choice);
   };
 
@@ -2231,7 +2234,7 @@ const App = () => {
     );
   };
 
-  const renderBackup = () => <StepBackup />;
+  const renderBackup = () => <StepBackup onboardingMode={onboardingMode} />;
   const renderInbox = (variant: "personal" | "business" = "personal") => {
     if (variant === "business") {
       return (

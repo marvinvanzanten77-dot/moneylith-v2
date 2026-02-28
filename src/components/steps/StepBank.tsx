@@ -40,7 +40,7 @@ interface StepBankProps {
   onSyncTransactions?: (transactions: MoneylithTransaction[]) => void;
   onConnectionChange?: (connected: boolean) => void;
   onPurgeBankData?: () => void;
-  onboardingMode?: "bank" | "manual" | null;
+  onboardingMode?: "bank" | "manual" | "cloud" | null;
 }
 
 const mapAccountType = (input?: string): MoneylithAccount["type"] => {

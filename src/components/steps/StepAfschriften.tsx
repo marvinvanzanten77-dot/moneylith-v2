@@ -30,7 +30,7 @@ interface StepAfschriftenProps {
   variant?: "personal" | "business";
   storagePrefix?: string;
   excludeLabels?: string[];
-  onboardingMode?: "bank" | "manual" | null;
+  onboardingMode?: "bank" | "manual" | "cloud" | null;
   aiBuckets?: AiBucketItem[];
   onAiBucketsChange?: (next: AiBucketItem[]) => void;
   fuelOverrides?: Record<string, "fuel" | "shop">;
