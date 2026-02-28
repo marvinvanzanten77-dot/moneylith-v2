@@ -3,9 +3,10 @@ import { CloudAccountCard } from "../CloudAccountCard";
 
 type StepBackupProps = {
   onboardingMode?: "bank" | "manual" | "cloud" | null;
+  storageMode?: "local" | "cloud";
 };
 
-export function StepBackup({ onboardingMode = null }: StepBackupProps) {
+export function StepBackup({ onboardingMode = null, storageMode = "local" }: StepBackupProps) {
   return (
     <div className="space-y-6">
       <div className="mb-2 space-y-2">
@@ -17,7 +18,7 @@ export function StepBackup({ onboardingMode = null }: StepBackupProps) {
       <div className="max-w-xl">
         <BackupCard />
       </div>
-      {onboardingMode === "cloud" && (
+      {(onboardingMode === "cloud" || storageMode === "cloud") && (
         <div className="max-w-xl">
           <CloudAccountCard />
         </div>

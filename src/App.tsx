@@ -16,6 +16,7 @@ import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften, type AiBucketItem } from "./components/steps/StepAfschriften";
 import { StepBank } from "./components/steps/StepBank";
 import { StepBackup } from "./components/steps/StepBackup";
+import { StepSettings } from "./components/steps/StepSettings";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { detectRecurringCandidates } from "./utils/recurring";
@@ -141,6 +142,7 @@ const personalTabs: TabConfig[] = [
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
+  { key: "settings", label: "Instellingen", desc: "Opslag, hulp en app-opties" },
 ];
 
 const businessTabs: TabConfig[] = [
@@ -154,6 +156,7 @@ const businessTabs: TabConfig[] = [
   { key: "biz-afschriften", label: "Afschriften", desc: "AI-analyse" },
   { key: "biz-vooruitblik", label: "Vooruitblik", desc: "Scenario als alles zo blijft" },
   { key: "biz-backup", label: "Backup", desc: "Export & import van je data" },
+  { key: "biz-settings", label: "Instellingen", desc: "Opslag, hulp en app-opties" },
 ];
 const useActiveTabs = (mode: Mode) => useMemo(() => (mode === "zakelijk" ? businessTabs : personalTabs), [mode]);
 
@@ -293,6 +296,7 @@ const App = () => {
     "moneylith.onboarding.mode",
     null,
   );
+  const [storageMode, setStorageMode] = useLocalStorage<"local" | "cloud">("moneylith.storage.mode", "local");
   const [currentStep, setCurrentStep] = useState<StepKey>("intent");
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
@@ -2234,7 +2238,19 @@ const App = () => {
     );
   };
 
-  const renderBackup = () => <StepBackup onboardingMode={onboardingMode} />;
+  const renderBackup = () => <StepBackup onboardingMode={onboardingMode} storageMode={storageMode} />;
+  const renderSettings = () => (
+    <StepSettings
+      storageMode={storageMode}
+      onStorageModeChange={(next) => setStorageMode(next)}
+      helpMode={helpMode}
+      onHelpModeChange={(enabled) => setHelpMode(enabled)}
+      showModeBanner={showModeBanner}
+      onShowModeBannerChange={(enabled) => setShowModeBanner(enabled)}
+      onResetIntro={() => setIntroSeen(false)}
+      onOpenBackup={() => setCurrentStep(mode === "zakelijk" ? "biz-backup" : "backup")}
+    />
+  );
   const renderInbox = (variant: "personal" | "business" = "personal") => {
     if (variant === "business") {
       return (
@@ -2295,6 +2311,7 @@ const App = () => {
     if (normalizedStep === "action") return renderAction("personal");
     if (normalizedStep === "vooruitblik") return renderAction(isBusinessView ? "business" : "personal");
     if (normalizedStep === "backup") return renderBackup();
+    if (normalizedStep === "settings") return renderSettings();
     return null;
   };
 
@@ -2390,6 +2407,9 @@ const App = () => {
       case "backup":
         filled = false;
         break;
+      case "settings":
+        filled = true;
+        break;
       default:
         filled = false;
         break;
@@ -2409,6 +2429,7 @@ const App = () => {
     inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
     backup: "Exporteer of importeer je data lokaal (geen cloud).",
+    settings: "Beheer app-opties zoals opslagmodus, hulp en zichtbaarheid van UI-banners.",
     verplichtingen: "Zakelijke verplichtingen en regelingen; houd de maandlasten en looptijden bij.",
     "biz-afschriften": "Upload zakelijke afschriften; AI haalt patronen uit je zakelijke uitgaven.",
     "biz-rekeningen": "Beheer je zakelijke rekeningen; actieve rekeningen tellen mee voor uploads/analyse.",
@@ -2417,6 +2438,7 @@ const App = () => {
     "biz-cashflow": "Inkomend/uitgaand geld, runway en cashflow voor je bedrijf.",
     "biz-kapitaal": "Zakelijk kapitaal/buffer en reserves; inzicht in financiële veerkracht.",
     "biz-vooruitblik": "Scenario als je niets verandert; zicht op risico’s en kansen.",
+    "biz-settings": "Beheer app-opties zoals opslagmodus, hulp en zichtbaarheid van UI-banners.",
   };
 
   return (
@@ -2437,13 +2459,11 @@ const App = () => {
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
             <button
               type="button"
-              onClick={() => {
-                setHelpMode((prev) => !prev);
-              }}
+              onClick={() => setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings")}
               className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
-              aria-label="Open hulp tips"
+              aria-label="Open instellingen"
             >
-              {helpMode ? "Hulp uit" : "Hulp"}
+              Instellingen
             </button>
           </div>
           <div className="mb-4 flex items-center gap-2">
