@@ -5,7 +5,7 @@ import { CookieSettings } from "./CookieSettings";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
 
-const lastUpdated = "2025-12-16";
+const lastUpdated = "2026-03-06";
 
 const sections: Record<LegalKind, { title: string; blocks: { heading: string; bullets: string[] }[] }> = {
   privacy: {
@@ -20,11 +20,50 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
         ],
       },
       {
+        heading: "Bank koppeling via API providers",
+        bullets: [
+          "Bij het koppelen van je bank gebruiken we externe API providers (Plaid, TrueLayer) volgens EU PSD2 wetgeving.",
+          "Je geeft expliciete toestemming voor toegang tot je bankrekening data (accounts, transacties, saldi).",
+          "We ontvangen alleen read-only data; geen mogelijkheid tot betalingen zonder jouw aparte toestemming.",
+          "Bank access tokens worden versleuteld opgeslagen en zijn tijdelijk (verlopen na 90 dagen inactiviteit).",
+          "Je kunt je bank koppeling op elk moment verwijderen via de app instellingen.",
+        ],
+      },
+      {
+        heading: "Beveiliging & Encryptie",
+        bullets: [
+          "Alle data wordt versleuteld tijdens overdracht via TLS 1.3+ (HTTPS).",
+          "Gevoelige data zoals API tokens worden versleuteld opgeslagen (AES-256).",
+          "Geen onversleutelde financiële data wordt verzonden of opgeslagen op onze servers.",
+          "Toegang tot productie systemen vereist multi-factor authenticatie (MFA).",
+          "Regelmatige security audits en vulnerability scans worden uitgevoerd.",
+        ],
+      },
+      {
         heading: "AI-verwerking",
         bullets: [
           "De backend wordt alleen gebruikt om AI-analyses uit te voeren op jouw verzoek.",
-          "We slaan de inhoud van je AI-input en -output niet op en loggen geen financiële details.",
-          "AI-output is tijdelijk: je kunt deze lokaal exporteren als je dat wilt.",
+          "Transactie data wordt tijdelijk naar OpenAI gestuurd voor analyse (max 30 seconden, daarna verwijderd).",
+          "We slaan geen AI-input of -output permanent op en loggen geen financiële details.",
+          "AI-output blijft lokaal in je browser; je kunt deze exporteren als je dat wilt.",
+        ],
+      },
+      {
+        heading: "Data retentie & verwijdering",
+        bullets: [
+          "Lokale browser data: bewaard totdat je deze zelf verwijdert.",
+          "Bank access tokens: automatisch verlopen na 90 dagen inactiviteit.",
+          "Logs & analytics: geanonimiseerd bewaard voor 90 dagen, daarna verwijderd.",
+          "Je kunt alle data permanent verwijderen via browser localStorage wissen of app reset.",
+        ],
+      },
+      {
+        heading: "Third-party diensten",
+        bullets: [
+          "Plaid / TrueLayer: bank data koppeling (PSD2 compliant, EU servers).",
+          "OpenAI: AI analyses van transacties (data wordt niet voor training gebruikt).",
+          "Vercel: hosting infrastructure (ISO 27001 gecertificeerd).",
+          "Deze diensten hebben eigen privacy policies; zie hun websites voor details.",
         ],
       },
       {
@@ -36,10 +75,12 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
         ],
       },
       {
-        heading: "Jouw keuzes",
+        heading: "Jouw rechten & keuzes",
         bullets: [
           "Je bepaalt zelf of analytics aanstaat via het cookie-instellingenpaneel.",
           "Je kunt je gegevens exporteren als JSON en lokaal bewaren als back-up.",
+          "Je hebt recht op inzage, correctie, en verwijdering van je data (GDPR).",
+          "Je kunt bank toegang intrekken en alle lokale data verwijderen via de app.",
           "Vragen over privacy? Mail ons via info@moneylith.nl.",
         ],
       },
