@@ -149,15 +149,19 @@ This policy supports compliance with:
 
 ### 4.2 Encryption at Rest
 
-**User Data:**
-- Browser localStorage encrypted by browser security model
-- No unencrypted financial data stored on servers
+**Server-Side:**
+- **No consumer financial data stored at-rest on servers**
+- Temporary processing only (max 30 seconds in memory)
 - API keys and secrets encrypted in environment variables (Vercel KMS)
-
-**Sensitive Credentials:**
-- Bank access tokens encrypted with AES-256
-- OpenAI API keys stored in Vercel encrypted environment
 - No hardcoded credentials in source code
+
+**Client-Side:**
+- Browser localStorage used for user data persistence
+- No application-level encryption applied to localStorage
+- Security relies on OS-level disk encryption (user responsibility)
+- Bank access tokens stored in plain text in localStorage (client-side only)
+
+**Note:** Consumer data from Plaid API is NOT encrypted at-rest by our application. Data is not stored server-side, and client-side storage (localStorage) does not have application-level encryption. This is an acceptable security model for client-side-only applications as data never leaves the user's device in a stored state.
 
 ### 4.3 Infrastructure Hardening
 
