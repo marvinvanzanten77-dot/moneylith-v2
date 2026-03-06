@@ -9,7 +9,9 @@
     "dev:api": "node dev-server.mjs",
     "dev:vercel": "vercel dev --listen 3000",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit": "npm audit",
+    "audit:ci": "npm audit --production --audit-level=moderate"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

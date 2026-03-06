@@ -255,22 +255,29 @@ This policy supports compliance with:
 ### 6.2 Vulnerability Management Program
 
 **Detection:**
-- Automated vulnerability scanning: Weekly
-- Dependency updates: Monthly
-- Security advisories monitored: Daily
-- Bug bounty program: Planned (future)
+- **Automated vulnerability scanning:** GitHub Dependabot (enabled, alerts on all vulnerability types)
+- **Dependency audits:** `npm audit` script runs for all installations and deployments
+- **Production builds:** `npm audit --production` run during CI/CD pipeline
+- **Security advisories monitored:** Daily via GitHub security alerts
+- **Dependency updates:** Automatic Dependabot PRs for minor/patch updates
+
+**Scanning cadence:**
+- Real-time: Dependabot scans on each push to GitHub
+- Pre-deployment: `npm audit --production` runs in Vercel build pipeline (fails on moderate vulnerabilities)
+- Manual: `npm audit` available anytime via command line
 
 **Assessment:**
-- **Critical:** Patch within 24 hours
-- **High:** Patch within 7 days
-- **Medium:** Patch within 30 days
-- **Low:** Patch in next release cycle
+- **Critical:** Patch within 24 hours (Vercel hotfix deployment)
+- **High:** Patch within 7 days (automated Dependabot PR merged)
+- **Medium:** Patch in next release cycle (depends on build failure)
+- **Low:** Reviewed quarterly and batched
 
 **Remediation:**
 - Emergency patch process for critical vulnerabilities
-- Hotfix deployment capability (< 1 hour)
+- Hotfix deployment capability (< 1 hour via Vercel)
+- Automatic dependency updates via Dependabot
 - Validation testing after patches applied
-- Post-mortem for security incidents
+- Post-mortem documentation for critical incidents
 
 ### 6.3 Third-Party Security
 
