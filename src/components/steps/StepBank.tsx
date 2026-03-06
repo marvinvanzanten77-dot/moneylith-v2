@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePlaidLink } from "react-plaid-link";
 import type { FixedCostManualItem, IncomeItem, MoneylithAccount, MoneylithBucket, MoneylithTransaction, SchuldItem } from "../../types";
 import { analyzeBankTransactions } from "../../logic/bankAnalysis";
 import { persistGateway } from "../../storage/persistGateway";
@@ -92,157 +93,197 @@ export const StepBank = ({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<SyncAccount[]>([]);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
 
-  const loading = state === "syncing";
+  const loading = state === "syncing" || state === "connecting";
   const hasAccounts = accounts.length > 0;
 
   const hint = useMemo(() => {
-    if (state === "connected" || hasAccounts) return "Bank gekoppeld. Je kunt opnieuw synchroniseren om te verversen.";
+    if (state === "connected" || hasAccounts) return "Bank gekoppeld via Plaid. Je kunt dat synchroniseren om te verversen.";
     if (state === "syncing") return "Synchronisatie bezig...";
+    if (state === "connecting") return "Plaid Link openen...";
     if (state === "failed") return "Koppeling of synchronisatie mislukt.";
-    return "Koppel je bank via TrueLayer Hosted Consent Screen.";
+    return "Koppel je bank via Plaid in-app authentication.";
   }, [hasAccounts, state]);
 
-  const hydrateConnectionStatus = useCallback(async () => {
+  // Generate link token for Plaid Link UI
+  const generateLinkToken = useCallback(async () => {
     try {
-      const resp = await fetch("/api/bank/status", { method: "GET" });
-      const data = (await resp.json().catch(() => ({}))) as SyncResponse;
-      if (!resp.ok || !data.connected) {
-        setState("disconnected");
-        setAccounts([]);
-        onConnectionChange?.(false);
-        onPurgeBankData?.();
-        setStatus("Niet gekoppeld.");
-        return false;
-      }
-      setState("connected");
-      onConnectionChange?.(true);
-      setStatus(data.expires_at ? `Verbonden (token geldig tot ${new Date(data.expires_at).toLocaleString()}).` : "Verbonden.");
-      return true;
-    } catch {
-      setState("failed");
-      setError("Verbindingsstatus ophalen mislukt.");
-      return false;
-    }
-  }, [onConnectionChange, onPurgeBankData]);
+      const response = await fetch("/api/plaid?plaid=create-link-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: `user-${Date.now()}` }),
+      });
 
-  const runSync = useCallback(async () => {
-    setState("syncing");
-    setError(null);
-    setStatus("Synchroniseren...");
-    try {
-      const resp = await fetch("/api/bank/sync", { method: "POST" });
-      const data = (await resp.json().catch(() => ({}))) as SyncResponse & { error?: string };
-      if (!resp.ok || !data.ok) {
-        if (resp.status === 401) {
-          setState("disconnected");
-          onConnectionChange?.(false);
-          onPurgeBankData?.();
-          setError("Geen actieve bankkoppeling. Verbind opnieuw.");
-          setStatus(null);
-          return;
-        }
-        setState("failed");
-        setError(data.error || `Sync mislukt (${resp.status})`);
-        setStatus(null);
-        return;
+      if (!response.ok) {
+        throw new Error("Failed to generate link token");
       }
 
-      const syncedAccounts = Array.isArray(data.accounts) ? data.accounts : [];
-      const syncedTransactions = Array.isArray(data.transactions) ? data.transactions : [];
-      setAccounts(syncedAccounts);
-
-      onSyncAccounts?.(mapAccounts(syncedAccounts));
-      onSyncTransactions?.(mapTransactions(syncedTransactions));
-
-      if (onboardingMode === "bank" && syncedTransactions.length > 0) {
-        const analysis = await analyzeBankTransactions(
-          syncedTransactions.map((tx) => ({
-            date: tx.date,
-            description: tx.description,
-            amount: tx.amount,
-          })),
-          "",
-        );
-        if (analysis.suggestedDebts.length) onAutoFillDebts?.(analysis.suggestedDebts);
-        if (analysis.suggestedIncomes.length) onAutoFillIncomes?.(analysis.suggestedIncomes);
-        if (analysis.suggestedFixedCosts.length) onAutoFillFixedCosts?.(analysis.suggestedFixedCosts);
-        if (analysis.suggestedBuckets.length) onAutoFillBuckets?.(analysis.suggestedBuckets);
-      }
-
-      setState("connected");
-      onConnectionChange?.(true);
-      persistGateway.set("moneylith.personal.bank.lastSync", new Date().toISOString());
-      setStatus(`Sync voltooid: ${syncedAccounts.length} rekening(en), ${syncedTransactions.length} transactie(s).`);
+      const data = await response.json();
+      setLinkToken(data.link_token);
+      setState("connecting");
+      return data.link_token;
     } catch (err) {
       setState("failed");
-      setError("Synchronisatie mislukt. Probeer opnieuw.");
-      setStatus(null);
+      setError("Link token generatie mislukt. Probeer opnieuw.");
+      return null;
     }
-  }, [onAutoFillBuckets, onAutoFillDebts, onAutoFillFixedCosts, onAutoFillIncomes, onConnectionChange, onPurgeBankData, onSyncAccounts, onSyncTransactions, onboardingMode]);
+  }, []);
+
+  // Exchange public token for access token after successful Plaid login
+  const exchangePublicToken = useCallback(
+    async (publicToken: string) => {
+      setState("syncing");
+      setError(null);
+      setStatus("Token uitwisseling en synchronisatie...");
+
+      try {
+        const exchangeResponse = await fetch("/api/plaid?plaid=exchange-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ public_token: publicToken }),
+        });
+
+        if (!exchangeResponse.ok) {
+          throw new Error("Token exchange failed");
+        }
+
+        const { access_token } = await exchangeResponse.json();
+
+        // Fetch accounts
+        const accountsResponse = await fetch("/api/plaid?plaid=accounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token }),
+        });
+
+        if (!accountsResponse.ok) {
+          throw new Error("Failed to fetch accounts");
+        }
+
+        const { accounts: fetchedAccounts } = await accountsResponse.json();
+
+        // Fetch transactions
+        const transactionsResponse = await fetch("/api/plaid?plaid=transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token }),
+        });
+
+        if (!transactionsResponse.ok) {
+          throw new Error("Failed to fetch transactions");
+        }
+
+        const { transactions: fetchedTransactions } = await transactionsResponse.json();
+
+        // Store access token locally for future syncs
+        persistGateway.set("moneylith.plaid.access_token", access_token);
+        persistGateway.set("moneylith.personal.bank.lastSync", new Date().toISOString());
+
+        // Map and update UI
+        const mappedAccounts: SyncAccount[] = fetchedAccounts.map((acc: any) => ({
+          account_id: acc.id,
+          display_name: acc.name,
+          account_type: acc.type,
+          currency: "EUR",
+        }));
+
+        const mappedTransactions: SyncTransaction[] = fetchedTransactions.map((tx: any) => ({
+          external_id: tx.id,
+          account_id: tx.account_id,
+          date: tx.date,
+          amount: tx.type === "expense" ? -tx.amount : tx.amount,
+          description: tx.name,
+          category: tx.category,
+        }));
+
+        setAccounts(mappedAccounts);
+        onSyncAccounts?.(mapAccounts(mappedAccounts));
+        onSyncTransactions?.(mapTransactions(mappedTransactions));
+
+        // Auto-fill in onboarding mode
+        if (onboardingMode === "bank" && mappedTransactions.length > 0) {
+          const analysis = await analyzeBankTransactions(
+            mappedTransactions.map((tx) => ({
+              date: tx.date,
+              description: tx.description,
+              amount: tx.amount,
+            })),
+            "",
+          );
+          if (analysis.suggestedDebts.length) onAutoFillDebts?.(analysis.suggestedDebts);
+          if (analysis.suggestedIncomes.length) onAutoFillIncomes?.(analysis.suggestedIncomes);
+          if (analysis.suggestedFixedCosts.length) onAutoFillFixedCosts?.(analysis.suggestedFixedCosts);
+          if (analysis.suggestedBuckets.length) onAutoFillBuckets?.(analysis.suggestedBuckets);
+        }
+
+        setState("connected");
+        onConnectionChange?.(true);
+        setStatus(`Sync voltooid: ${mappedAccounts.length} rekening(en), ${mappedTransactions.length} transactie(s).`);
+      } catch (err) {
+        setState("failed");
+        setError((err as Error).message || "Synchronisatie mislukt. Probeer opnieuw.");
+        setStatus(null);
+      }
+    },
+    [onAutoFillBuckets, onAutoFillDebts, onAutoFillFixedCosts, onAutoFillIncomes, onConnectionChange, onSyncAccounts, onSyncTransactions, onboardingMode],
+  );
+
+  // Plaid Link configuration
+  const { open } = usePlaidLink({
+    token: linkToken || "",
+    onSuccess: (publicToken) => {
+      void exchangePublicToken(publicToken);
+    },
+    onExit: () => {
+      setState("disconnected");
+      setError("Plaid Link gesloten zonder verbinding.");
+    },
+  });
 
   const runDisconnect = useCallback(async () => {
     setError(null);
-    try {
-      const resp = await fetch("/api/bank/disconnect", { method: "POST" });
-      if (!resp.ok) {
-        setState("failed");
-        setError("Ontkoppelen mislukt.");
-        return;
-      }
-      setState("disconnected");
-      setAccounts([]);
-      onConnectionChange?.(false);
-      onPurgeBankData?.();
-      setStatus("Bankkoppeling ontkoppeld.");
-    } catch {
-      setState("failed");
-      setError("Ontkoppelen mislukt.");
-    }
+    persistGateway.remove("moneylith.plaid.access_token");
+    setState("disconnected");
+    setAccounts([]);
+    onConnectionChange?.(false);
+    onPurgeBankData?.();
+    setStatus("Bankkoppeling verwijderd.");
   }, [onConnectionChange, onPurgeBankData]);
 
+  // Check if already connected on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const bankStatus = params.get("bank");
-    if (bankStatus === "connected") {
-      setState("syncing");
-      void runSync();
-      params.delete("bank");
-      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-      window.history.replaceState({}, "", next);
-    } else if (bankStatus === "error" || bankStatus === "state_error") {
-      setState("failed");
-      setError("Bankkoppeling mislukt. Probeer opnieuw.");
-      params.delete("bank");
-      const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-      window.history.replaceState({}, "", next);
-    } else {
-      void hydrateConnectionStatus();
+    const accessToken = persistGateway.get("moneylith.plaid.access_token");
+    if (accessToken) {
+      setState("connected");
+      onConnectionChange?.(true);
+      setStatus("Verbonden met Plaid.");
     }
-  }, [hydrateConnectionStatus, runSync]);
+  }, [onConnectionChange]);
 
   return (
     <div className="space-y-4">
       <div className="card-shell p-4 text-slate-900">
-        <h3 className="text-lg font-semibold text-slate-900">Bankkoppeling (TrueLayer)</h3>
+        <h3 className="text-lg font-semibold text-slate-900">Bankkoppeling (Plaid)</h3>
         <p className="mt-1 text-sm text-slate-600">{hint}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setState("connecting");
-              setStatus("Doorsturen naar bank consent...");
-              window.location.href = "/api/bank/connect";
+            onClick={async () => {
+              const token = await generateLinkToken();
+              if (token) {
+                open();
+              }
             }}
-            className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 shadow hover:bg-amber-400"
+            className="rounded-full bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-400 disabled:opacity-60"
             disabled={loading}
           >
-            Connect Bank
+            {loading ? "Bezig..." : "Connect Bank"}
           </button>
           <button
             type="button"
-            onClick={() => void runSync()}
-            className="rounded-full border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+            onClick={() => void exchangePublicToken(persistGateway.get("moneylith.plaid.access_token") || "")}
+            className="rounded-full border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-60"
             disabled={loading || state === "disconnected" || state === "connecting"}
           >
             {loading ? "Bezig..." : "Sync nu"}
@@ -279,7 +320,6 @@ export const StepBank = ({
               <div key={acct.account_id} className="rounded-lg border border-slate-200 bg-white/80 p-3 text-sm">
                 <p className="font-semibold text-slate-900">{acct.display_name || "Rekening"}</p>
                 <p className="text-xs text-slate-500">{acct.account_type || "account"}</p>
-                {acct.iban ? <p className="text-xs text-slate-500">IBAN: {acct.iban}</p> : null}
                 {acct.currency ? <p className="text-xs text-slate-500">Valuta: {acct.currency}</p> : null}
               </div>
             ))}
