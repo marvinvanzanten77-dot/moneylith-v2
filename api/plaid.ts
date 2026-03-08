@@ -10,7 +10,7 @@
  */
 
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
+import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from "plaid";
 
 // Initialize Plaid client
 const configuration = new Configuration({
@@ -39,8 +39,8 @@ async function handleCreateLinkToken(req: VercelRequest, res: VercelResponse) {
         client_user_id: userId || `user-${Date.now()}`,
       },
       client_name: "Moneylith",
-      products: ["auth", "transactions"],
-      country_codes: ["NL", "BE"],
+      products: [Products.Auth, Products.Transactions],
+      country_codes: [CountryCode.Nl, CountryCode.Be],
       language: "nl",
       redirect_uri: process.env.PLAID_REDIRECT_URI || "https://moneylith-v2.vercel.app",
     });
