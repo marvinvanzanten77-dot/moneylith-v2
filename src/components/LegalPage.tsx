@@ -30,6 +30,17 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
         ],
       },
       {
+        heading: "Crypto Exchange API koppeling (Bitvavo)",
+        bullets: [
+          "Moneylith ondersteunt 2 soorten API-koppelingen met crypto-exchanges (bv. Bitvavo):",
+          "• Observatie modus: Alleen 'View' recht - leest je saldi en portefeuilles uit (geen trading mogelijk).",
+          "• Trading modus: Alle 3 rechten (View, Trade, Withdraw) - voor geavanceerde trading features.",
+          "Je kiest zelf welke modus je wilt bij het aanmaken van de API key op je exchange.",
+          "Moneylith werkt alleen met de rechten die je expliciet toewijst; we vragen nooit meer rechten dan nodig.",
+          "Exchange access wordt versleuteld opgeslagen en je kunt de koppeling op elk moment intrekken.",
+        ],
+      },
+      {
         heading: "Beveiliging & Encryptie",
         bullets: [
           "Alle data wordt versleuteld tijdens overdracht via TLS 1.3+ (HTTPS).",
