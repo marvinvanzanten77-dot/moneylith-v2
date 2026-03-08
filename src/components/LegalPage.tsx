@@ -23,7 +23,7 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
         heading: "Bank koppeling via API providers",
         bullets: [
           "Bij het koppelen van je bank gebruiken we externe API providers (Plaid, TrueLayer) volgens EU PSD2 wetgeving.",
-          "Je geeft expliciete toestemming voor toegang tot je bankrekening data (accounts, transacties, saldi).",
+          "Je geeft expliciete toestemming voor toegang tot je bankrekening data (accounts, transacties, saldo).",
           "We ontvangen alleen read-only data; geen mogelijkheid tot betalingen zonder jouw aparte toestemming.",
           "Bank access tokens worden versleuteld opgeslagen en zijn tijdelijk (verlopen na 90 dagen inactiviteit).",
           "Je kunt je bank koppeling op elk moment verwijderen via de app instellingen.",
