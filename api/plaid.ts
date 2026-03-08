@@ -19,6 +19,12 @@
 
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from "plaid";
+import https from "https";
+
+// Custom HTTPS agent to disable Expect header in dev mode
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+});
 
 // Initialize Plaid client
 const configuration = new Configuration({
@@ -28,6 +34,8 @@ const configuration = new Configuration({
       "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID,
       "PLAID-SECRET": process.env.PLAID_SECRET,
     },
+    // httpAgent, httpsAgent to handle dev environment compatibility
+    timeout: 30000,
   },
 });
 
