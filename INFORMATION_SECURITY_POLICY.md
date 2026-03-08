@@ -476,8 +476,18 @@ This policy supports compliance with:
 
 ### Appendix B: Related Documents
 
+**Implementation Frameworks (Required for Plaid Compliance):**
+- [Zero Trust Architecture](./docs/ZERO_TRUST_ARCHITECTURE.md) - Details on never-trust-always-verify model (Attestation 3)
+- [Centralized IAM Architecture](./docs/CENTRALIZED_IAM_ARCHITECTURE.md) - GitHub as single source of truth for all access (Attestation 4)
+- [Automated De-provisioning Procedure](./docs/AUTOMATED_DEPROVISIONING_PROCEDURE.md) - 24-hour employee access revocation process (Attestation 2)
+- [Consumer MFA Roadmap](./docs/CONSUMER_MFA_ROADMAP.md) - TOTP 2FA implementation timeline (Attestation 5)
+- [Plaid Compliance Attestation](./docs/PLAID_COMPLIANCE_ATTESTATION.md) - Complete gap closure checklist with evidence
+
+**Public Documents:**
 - Privacy Policy: https://moneylith-v2.vercel.app/privacy
 - Terms of Service: https://moneylith-v2.vercel.app/terms
+
+**Internal Plans (Private):**
 - Security Incident Response Plan: [Internal]
 - Business Continuity Plan: [Internal]
 
