@@ -3,10 +3,11 @@ import { useState } from "react";
 type OnboardingMode = "bank" | "manual" | "cloud" | null;
 
 interface OnboardingChoiceProps {
+  onOpenBusiness?: () => void;
   onChoice: (mode: OnboardingMode) => void;
 }
 
-export function OnboardingChoice({ onChoice }: OnboardingChoiceProps) {
+export function OnboardingChoice({ onChoice, onOpenBusiness }: OnboardingChoiceProps) {
   const [selected, setSelected] = useState<OnboardingMode>(null);
 
   const handleStart = () => {
@@ -26,6 +27,14 @@ export function OnboardingChoice({ onChoice }: OnboardingChoiceProps) {
           <p className="text-lg text-slate-300">Kies je startmodus</p>
         </div>
 
+        {onOpenBusiness && (
+          <div className="text-center">
+            <button type="button" onClick={onOpenBusiness} className="rounded-lg border border-amber-300 bg-amber-100 px-6 py-3 font-semibold text-slate-900">
+              Open Zakelijk
+            </button>
+            <p className="mt-2 text-sm text-slate-300">Bekijk de fictieve zzp-onderneming of hervat je eigen zakelijke administratie.</p>
+          </div>
+        )}
         <div className="grid gap-6 md:grid-cols-3">
           <button
             type="button"

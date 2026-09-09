@@ -259,7 +259,7 @@ const ActionZone = ({
   );
 };
 
-const App = () => {
+const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
   const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
@@ -2265,7 +2265,7 @@ const App = () => {
 
   // Show onboarding screen if no choice made yet (after all hooks!)
   if (!onboardingMode) {
-    return <OnboardingChoice onChoice={handleOnboardingChoice} />;
+    return <OnboardingChoice onChoice={handleOnboardingChoice} onOpenBusiness={onOpenBusiness} />;
   }
 
   const renderContent = () => {
@@ -2491,19 +2491,10 @@ const App = () => {
             >
               Persoonlijk
             </button>
-            <div className="relative flex-1 group">
-              <button
-                type="button"
-                onClick={() => {}}
-                aria-disabled="true"
-                className="w-full rounded-full px-3 py-1 text-xs font-medium border border-white/20 bg-white/5 text-slate-400 cursor-not-allowed"
-              >
-                Zakelijk
-              </button>
-              <div className="pointer-events-none absolute -top-9 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-900 shadow group-hover:block">
-                Binnenkort beschikbaar
-              </div>
-            </div>
+            <button type="button" onClick={onOpenBusiness}
+              className="flex-1 rounded-full px-3 py-1 text-xs font-medium border border-white/20 bg-white/10 text-slate-200 hover:bg-white/20">
+              Zakelijk
+            </button>
           </div>
           <div className="space-y-2">
             {activeTabs.map((step) => {
