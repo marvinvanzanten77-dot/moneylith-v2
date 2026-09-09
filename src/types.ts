@@ -1,4 +1,4 @@
-﻿export type MonthId = string; // "2025-12", "2026-01", etc.
+export type MonthId = string; // "2025-12", "2026-01", etc.
 
 export interface MonthLimit {
   month: MonthId;
@@ -25,6 +25,7 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  amountEntered?: boolean;
   id: string;
   naam: string;
   bedrag: number;
@@ -107,6 +108,7 @@ export type FixedCostItem = {
 };
 
 export type IncomeItem = {
+  amountEntered?: boolean;
   id: string;
   naam: string;
   bedrag: number;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
 import { numberInputValue, parseNumberInput } from "../../utils/numberInput";
@@ -88,12 +88,13 @@ const simulateForecast = (input: ForecastInput, delta: ScenarioDelta, months = 1
 
 type StepVooruitblikProps = {
   financialSnapshot?: FinancialSnapshot | null;
+  missingInputs?: string[];
   variant?: "personal" | "business";
   mode?: FinanceMode;
   readOnly?: boolean;
 };
 
-export function StepVooruitblik({ financialSnapshot, variant = "personal" }: StepVooruitblikProps) {
+export function StepVooruitblik({ financialSnapshot, missingInputs = ["Inkomen", "Vaste lasten", "Schulden", "Vermogen"] }: StepVooruitblikProps) {
   const snapshot = financialSnapshot ?? null;
   const debtNow = snapshot?.totalDebt ?? 0;
   const monthlyPayment = snapshot?.monthlyPressure ?? 0;
@@ -118,6 +119,24 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
     shockDurationMonths: 0,
     shockStartMonth: 0,
   });
+
+  const valuesValid = snapshot && [snapshot.totalDebt, snapshot.monthlyPressure, snapshot.netFree, snapshot.assetsTotal].every(Number.isFinite)
+    && debtNow >= 0 && monthlyPayment >= 0 && bufferNow >= 0;
+  if (missingInputs.length > 0 || !valuesValid) {
+    return (
+      <section className="space-y-3" aria-labelledby="forecast-title">
+        <h1 id="forecast-title" className="text-2xl font-semibold text-slate-50">Vooruitblik</h1>
+        <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4 text-slate-200" role="status">
+          <h2 className="font-semibold">Nog onvoldoende gegevens voor een vooruitblik</h2>
+          <p className="mt-2 text-sm">Vul eerst je gegevens aan en controleer of de overzichten compleet zijn. Een ontbrekend bedrag is niet hetzelfde als € 0.</p>
+          {missingInputs.length > 0
+            ? <p className="mt-2 text-sm">Nog nodig: {missingInputs.join(", ").toLowerCase()}.</p>
+            : <p className="mt-2 text-sm">Controleer de bedragen: er staat nog een ongeldig bedrag in je overzicht.</p>}
+          <p className="mt-2 text-sm">Daarna tonen we je berekening en mogelijke scenario’s.</p>
+        </div>
+      </section>
+    );
+  }
 
   const deltas: Record<ScenarioKey, ScenarioDelta> = {
     baseline: {},
@@ -182,7 +201,7 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
     <div className="space-y-6">
       <div className="mb-4 flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-slate-50">Vooruitblik</h1>
-        <p className="text-sm text-slate-400">Deterministische projectie van je huidige pad en scenario's.</p>
+        <p className="text-sm text-slate-400">Een inschatting voor de komende 12 maanden op basis van je gecontroleerde gegevens.</p>
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -319,12 +338,8 @@ export function StepVooruitblik({ financialSnapshot, variant = "personal" }: Ste
         <h3 className="text-sm font-semibold text-amber-100">Wat kost niets doen?</h3>
         <p className="text-xs text-amber-100">Verloren maanden: {results.baseline.monthsToDebtFree ?? "onbekend"} (bij huidig tempo).</p>
         <p className="text-xs text-amber-100">Onbenutte vrije ruimte (12m): {formatCurrency(costNothing)}</p>
-        {results.baseline.bufferAt12 === 0 && <p className="text-xs text-amber-100">Buffer blijft 0 → kwetsbaarheid blijft hoog.</p>}
-        {debtNow === 0 && bufferNow === 0 && freeRoomNow === 0 && (
-          <p className="text-xs text-amber-100">
-            Vul inkomen, vaste lasten en schulden in voor een betekenisvolle vooruitblik. Zonder data blijft de simulatie leeg.
-          </p>
-        )}
+        {results.baseline.bufferAt12 === 0 && <p className="text-xs text-amber-100">Op basis van deze invoer is er over 12 maanden nog geen buffer.</p>}
+
       </div>
     </div>
   );

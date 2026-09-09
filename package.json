@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "audit": "npm audit",
-    "audit:ci": "npm audit --production --audit-level=moderate"
+    "audit:ci": "npm audit --production --audit-level=moderate",
+    "test": "node --import tsx --test tests/*.test.tsx"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
@@ -37,6 +38,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.5",
     "vite": "^7.3.1"
   }

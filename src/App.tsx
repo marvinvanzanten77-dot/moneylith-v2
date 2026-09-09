@@ -1,4 +1,7 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { InputReview } from "./components/InputReview";
+import { formatCurrency } from "./utils/format";
+import { reviewSection, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FixedCostsList } from "./components/FixedCostsList";
 import { SchuldenkaartCard } from "./components/SchuldenkaartCard";
 import { VermogenCard } from "./components/VermogenCard";
@@ -968,6 +971,8 @@ const App = () => {
   const observation = useObserver(mode === "zakelijk" ? "business" : "personal", moneylithSnapshot);
   const activeTabs = useActiveTabs(mode);
 
+  const [personalReviews, setPersonalReviews] = useLocalStorage<InputReviews>("moneylith.personal.inputReviews.v1", {});
+  const [businessReviews, setBusinessReviews] = useLocalStorage<InputReviews>("moneylith.business.inputReviews.v1", {});
   const [netIncome, setNetIncome] = useLocalStorage<number>("income-netto", 0);
   const [netIncomeBusiness, setNetIncomeBusiness] = useLocalStorage<number>("income-netto-business", 0);
   // INVENTARISATIE (Hoofdstuk 3 - geen wijziging):
@@ -1444,6 +1449,51 @@ const App = () => {
   const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts : manualFixedCosts;
   const fixedCostsBusiness = autoFixedCostsBusiness > 0 ? autoFixedCostsBusiness : manualFixedCostsBusiness;
 
+  const inputSections = (variant: "personal" | "business") => {
+    const business = variant === "business";
+    const receipts = business ? businessReviews : personalReviews;
+    const incomes = business ? incomeItemsBusiness : incomeItems;
+    const manual = business ? fixedCostManualItemsBusiness : fixedCostManualItems;
+    const detected = (business ? mergedFixedCostItemsBusiness : mergedFixedCostItems).filter((item) => item.isFixed && !item.isIgnored);
+    const useDetected = detected.length > 0;
+    const debtItems = business ? debtsBusiness : debts;
+    const assetItems = business ? assetsBusiness : assets;
+    return {
+      income: reviewSection("income", "Inkomen", manualReviewRows(incomes), receipts),
+      fixed: reviewSection("fixed", "Vaste lasten", useDetected ? detected.map((item) => ({
+        id: item.id, name: item.customLabel || item.descriptionPattern,
+        amount: item.customMonthlyAmount ?? item.estimatedMonthlyAmount,
+        details: item,
+      })) : manualReviewRows(manual), receipts),
+      debts: reviewSection("debts", "Schulden", debtItems.map((item) => ({
+        id: item.id, name: item.naam, amount: item.saldo ?? item.openBedrag ?? NaN,
+        complete: Number.isFinite(item.minimaleMaandlast ?? item.minBetaling) && (item.minimaleMaandlast ?? item.minBetaling ?? -1) >= 0,
+        details: item,
+      })), receipts),
+      assets: reviewSection("assets", "Vermogen", assetItems.map((item) => ({
+        id: item.id, name: item.naam, amount: item.bedrag, details: item,
+      })), receipts),
+    };
+  };
+  const personalSections = inputSections("personal");
+  const businessSections = inputSections("business");
+  // Invalidate receipts even when the relevant form is not currently mounted.
+  useEffect(() => {
+    for (const [sections, receipts, save] of [
+      [personalSections, personalReviews, setPersonalReviews],
+      [businessSections, businessReviews, setBusinessReviews],
+    ] as const) {
+      const obsolete = Object.values(sections).filter((section) => receipts[section.key] && !section.ready);
+      if (obsolete.length) save({ ...receipts, ...Object.fromEntries(obsolete.map((section) => [section.key, null])) });
+    }
+  }, [personalSections, businessSections, personalReviews, businessReviews, setPersonalReviews, setBusinessReviews]);
+  const renderInputReview = (variant: "personal" | "business", key: ReviewKey) => {
+    const sections = variant === "business" ? businessSections : personalSections;
+    const receipts = variant === "business" ? businessReviews : personalReviews;
+    const save = variant === "business" ? setBusinessReviews : setPersonalReviews;
+    return <InputReview section={sections[key]} onReview={(signature) => save({ ...receipts, [key]: signature })} />;
+  };
+
   const derivedIncomeFromTransactions = useMemo(() => {
     const pos = transactions?.filter((t) => t.amount > 0) ?? [];
     return pos.reduce((sum, t) => sum + t.amount, 0);
@@ -1876,34 +1926,11 @@ const App = () => {
       : undefined;
     const freeLabel = isBusinessVariant ? "Netto bedrijfsruimte / maand" : "Vrij te besteden per maand";
 
-    const incomeValue = isBusinessVariant ? netIncomeBusiness ?? 0 : netIncome ?? 0;
-    const fixedValue = isBusinessVariant ? fixedCostsBusiness ?? 0 : fixedCosts ?? 0;
-
-    const incomeSourceLabel = snapshot?.totalIncome?.source === "transactions"
-      ? "Bron: Afschriften"
-      : snapshot?.totalIncome?.source === "buckets"
-      ? "Bron: Buckets"
-      : "Bron: Handmatig";
-    const fixedSourceLabel = snapshot?.fixedCostsTotal?.source === "transactions"
-      ? "Bron: Afschriften"
-      : snapshot?.fixedCostsTotal?.source === "buckets"
-      ? "Bron: Buckets"
-      : "Bron: Handmatig";
-
-    const freeAmount = incomeValue - fixedValue;
+    const sections = isBusinessVariant ? businessSections : personalSections;
+    const ready = sections.income.ready && sections.fixed.ready;
+    const freeAmount = sections.income.total - sections.fixed.total;
     const activeGoalsList = goalsSource.filter((g) => g.isActive);
-    const totalGoalPressure = activeGoalsList.reduce((sum, g) => sum + (g.monthlyContribution ?? 0), 0);
-
-    let marginStatus = "Geen doelen ingesteld";
-    if (freeAmount <= 0) {
-      marginStatus = "Onhoudbaar tempo";
-    } else if (activeGoalsList.length > 0) {
-      const margin = freeAmount - totalGoalPressure;
-      const threshold = 0.2 * freeAmount;
-      if (margin < 0) marginStatus = "Onhoudbaar tempo";
-      else if (margin < threshold) marginStatus = "Krap tempo";
-      else marginStatus = "Stabiel tempo";
-    }
+    const marginStatus = foundationStatus(sections.income, sections.fixed, activeGoalsList.map((g) => g.monthlyContribution ?? 0));
 
     const aiActionsForMode = isBusinessVariant ? aiActionsBusiness : aiActionsPersonal;
     const incomeApplyCheck = canApplyIncomeSuggestion({
@@ -1978,6 +2005,7 @@ const App = () => {
           </div>
         )}
         <IncomeList
+          confirmed={sections.income.ready}
           items={incomeItemsSource}
           onItemsChange={setIncomeItemsFn}
           onSumChange={(sum) => setNetIncomeFn((prev) => (prev === sum ? prev : sum))}
@@ -1986,6 +2014,7 @@ const App = () => {
           emptyLabel={isBusinessVariant ? "Nog geen inkomstenstroom toegevoegd voor je bedrijf." : undefined}
           totalLabel={isBusinessVariant ? "Totaal omzet" : undefined}
         />
+        {renderInputReview(variant, "income")}
         {incomeHelp && <p className="text-xs text-slate-200">{incomeHelp}</p>}
         <FutureIncomeList
           items={futureIncomeSource}
@@ -1996,6 +2025,7 @@ const App = () => {
           emptyLabel={isBusinessVariant ? "Nog geen toekomstige inkomsten toegevoegd." : undefined}
         />
         <FixedCostsList
+          confirmed={sections.fixed.ready && !fixedItemsSource.some((item) => item.isFixed && !item.isIgnored)}
           items={fixedManualSource}
           onItemsChange={setFixedManualFn}
           onSumChange={(sum) => setManualFixedFn((prev) => (prev === sum ? prev : sum))}
@@ -2004,16 +2034,18 @@ const App = () => {
           emptyLabel={isBusinessVariant ? "Nog geen vaste bedrijfskosten toegevoegd." : undefined}
           totalLabel={isBusinessVariant ? "Som van vaste bedrijfskosten" : undefined}
         />
+        {renderInputReview(variant, "fixed")}
         {fixedHelp && <p className="text-xs text-slate-200">{fixedHelp}</p>}
         <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-slate-100 shadow-sm space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-slate-50">{freeLabel}</p>
             <span className="rounded-full border border-white/20 px-3 py-0.5 text-[11px] text-slate-100">
-              {incomeSourceLabel} / {fixedSourceLabel}
+              {ready ? "Gecontroleerde invoer" : "Invoer nog niet compleet"}
             </span>
           </div>
-          <p className="text-xl font-bold text-white">€{freeAmount.toFixed(0)}</p>
-          <p className="text-xs text-slate-200">{marginStatus}</p>
+          <p className="text-xl font-bold text-white">{ready ? formatCurrency(freeAmount) : "—"}</p>
+          <p className="text-xs text-slate-200" role="status">{marginStatus}</p>
+          {!ready && <p className="text-sm text-slate-200">Vul je inkomen en vaste lasten in en bevestig dat beide overzichten compleet zijn. Heb je geen inkomen of vaste lasten? Bevestig dan expliciet € 0.</p>}
           <p className="text-xs text-slate-300">
             Inkomsten en vaste lasten komen uit de tabellen hierboven. De som van vaste lasten gebruikt de wizard zodra je daar items bevestigt, anders de handmatige lijst.
           </p>
@@ -2065,61 +2097,25 @@ const App = () => {
   // Schrijft: setDebtsSummary, setAssetsSummary, setAflosMode (lokale state in App)
   // Gebruikt totals: debtsSummary, assetsSummary, aflosMode
   const renderAction = (variant: "personal" | "business" = "personal") => {
-    const isBusinessVariant = variant === "business";
-    const mapBucketsForNetFree = (sourceBuckets: SpendBucket[], netFreeValue: number): SpendBucket[] => {
-      return sourceBuckets.map((b) => {
-        const shareOfFree = netFreeValue > 0 ? Math.min(b.monthlyAvg / netFreeValue, 5) : undefined;
-        return { ...b, shareOfFree };
-      });
+    const sections = variant === "business" ? businessSections : personalSections;
+    const debtItems = variant === "business" ? debtsBusiness : debts;
+    const missing = missingInputs(Object.values(sections));
+    const forecastSnapshot: FinancialSnapshot = {
+      totalIncome: { value: sections.income.total, source: "manual" },
+      fixedCostsTotal: { value: sections.fixed.total, source: "manual" },
+      netFree: sections.income.total - sections.fixed.total,
+      totalDebt: sections.debts.total,
+      assetsTotal: sections.assets.total,
+      monthlyPressure: debtItems.reduce((sum, item) => sum + (item.minimaleMaandlast ?? item.minBetaling ?? 0), 0),
+      runwayMonths: null,
     };
-
-    const personalNetFree = netIncome - fixedCosts;
-    const businessNetFree = netIncomeBusiness - fixedCostsBusiness;
-
-    const bucketsForVariant = isBusinessVariant
-      ? mapBucketsForNetFree(bucketsBusiness, businessNetFree)
-      : mapBucketsForNetFree(bucketsPersonal, personalNetFree);
-
-    const businessSnapshotForView: FinancialSnapshot = {
-      totalIncome: { value: netIncomeBusiness ?? 0, source: "manual" },
-      fixedCostsTotal: { value: fixedCostsBusiness ?? 0, source: "manual" },
-      netFree: businessNetFree ?? 0,
-      totalDebt: debtsSummaryBusiness.totalDebt ?? 0,
-      assetsTotal: assetsSummaryBusiness.totalAssets ?? 0,
-      monthlyPressure: debtsSummaryBusiness.totalMinPayment ?? 0,
-      runwayMonths:
-        fixedCostsBusiness > 0 && assetsSummaryBusiness.totalAssets > 0
-          ? Math.floor(assetsSummaryBusiness.totalAssets / fixedCostsBusiness)
-          : null,
-      intent: undefined,
-      focus: null,
-      optimizeCosts: undefined,
-    };
-
-    const personalSnapshotForView: FinancialSnapshot = {
-      totalIncome: { value: netIncome ?? 0, source: "manual" },
-      fixedCostsTotal: { value: fixedCosts ?? 0, source: "manual" },
-      netFree: personalNetFree ?? 0,
-      totalDebt: debtsSummary.totalDebt ?? 0,
-      assetsTotal: assetsSummary.totalAssets ?? 0,
-      monthlyPressure: debtsSummary.totalMinPayment ?? 0,
-      runwayMonths:
-        fixedCosts > 0 && assetsSummary.totalAssets > 0 ? Math.floor(assetsSummary.totalAssets / fixedCosts) : null,
-      intent: undefined,
-      focus: null,
-      optimizeCosts: undefined,
-    };
-
     return (
-      <StepVooruitblik
-        financialSnapshot={isBusinessVariant ? businessSnapshotForView : personalSnapshotForView}
-        spendBuckets={bucketsForVariant}
-        monthFocus={monthFocus}
-        variant={variant}
-        mode={isBusinessVariant ? "business" : "personal"}
-        readOnly={false}
-        aiAnalysisDone={isBusinessVariant ? true : aiAnalysisDone}
-      />
+      <div className="space-y-4">
+        <StepVooruitblik financialSnapshot={forecastSnapshot} missingInputs={missing} variant={variant} />
+        <p className="text-sm text-slate-300">Controleer inkomen en vaste lasten bij Fundament. Vul schulden en vermogen aan in de bijbehorende tabbladen en bevestig hieronder dat die overzichten compleet zijn.</p>
+        {renderInputReview(variant, "debts")}
+        {renderInputReview(variant, "assets")}
+      </div>
     );
   };
 
@@ -2332,18 +2328,16 @@ const App = () => {
       ? Math.floor(activeAssetsSummary.totalAssets / activeFixedCosts)
       : null);
   const focusDisplay = snapshot?.focus ? focusLabelMap[snapshot.focus ?? null] : quickSummary.focus;
-  const fundamentFilled = activeIncomeItems.length > 0 && activeFixedCostManualItems.length > 0;
-  const schuldenFilled = activeDebtsSummary.totalDebt > 0 && activeDebtsSummary.totalMinPayment > 0;
-  const vermogenFilled = (activeAssetsSummary.totalAssets ?? 0) > 0;
+  const activeSections = isBusiness ? businessSections : personalSections;
+  const fundamentFilled = activeSections.income.ready && activeSections.fixed.ready;
+  const schuldenFilled = activeSections.debts.ready;
+  const vermogenFilled = activeSections.assets.ready;
   const activePayAccountIds = activeAccounts.filter((a) => a.active && a.type === "betaalrekening").map((a) => a.id);
   const rekeningenFilled = activePayAccountIds.length > 0;
   const afschriftenFilled = activeStatements.some((s) => activePayAccountIds.includes(s.accountId));
   const ritmeFilled = false;
   const doelenFilled = activeGoals.length > 0;
-  const vooruitblikFilled =
-    totalDebtDisplay > 0 ||
-    assetsTotalDisplay > 0 ||
-    netFreeDisplay !== 0;
+  const vooruitblikFilled = missingInputs(Object.values(activeSections)).length === 0;
   const getStepStatus = (key: StepKey) => {
     const normalized = normalizeStep(key);
     const active = currentStep === key;

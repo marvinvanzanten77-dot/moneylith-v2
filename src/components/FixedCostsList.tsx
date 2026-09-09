@@ -15,6 +15,7 @@ interface FixedCostsListProps {
   emptyLabel?: string;
   totalLabel?: string;
   readOnly?: boolean;
+  confirmed?: boolean;
 }
 
 const newId = () => {
@@ -35,6 +36,7 @@ export function FixedCostsList({
   emptyLabel,
   totalLabel,
   readOnly = false,
+  confirmed = false,
 }: FixedCostsListProps) {
   const [localItems, setLocalItems] = useLocalStorage<FixedCostManualItem[]>(
     storageKey ?? "moneylith.personal.fixedCosts",
@@ -64,7 +66,7 @@ export function FixedCostsList({
   const addItem = () => {
     if (isReadOnly) return;
     const id = newId();
-    const next = [...items, { id, naam: "", bedrag: 0, dagVanMaand: 1, opmerking: "" }];
+    const next = [...items, { id, naam: "", bedrag: 0, amountEntered: false, dagVanMaand: 1, opmerking: "" }];
     updateItems(next);
     setExpandedId(id);
   };
@@ -149,7 +151,7 @@ export function FixedCostsList({
                   <p className="text-sm font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <span>{formatCurrency(item.bedrag || 0)}</span>
+                  <span>{item.amountEntered !== false && Number.isFinite(item.bedrag) && (item.bedrag !== 0 || item.amountEntered === true) ? formatCurrency(item.bedrag) : "Nog niet ingevuld"}</span>
                 </div>
               </button>
 
@@ -174,9 +176,9 @@ export function FixedCostsList({
                         min={0}
                         step={1}
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={numberInputValue(item.bedrag)}
-                        onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value) })}
-                        placeholder="0"
+                        value={item.amountEntered === false ? "" : item.amountEntered === true ? item.bedrag : (numberInputValue(item.bedrag) ?? "")}
+                        onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value), amountEntered: e.target.value.trim() !== "" })}
+                        placeholder="Bedrag invullen"
                         readOnly={isReadOnly}
                       />
                     </label>
@@ -226,7 +228,7 @@ export function FixedCostsList({
       <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
         <div className="flex items-center justify-between">
           <span>{totalLabel ?? "Som van vaste lasten"}</span>
-          <span className="font-semibold">{formatCurrency(items.reduce((sum, item) => sum + (item.bedrag || 0), 0))}</span>
+          <span className="font-semibold">{confirmed || (items.length > 0 && items.every((item) => item.amountEntered !== false && Number.isFinite(item.bedrag) && (item.bedrag !== 0 || item.amountEntered === true))) ? formatCurrency(items.reduce((sum, item) => sum + item.bedrag, 0)) : "Nog niet ingevuld"}</span>
         </div>
       </div>
     </div>
