@@ -11,8 +11,8 @@ function getKey(req: VercelRequest) {
     (req.headers["x-real-ip"] as string) ||
     req.socket.remoteAddress ||
     "unknown";
-  const user = (req.headers["x-user-id"] as string) || "";
-  return user ? `user:${user}` : `ip:${ip}`;
+  // Never trust a caller-provided user id to bypass an anonymous rate limit.
+  return `ip:${ip}`;
 }
 
 export function rateLimit(req: VercelRequest, res: VercelResponse, cfg: WindowConfig): boolean {

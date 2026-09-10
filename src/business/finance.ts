@@ -2,7 +2,7 @@ import {
   reviewSection,
   type InputSection,
   type ReviewRow,
-} from "../logic/inputReadiness";
+} from "../logic/inputReadiness.js";
 import {
   addMonth,
   cashSign,
@@ -14,7 +14,7 @@ import {
   validateBusiness,
   type BusinessData,
   type Section,
-} from "./model";
+} from "./model.js";
 
 export function reviewSections(
   data: BusinessData,

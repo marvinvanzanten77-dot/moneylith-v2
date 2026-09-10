@@ -186,3 +186,20 @@ export function GuideCard({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+export function ModeBanner({ mode, visible, onHide, children }: {
+  mode: "personal" | "business"; visible: boolean; onHide: () => void; children?: ReactNode;
+}) {
+  if (!visible && !children) return null;
+  return <ModeInformation>
+    {visible && <div className="flex items-start justify-between gap-3">
+      <div className="space-y-1">
+        <p className="font-semibold text-sm">{mode === "personal" ? "Persoonlijke modus" : "Zakelijke modus"}</p>
+        <p>{mode === "personal" ? "Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden." : "Focus op omzet, bedrijfskosten, facturen, btw, kasstroom, schulden, vermogen en doelen. Persoonlijke data blijft gescheiden."}</p>
+        <p className="text-[11px] text-slate-200">{mode === "personal" ? "Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde." : "Tip: schakel naar Persoonlijk voor privéfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde."}</p>
+      </div>
+      <button type="button" className="text-[11px] underline text-amber-100" onClick={onHide}>Verberg</button>
+    </div>}
+    {children}
+  </ModeInformation>;
+}

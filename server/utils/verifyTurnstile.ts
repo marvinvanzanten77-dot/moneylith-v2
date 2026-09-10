@@ -5,7 +5,7 @@ export async function verifyTurnstile(req: VercelRequest): Promise<boolean> {
   const optional = process.env.TURNSTILE_OPTIONAL !== "false";
   if (!secret) {
     console.warn("Turnstile secret ontbreekt; verificatie overgeslagen.");
-    return true;
+    return optional;
   }
 
   const token = (req.body as any)?.turnstileToken || (req.headers["x-turnstile-token"] as string) || "";

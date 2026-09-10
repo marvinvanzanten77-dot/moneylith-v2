@@ -1,5 +1,5 @@
 import { toDebtCardItems, fromDebtCardItems } from "./logic/debtRecords";
-import { ApplicationLayout, ModeInformation } from "./components/ApplicationLayout";
+import { ApplicationLayout, ModeBanner } from "./components/ApplicationLayout";
 import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
 import { NavigationStep } from "./components/NavigationStep";
 import { InputReview } from "./components/InputReview";
@@ -2377,52 +2377,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
                 />
       );
     })}</>}
-      banner={showModeBanner && <ModeInformation>
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="font-semibold text-sm">Persoonlijke modus</p>
-            <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
-            <p className="text-[11px] text-slate-200">Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.</p>
-          </div>
-          <button type="button" className="text-[11px] underline text-amber-100" onClick={() => setShowModeBanner(false)}>Verberg</button>
-        </div>
-      </ModeInformation>}
-      guide={      <AiAssistantCard
-        mode={mode === "zakelijk" ? "business" : "personal"}
-        actions={mode === "zakelijk" ? aiActionsBusiness : aiActionsPersonal}
-        onActionsChange={handleAiActionsChange}
-        selectedMonth={selectedMonth}
-        currentStep={currentStep}
-        selectedFocus={quickSummary.focus}
-        userIntent={userIntent}
-        debtsTotal={debtsSummary.totalDebt}
-        debtsMinPayment={debtsSummary.totalMinPayment}
-        debtsCount={debtsSummary.debtCount}
-        debtClearMonths={debtClearMonths}
-        debtClearMonthsAggressive={debtClearMonthsAggressive}
-            debtClearMonthsBuffered={debtClearMonthsBuffered}
-            aflosMode={aflosMode}
-            bufferMonthlyReserve={bufferMonthlyReserve}
-            bufferTargetMonths={bufferTargetMonths}
-            assetsTotal={assetsSummary.totalAssets}
-            assetsCount={assetsSummary.assetsCount}
-            assetMonthlyContribution={assetMonthlyContribution}
-            assetTarget={assetTarget}
-            assetTargetMonths={assetTargetMonths}
-        fixedCostPressure={fixedCostPressure}
-        runwayMonths={runwayMonths}
-        fixedCosts={fixedCosts}
-        financialSnapshot={financialSnapshot}
-        allowProactiveSavingsAdvice={financialSnapshot?.optimizeCosts ?? userIntent.optimizeCosts ?? false}
-        appSnapshot={moneylithSnapshot}
-        onSetAiAnalysisRaw={(raw) => {
-          if (mode === "zakelijk") {
-            setAiAnalysisRawBusiness(raw);
-          } else {
-            setAiAnalysisRaw(raw);
-          }
-        }}
-      />}
+      banner={<ModeBanner mode="personal" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />}
+      guide={<AiAssistantCard scope="personal" userIntent={userIntent} readiness={personalSections} appSnapshot={moneylithSnapshot} />}
       overlays={<>      {helpTooltip && helpMode && (
         <div
           className="pointer-events-none fixed z-[99] max-w-xs rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-lg"

@@ -1,8 +1,6 @@
-import { Button, SurfaceCard } from "../components/WorkspaceUI";
-import { GuideCard } from "../components/ApplicationLayout";
-import { analyzePatterns, goalProgress, guideFor } from "./insights";
+import { SurfaceCard } from "../components/WorkspaceUI";
+import { analyzePatterns, goalProgress } from "./insights";
 import type { BusinessData, Goal } from "./model";
-import type { BusinessTab } from "./copy";
 
 const currency = new Intl.NumberFormat("nl-NL", {
   style: "currency",
@@ -164,33 +162,5 @@ export function GoalSummary({
         </span>
       )}
     </>
-  );
-}
-
-export function BusinessGuide({
-  data,
-  tab,
-  go,
-}: {
-  data: BusinessData;
-  tab: BusinessTab;
-  go: (tab: BusinessTab) => void;
-}) {
-  const guide = guideFor(data, tab);
-  return (
-    <GuideCard>
-      <section className="space-y-3" aria-label="Zakelijke gids">
-        <p className="text-xs text-slate-400">
-          Lokale hulp · AI niet aangesloten
-        </p>
-        <h2 className="text-lg font-semibold">Jouw volgende stap</h2>
-        <p>{guide.text}</p>
-        <Button onClick={() => go(guide.target)}>{guide.action}</Button>
-        <small className="block text-xs text-slate-400">
-          Lokale hulp op basis van deze administratie. AI is niet aangesloten;
-          er worden geen gegevens verstuurd.
-        </small>
-      </section>
-    </GuideCard>
   );
 }

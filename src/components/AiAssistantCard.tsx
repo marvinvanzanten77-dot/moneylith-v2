@@ -1,147 +1,81 @@
 import { GuideCard } from "./ApplicationLayout";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAiOrchestrator, type TabKey } from "../hooks/useAiOrchestrator";
-import { analyseObservation } from "../logic/analysis";
-import { buildMoneylithPrompt } from "../logic/aiPrompt";
-import { useObserver } from "../hooks/useObserver";
-import { appendAiMessage, clearAiMessages, getAiMessages, subscribeToAiMessages } from "../logic/aiMessageBus";
-import type { AiActions } from "../logic/extractActions";
+import { useEffect, useRef, useState } from "react";
 import { TurnstileWidget } from "./TurnstileWidget";
 import type { MoneylithSnapshot } from "../core/moneylithSnapshot";
-
-interface AiAssistantCardProps {
-  mode?: "personal" | "business";
-  actions?: AiActions | null;
-  onActionsChange?: (actions: AiActions | null) => void;
-  onSetAiAnalysisRaw?: (raw: string) => void;
+import { businessChatData, type ChatScope, type ChatMessage } from "../ai/context";
+import { ChatRequestGuard, loadChat, saveChat } from "../ai/conversation";
+import type { BusinessData } from "../business/model";
+interface Props {
+  scope?: ChatScope;
+  businessData?: BusinessData;
   appSnapshot?: MoneylithSnapshot;
-  [key: string]: unknown;
+  userIntent?: unknown;
+  readiness?: unknown;
 }
-
-export function AiAssistantCard({ mode = "personal", actions, onActionsChange, onSetAiAnalysisRaw, appSnapshot }: AiAssistantCardProps) {
-  const observation = useObserver(mode, appSnapshot);
+export function AiAssistantCard(props: Props) {
+  const scope = props.scope ?? "personal";
+  return <ScopedAssistant key={scope} {...props} scope={scope} />;
+}
+function ScopedAssistant({ scope, businessData, appSnapshot, userIntent, readiness }: Props & { scope: ChatScope }) {
+  const [messages, setMessages] = useState(() => loadChat(scope));
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [lastAiActions, setLastAiActions] = useState<AiActions | null>(actions ?? null);
   const [chatInput, setChatInput] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileOptional =
-    import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
-
-  const [messages, setMessages] = useState(getAiMessages());
-
-  useEffect(() => {
-    const unsubscribe = subscribeToAiMessages((next) => setMessages(next));
-    return unsubscribe;
-  }, []);
-
-  const { runAi } = useAiOrchestrator({
-    mode,
-    appendMessage: appendAiMessage,
-    setLoading: setAiLoading,
-    setLastActions: setLastAiActions,
-    onRawContent: (raw) => {
-      onSetAiAnalysisRaw?.(raw);
-    },
-  });
-
-  useEffect(() => {
-    const next = actions ?? null;
-    // Alleen bij daadwerkelijke wijziging om render-loops te voorkomen
-    if (JSON.stringify(next) !== JSON.stringify(lastAiActions)) {
-      setLastAiActions(next);
-    }
-  }, [mode, actions, lastAiActions]);
-
-  useEffect(() => {
-    if (!onActionsChange) return;
-    onActionsChange(lastAiActions);
-    // onActionsChange is stabiel in App; afhankelijkheid bewust beperkt
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastAiActions]);
-
-  const analysis = useMemo(() => (observation ? analyseObservation(observation, mode) : null), [mode, observation]);
-  const toRawContext = (src: ReturnType<typeof useObserver>["personal"]) => ({
-    incomes: src.income,
-    fixed: src.fixedCostManualItems,
-    debts: src.debts,
-    assets: src.assets as any,
-    buckets: src.buckets,
-    futureIncomes: src.futureIncome,
-    transactions: src.transactions,
-    netFree: src.totals.netFree,
-  });
-
-  const primaryRaw = useMemo(
-    () => toRawContext(mode === "business" ? observation.business : observation.personal),
-    [mode, observation],
-  );
-  const secondaryRaw = useMemo(
-    () => toRawContext(mode === "business" ? observation.personal : observation.business),
-    [mode, observation],
-  );
-
-  const aiPayload = useMemo(() => {
-    const extras = secondaryRaw
-      ? [{ label: mode === "business" ? "persoonlijke context (alleen ter info)" : "zakelijke context (alleen ter info)", raw: secondaryRaw }]
-      : undefined;
-    return analysis ? buildMoneylithPrompt(analysis, primaryRaw, extras, appSnapshot) : null;
-  }, [analysis, appSnapshot, primaryRaw, secondaryRaw, mode]);
+  const turnstileOptional = import.meta.env.VITE_TURNSTILE_OPTIONAL !== "false" || !import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const guard = useRef(new ChatRequestGuard());
+  useEffect(() => () => guard.current.cancel(), []);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
-    // Only scroll the conversation, never move the surrounding workspace.
     const conversation = messagesEndRef.current?.parentElement;
-    if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
+    conversation?.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [messages]);
-
   const handleChatSend = async () => {
-    if (!aiPayload || !chatInput.trim()) {
-      setAiError("Geen vraag ingevuld.");
-      return;
-    }
-    if (!turnstileOptional && !turnstileToken) {
-      setAiError("Verificatie mislukt, probeer opnieuw.");
-      return;
-    }
+    if (aiLoading || !chatInput.trim()) return;
+    if (!turnstileOptional && !turnstileToken) { setAiError("Verificatie mislukt, probeer opnieuw."); return; }
+    const request = guard.current.start();
     const question = chatInput.trim();
-    setChatInput("");
+    const next: ChatMessage[] = [...messages, { role: "user" as const, content: question }].slice(-24);
+    setMessages(next); saveChat(scope, next);
+    setChatInput(""); setAiLoading(true); setAiError(null);
     try {
-      const result = await runAi({
-        tab: "ai-analyse" as TabKey,
-        system: aiPayload.system,
-        user: `${aiPayload.user}\n\nVraag: ${question}`,
-        displayUserMessage: question,
-        turnstileToken: turnstileOptional ? undefined : turnstileToken ?? undefined,
-        snapshot: appSnapshot,
+      const context = scope === "personal"
+        ? { month: appSnapshot?.meta.selectedMonth, intent: userIntent, readiness, data: appSnapshot?.personal ?? {} }
+        : businessChatData(businessData);
+      const response = await fetch("/api/moneylith/analyse", {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal: request.signal,
+        body: JSON.stringify({ scope, context, question, history: messages.slice(-24), turnstileToken: turnstileToken ?? undefined }),
       });
-      if (result) {
-        setAiError(null);
-        setTurnstileToken(null); // force nieuwe token next time
-      } else {
-        setAiError("AI kon nu je vraag niet verwerken. Probeer het later opnieuw.");
-      }
-    } catch (err) {
-      console.error(err);
-      setAiError("AI kon nu je vraag niet verwerken. Probeer het later opnieuw.");
+      const result = await response.json() as { content?: string; error?: string; scope?: ChatScope };
+      if (!response.ok || result.error) throw new Error(result.error || "AI-service niet bereikbaar. Probeer het later opnieuw.");
+      if (result.scope !== scope || !result.content?.trim()) throw new Error("Geen geldig AI-antwoord ontvangen. Probeer opnieuw.");
+      if (!request.current()) return;
+      const completed: ChatMessage[] = [...next, { role: "assistant" as const, content: result.content }].slice(-24);
+      saveChat(scope, completed); setMessages(completed);
+    } catch (error) {
+      if (request.current()) setAiError(error instanceof Error ? error.message : "AI-service niet bereikbaar. Probeer opnieuw.");
+    } finally {
+      if (request.current()) { setAiLoading(false); setTurnstileToken(null); }
     }
   };
-
   return (
     <GuideCard>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">AI assistent</h2>
           <p className="text-xs text-slate-400">
-            Stel een vraag of laat de assistent je huidige gegevens analyseren.
+            {scope === "business-demo" ? "Analyse van fictieve demogegevens." : "Stel een vraag of laat de assistent je huidige gegevens analyseren."}
           </p>
         </div>
         <button
           type="button"
           onClick={() => {
-            appendAiMessage({ role: "system", content: "[Chat reset]" });
-            clearAiMessages();
+            guard.current.cancel();
+            saveChat(scope, []);
             setMessages([]);
+            setAiLoading(false);
+            setAiError(null);
+            setChatInput("");
           }}
           className="text-[11px] text-slate-400 hover:text-slate-200 underline"
         >
@@ -174,11 +108,13 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
         <div className="flex-1 space-y-2">
           <TurnstileWidget
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
-            onVerify={(token) => setTurnstileToken(token)}
+            onVerify={setTurnstileToken}
             theme="dark"
           />
           <input
             type="text"
+            aria-label="Vraag aan de AI"
+            maxLength={6000}
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder="Stel een vraag aan de AI..."
@@ -189,19 +125,19 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
               }
             }}
             className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 disabled:opacity-50"
-            disabled={!aiPayload || aiLoading}
+            disabled={aiLoading}
           />
         </div>
         <button
           type="button"
           onClick={handleChatSend}
-          disabled={!aiPayload || aiLoading || !chatInput.trim() || (!turnstileOptional && !turnstileToken)}
+          disabled={aiLoading || !chatInput.trim() || (!turnstileOptional && !turnstileToken)}
           className="rounded-lg bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 disabled:opacity-50"
         >
           {aiLoading ? "Bezig..." : "Stel vraag"}
         </button>
       </div>
-      {aiError && <p className="mt-2 text-[11px] text-red-400">{aiError}</p>}
+      {aiError && <p role="alert" className="mt-2 text-[11px] text-red-400">{aiError}</p>}
     </GuideCard>
   );
 }

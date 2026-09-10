@@ -1,3 +1,5 @@
+import { saveChat } from "../ai/conversation";
+import { AiAssistantCard } from "../components/AiAssistantCard";
 import {
   Input,
   Textarea,
@@ -7,7 +9,7 @@ import {
 } from "../components/WorkspaceUI";
 import {
   ApplicationLayout,
-  ModeInformation,
+  ModeBanner,
 } from "../components/ApplicationLayout";
 import {
   readBusinessStep,
@@ -15,7 +17,7 @@ import {
   workspaceStepMap,
 } from "../components/workspaceNavigation";
 import { NavigationStep } from "../components/NavigationStep";
-import { BusinessGuide, GoalSummary, PatternsPanel } from "./InsightPanels";
+import { GoalSummary, PatternsPanel } from "./InsightPanels";
 import { stepProgress } from "./insights";
 import { useState } from "react";
 import { Collection, ConfirmAction, EditDialog, type Field } from "./Editor";
@@ -275,6 +277,7 @@ export default function BusinessWorkspace({
   const [tab, setTab] = useState<BusinessTab>(readBusinessStep);
   const [backup, setBackup] = useState("");
   const [showRestore, setShowRestore] = useState(false);
+  const [showModeBanner, setShowModeBanner] = useState(true);
   const isDemo = workspace === "demo";
   const go = (next: BusinessTab) => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -305,6 +308,7 @@ export default function BusinessWorkspace({
     setMessage("Opgeslagen in deze browser.");
   };
   const reset = () => {
+    saveChat("business-demo", []);
     setData(resetBusinessDemo(localStorage));
     setFormRevision((version) => version + 1);
     go("foundation");
@@ -312,18 +316,18 @@ export default function BusinessWorkspace({
     setError("");
   };
   const header = (
-    <ModeInformation>
-      <div className="space-y-2">
+    <ModeBanner mode="business" visible={showModeBanner} onHide={() => setShowModeBanner(false)}>
+      <div data-demo-controls className="mt-3 border-t border-amber-200/20 pt-2 space-y-2 text-[11px] [&_button]:text-[11px] [&_button]:bg-transparent [&_button]:text-amber-100 [&_button]:shadow-none">
         <div className="space-y-1">
-          <p className="font-semibold text-sm">
+          <p className="font-semibold">
             {isDemo
-              ? "Zakelijke demo — fictieve gegevens"
+              ? "Demo — fictieve gegevens"
               : "Zakelijk — eigen administratie"}
           </p>
           <p>
             {isDemo
-              ? "Vrij bewerkbaar. Geen echte bank- of AI-verbinding."
-              : "Eigen gegevens, uitsluitend in deze browser opgeslagen."}
+              ? "Vrij bewerkbaar. Bankverbinding niet beschikbaar."
+              : "Eigen gegevens, uitsluitend in deze browser opgeslagen. Bankverbinding niet beschikbaar."}
           </p>
         </div>
         <div className="biz-actions">
@@ -341,7 +345,7 @@ export default function BusinessWorkspace({
           )}
         </div>
       </div>
-    </ModeInformation>
+    </ModeBanner>
   );
   if (!data)
     return (
@@ -354,7 +358,6 @@ export default function BusinessWorkspace({
         banner={header}
         navigation={null}
         guide={null}
-        guideTitle="Gids · lokale hulp"
       >
         <div className="card-shell p-5 text-slate-900 space-y-4">
           <h1>Gegevens konden niet worden geopend</h1>
@@ -1398,8 +1401,7 @@ export default function BusinessWorkspace({
           onClick={() => go(key)}
         />
       ))}
-      guideTitle="Gids · lokale hulp"
-      guide={<BusinessGuide data={data} tab={tab} go={go} />}
+      guide={<AiAssistantCard key={formRevision} scope={isDemo ? "business-demo" : "business-real"} businessData={data} />}
     >
       <div key={formRevision} className="business-content space-y-4">
         {tab !== "intent" && (

@@ -10,7 +10,7 @@ import {
   readWorkspaceStep,
   rememberWorkspaceStep,
 } from "../src/components/workspaceNavigation";
-import { BusinessGuide } from "../src/business/InsightPanels";
+import { ModeBanner } from "../src/components/ApplicationLayout";
 import { emptyBusiness } from "../src/business/model";
 
 test("every business tab maps to the same personal position, including unavailable Bank", () => {
@@ -85,11 +85,12 @@ test("inline forms render editable saved values and distinguish unknown amounts 
   assert.match(html, /value="0"/);
   assert.match(html, /Opslaan/);
 });
-test("business guide identifies local help and offers no apparent chat or bank connection", () => {
-  const html = renderToStaticMarkup(
-    <BusinessGuide data={emptyBusiness("real")} tab="bank" go={() => {}} />,
-  );
-  assert.match(html, /AI niet aangesloten/);
-  assert.ok(!html.includes("<textarea"));
-  assert.ok(!html.includes("<input"));
+test("both modes use identical banner structure and hide control", () => {
+  for (const mode of ["personal", "business"] as const) {
+    const html = renderToStaticMarkup(<ModeBanner mode={mode} visible onHide={() => {}} />);
+    assert.match(html, /data-mode-information/);
+    assert.match(html, /Verberg/);
+    assert.match(html, /beide contexten delen geen data/);
+    assert.equal(renderToStaticMarkup(<ModeBanner mode={mode} visible={false} onHide={() => {}} />), "");
+  }
 });
