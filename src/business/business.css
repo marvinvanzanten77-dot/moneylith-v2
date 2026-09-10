@@ -9,7 +9,7 @@
   min-width: 0;
   box-sizing: border-box;
 }
-.business-content h2,
+.business-content h2:not([class]),
 .biz-dialog h2 {
   @apply text-lg font-semibold;
 }
@@ -71,10 +71,10 @@
   @apply flex flex-col gap-5;
 }
 .biz-form-grid {
-  @apply grid gap-4 md:grid-cols-2;
+  @apply grid gap-2 md:grid-cols-2 lg:grid-cols-4;
 }
 .biz-form-grid label {
-  @apply flex flex-col gap-1 text-sm font-semibold text-slate-800;
+  @apply flex flex-col gap-1 text-xs font-semibold text-slate-600;
 }
 .biz-error {
   @apply rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800;

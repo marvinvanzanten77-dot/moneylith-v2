@@ -1,3 +1,4 @@
+import { ExpandableRecord, recordControlClass } from "./ExpandableRecord";
 import { Button } from "./WorkspaceUI";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -21,7 +22,8 @@ interface IncomeListProps {
 }
 
 const newId = () => {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID)
+    return crypto.randomUUID();
   return String(Date.now());
 };
 
@@ -39,7 +41,10 @@ export function IncomeList({
   confirmed = false,
 }: IncomeListProps) {
   useId(); // reserved for potential aria relationships; avoid breaking existing structure
-  const [localItems, setLocalItems] = useLocalStorage<IncomeItem[]>(storageKey ?? "moneylith.personal.incomeItems", []);
+  const [localItems, setLocalItems] = useLocalStorage<IncomeItem[]>(
+    storageKey ?? "moneylith.personal.incomeItems",
+    [],
+  );
   const items = controlledItems ?? localItems;
   const setItems = onItemsChange ?? setLocalItems;
   const isReadOnly = readOnly === true;
@@ -58,13 +63,18 @@ export function IncomeList({
 
   const updateItem = (id: string, patch: Partial<IncomeItem>) => {
     if (isReadOnly) return;
-    updateItems(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    updateItems(
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
   };
 
   const addItem = () => {
     if (isReadOnly) return;
     const id = newId();
-    const next = [...items, { id, naam: "", bedrag: 0, amountEntered: false, opmerking: "" }];
+    const next = [
+      ...items,
+      { id, naam: "", bedrag: 0, amountEntered: false, opmerking: "" },
+    ];
     updateItems(next);
     setExpandedId(id);
   };
@@ -111,81 +121,99 @@ export function IncomeList({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-600">{heading ?? "Inkomen"}</p>
-          <h3 className="text-lg font-semibold text-slate-900">{subheading ?? "Overzicht van je inkomsten"}</h3>
+          <h3 className="text-lg font-semibold text-slate-900">
+            {subheading ?? "Overzicht van je inkomsten"}
+          </h3>
           <p className="text-xs text-slate-500">
-            Vrije ruimte = inkomen - vaste lasten. Dit bedrag wordt in andere tabs gebruikt als startpunt.
+            Vrije ruimte = inkomen - vaste lasten. Dit bedrag wordt in andere
+            tabs gebruikt als startpunt.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={addItem}
-          disabled={isReadOnly}
-        >
+        <Button type="button" onClick={addItem} disabled={isReadOnly}>
           {addLabel ?? "+ Nieuwe inkomstenstroom"}
         </Button>
       </div>
 
       <div className="space-y-3">
-        {items.length === 0 && <p className="text-sm text-slate-600">{emptyLabel ?? "Nog geen inkomsten toegevoegd."}</p>}
+        {items.length === 0 && (
+          <p className="text-sm text-slate-600">
+            {emptyLabel ?? "Nog geen inkomsten toegevoegd."}
+          </p>
+        )}
         {items.map((item) => {
           const isExpanded = expandedId === item.id;
           return (
-            <div
+            <ExpandableRecord
               key={item.id}
-              className={`rounded-xl border bg-white shadow-sm transition-all duration-200 ${
-                isExpanded ? "border-amber-400 ring-2 ring-amber-100" : "border-slate-200 hover:border-amber-200"
-              }`}
+              expanded={isExpanded}
+              onToggle={() => toggleExpanded(item.id)}
+              disabled={isReadOnly}
+              title={item.naam?.trim() || "Naam"}
+              summary={
+                <span>
+                  {item.amountEntered !== false &&
+                  Number.isFinite(item.bedrag) &&
+                  (item.bedrag !== 0 || item.amountEntered === true)
+                    ? formatCurrency(item.bedrag)
+                    : "Nog niet ingevuld"}
+                </span>
+              }
             >
-              <button
-                type="button"
-                onClick={() => toggleExpanded(item.id)}
-                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition ${
-                  isExpanded ? "bg-amber-50" : "hover:bg-slate-50"
-                }`}
-                disabled={isReadOnly}
-              >
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-900">{item.naam?.trim() || "Naam"}</p>
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <span>{item.amountEntered !== false && Number.isFinite(item.bedrag) && (item.bedrag !== 0 || item.amountEntered === true) ? formatCurrency(item.bedrag) : "Nog niet ingevuld"}</span>
-                </div>
-              </button>
-
               {isExpanded && (
                 <div className="border-t border-amber-100 px-3 py-3 text-sm text-slate-800">
                   <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
                     <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-slate-600">Naam</span>
+                      <span className="text-xs font-semibold text-slate-600">
+                        Naam
+                      </span>
                       <input
                         type="text"
-                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        className={recordControlClass}
                         value={item.naam}
-                        onChange={(e) => updateItem(item.id, { naam: e.target.value })}
+                        onChange={(e) =>
+                          updateItem(item.id, { naam: e.target.value })
+                        }
                         placeholder="Bijv. salaris"
                         readOnly={isReadOnly}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-slate-600">Bedrag</span>
+                      <span className="text-xs font-semibold text-slate-600">
+                        Bedrag
+                      </span>
                       <input
                         type="number"
                         min={0}
                         step={1}
-                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        value={item.amountEntered === false ? "" : item.amountEntered === true ? item.bedrag : (numberInputValue(item.bedrag) ?? "")}
-                        onChange={(e) => updateItem(item.id, { bedrag: parseNumberInput(e.target.value), amountEntered: e.target.value.trim() !== "" })}
+                        className={recordControlClass}
+                        value={
+                          item.amountEntered === false
+                            ? ""
+                            : item.amountEntered === true
+                              ? item.bedrag
+                              : (numberInputValue(item.bedrag) ?? "")
+                        }
+                        onChange={(e) =>
+                          updateItem(item.id, {
+                            bedrag: parseNumberInput(e.target.value),
+                            amountEntered: e.target.value.trim() !== "",
+                          })
+                        }
                         placeholder="Bedrag invullen"
                         readOnly={isReadOnly}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-slate-600">Opmerking</span>
+                      <span className="text-xs font-semibold text-slate-600">
+                        Opmerking
+                      </span>
                       <input
                         type="text"
-                        className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                        className={recordControlClass}
                         value={item.opmerking ?? ""}
-                        onChange={(e) => updateItem(item.id, { opmerking: e.target.value })}
+                        onChange={(e) =>
+                          updateItem(item.id, { opmerking: e.target.value })
+                        }
                         placeholder="optioneel"
                         readOnly={isReadOnly}
                       />
@@ -203,7 +231,7 @@ export function IncomeList({
                   </div>
                 </div>
               )}
-            </div>
+            </ExpandableRecord>
           );
         })}
       </div>
@@ -211,7 +239,20 @@ export function IncomeList({
       <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
         <div className="flex items-center justify-between">
           <span>{totalLabel ?? "Totaal inkomen"}</span>
-          <span className="font-semibold">{confirmed || (items.length > 0 && items.every((item) => item.amountEntered !== false && Number.isFinite(item.bedrag) && (item.bedrag !== 0 || item.amountEntered === true))) ? formatCurrency(items.reduce((sum, item) => sum + item.bedrag, 0)) : "Nog niet ingevuld"}</span>
+          <span className="font-semibold">
+            {confirmed ||
+            (items.length > 0 &&
+              items.every(
+                (item) =>
+                  item.amountEntered !== false &&
+                  Number.isFinite(item.bedrag) &&
+                  (item.bedrag !== 0 || item.amountEntered === true),
+              ))
+              ? formatCurrency(
+                  items.reduce((sum, item) => sum + item.bedrag, 0),
+                )
+              : "Nog niet ingevuld"}
+          </span>
         </div>
       </div>
     </div>

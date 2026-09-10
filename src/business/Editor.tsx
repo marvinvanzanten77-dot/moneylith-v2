@@ -1,11 +1,15 @@
 import {
+  ExpandableRecord,
+  recordControlClass,
+} from "../components/ExpandableRecord";
+import {
   Input,
   Select,
   Textarea,
   Button,
   SurfaceCard,
 } from "../components/WorkspaceUI";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { euros } from "./model";
 
 export type Field = {
@@ -96,7 +100,9 @@ export function EditDialog({
   fields,
   onSave,
   inline = false,
+  onCancel,
 }: {
+  onCancel?: () => void;
   inline?: boolean;
   title: string;
   button: string;
@@ -153,6 +159,13 @@ export function EditDialog({
   };
   const form = (
     <form
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && inline && onCancel) {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         try {
@@ -194,6 +207,7 @@ export function EditDialog({
             </span>
             {field.type === "select" ? (
               <Select
+                className={recordControlClass}
                 value={String(draft[field.key] ?? "")}
                 required={!field.optional && !field.nullable}
                 onChange={(e) =>
@@ -217,6 +231,7 @@ export function EditDialog({
               />
             ) : field.type === "textarea" ? (
               <Textarea
+                className={recordControlClass}
                 value={String(draft[field.key] ?? "")}
                 onChange={(e) =>
                   setDraft({ ...draft, [field.key]: e.target.value })
@@ -224,6 +239,7 @@ export function EditDialog({
               />
             ) : (
               <Input
+                className={recordControlClass}
                 type={field.type === "date" ? "date" : "text"}
                 inputMode={
                   field.type === "money" || field.type === "number"
@@ -252,13 +268,17 @@ export function EditDialog({
         <Button
           type="button"
           onClick={() => {
+            if (onCancel) {
+              onCancel();
+              return;
+            }
             if (inline) {
               setDraft(initialDraft());
               setError("");
             } else dialog.current?.close();
           }}
         >
-          {inline ? "Wijzigingen terugzetten" : "Annuleren"}
+          {inline && !onCancel ? "Wijzigingen terugzetten" : "Annuleren"}
         </Button>
       </div>
     </form>
@@ -293,6 +313,7 @@ export function Collection<T extends { id: string; label: string }>({
   onSave,
   onDelete,
   summary,
+  primaryValue,
   empty = "Nog niet ingevuld.",
   inline = false,
 }: {
@@ -303,18 +324,40 @@ export function Collection<T extends { id: string; label: string }>({
   onSave: (item: T) => void;
   onDelete: (id: string) => void;
   summary: (item: T) => ReactNode;
+  primaryValue?: (item: T) => ReactNode;
   empty?: string;
   inline?: boolean;
 }) {
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formVersion, setFormVersion] = useState(0);
   const formRef = useRef<HTMLDivElement>(null);
-  const editing = items.find((item) => item.id === editingId);
+  useEffect(() => {
+    if (!adding && !editingId) return;
+    const frame = requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      formRef.current
+        ?.querySelector<HTMLInputElement>("input")
+        ?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [adding, editingId]);
   return (
     <SurfaceCard className="space-y-4">
       <div className="biz-section-heading">
         <h2>{title}</h2>
+        {inline && (
+          <Button
+            onClick={() => {
+              setAdding(true);
+              setEditingId(null);
+              setFormVersion((v) => v + 1);
+            }}
+          >
+            + Toevoegen
+          </Button>
+        )}
         {!inline && (
           <EditDialog
             title={title + " — toevoegen"}
@@ -329,83 +372,90 @@ export function Collection<T extends { id: string; label: string }>({
         )}
       </div>
       {items.length === 0 && <p className="biz-muted">{empty}</p>}
-      <div className="biz-records">
-        {items.map((item) => (
-          <article key={item.id} className="biz-record">
-            <div>
-              <h3>{item.label}</h3>
-              <div className="biz-record-detail">{summary(item)}</div>
-            </div>
-            <div className="biz-actions">
-              {inline ? (
-                <Button
-                  onClick={() => {
-                    setEditingId(item.id);
-                    requestAnimationFrame(() => {
-                      formRef.current?.scrollIntoView({
-                        block: "center",
-                        behavior: "smooth",
-                      });
-                    });
+      <div className="space-y-3">
+        {items.map((item) =>
+          inline ? (
+            <ExpandableRecord
+              key={item.id}
+              title={item.label}
+              summary={
+                primaryValue?.(item) ??
+                (editingId === item.id ? "Sluiten" : "Bewerken")
+              }
+              expanded={editingId === item.id}
+              onToggle={() => {
+                setAdding(false);
+                setEditingId(editingId === item.id ? null : item.id);
+              }}
+            >
+              <div
+                className="border-t border-amber-100 px-3 py-3 text-sm text-slate-800 space-y-3"
+                ref={editingId === item.id ? formRef : undefined}
+              >
+                <div className="biz-record-detail">{summary(item)}</div>
+                <EditDialog
+                  key={item.id}
+                  inline
+                  title={title + " — bewerken"}
+                  button="Opslaan"
+                  value={item as unknown as Record<string, unknown>}
+                  fields={fields}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(patch) => {
+                    onSave({ ...item, ...patch });
+                    setEditingId(null);
                   }}
-                >
-                  Bewerk {item.label}
-                </Button>
-              ) : (
+                />
+                <ConfirmAction
+                  button={`Verwijder ${item.label}`}
+                  message={`Verwijder '${item.label}' uit deze administratie? Gekoppelde betalingen moeten eerst worden verwijderd.`}
+                  onConfirm={() => {
+                    onDelete(item.id);
+                    setEditingId(null);
+                  }}
+                />
+              </div>
+            </ExpandableRecord>
+          ) : (
+            <article key={item.id} className="biz-record">
+              <div>
+                <h3>{item.label}</h3>
+                <div className="biz-record-detail">{summary(item)}</div>
+              </div>
+              <div className="biz-actions">
                 <EditDialog
                   title={title + " — bewerken"}
                   button={`Bewerk ${item.label}`}
                   value={item as unknown as Record<string, unknown>}
                   fields={fields}
-                  onSave={(patch) => {
-                    onSave({ ...item, ...patch });
-                    setError("");
-                  }}
+                  onSave={(patch) => onSave({ ...item, ...patch })}
                 />
-              )}
-              <ConfirmAction
-                button={`Verwijder ${item.label}`}
-                message={`Verwijder '${item.label}' uit deze administratie? Gekoppelde betalingen moeten eerst worden verwijderd.`}
-                onConfirm={() => {
-                  onDelete(item.id);
-                  if (editingId === item.id) setEditingId(null);
-                  setError("");
-                }}
-              />
-            </div>
-          </article>
-        ))}
+                <ConfirmAction
+                  button={`Verwijder ${item.label}`}
+                  message={`Verwijder '${item.label}' uit deze administratie?`}
+                  onConfirm={() => onDelete(item.id)}
+                />
+              </div>
+            </article>
+          ),
+        )}
       </div>
-      {inline && (
-        <div ref={formRef} className="space-y-3">
+      {inline && adding && (
+        <div ref={formRef}>
           <EditDialog
-            key={`${editingId ?? "new"}-${formVersion}`}
+            key={`new-${formVersion}`}
             inline
-            title={title + (editing ? " — bewerken" : " — toevoegen")}
+            title={title + " — toevoegen"}
             button="Opslaan"
-            value={
-              editing
-                ? (editing as unknown as Record<string, unknown>)
-                : defaults
-            }
+            value={defaults}
             fields={fields}
+            onCancel={() => setAdding(false)}
             onSave={(patch) => {
-              onSave({
-                ...defaults,
-                ...editing,
-                ...patch,
-                id: editing?.id ?? crypto.randomUUID(),
-              } as T);
-              setEditingId(null);
+              onSave({ ...defaults, ...patch, id: crypto.randomUUID() } as T);
+              setAdding(false);
               setFormVersion((v) => v + 1);
-              setError("");
             }}
           />
-          {editing && (
-            <Button onClick={() => setEditingId(null)}>
-              Stoppen met bewerken
-            </Button>
-          )}
         </div>
       )}
       {error && (

@@ -3,6 +3,7 @@ import { CloudAccountCard } from "../CloudAccountCard";
 type StorageMode = "local" | "cloud";
 
 type StepSettingsProps = {
+  business?: boolean;
   storageMode: StorageMode;
   onStorageModeChange: (mode: StorageMode) => void;
   helpMode: boolean;
@@ -15,6 +16,7 @@ type StepSettingsProps = {
 };
 
 export function StepSettings({
+  business = false,
   storageMode,
   onStorageModeChange,
   helpMode,
@@ -40,26 +42,35 @@ export function StepSettings({
           <button
             type="button"
             onClick={() => onStorageModeChange("local")}
-            className={`rounded-xl border px-3 py-3 text-left transition ${
+            className={`rounded-xl border px-3 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed ${
               storageMode === "local"
                 ? "border-emerald-400 bg-emerald-50"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
             <p className="text-sm font-semibold text-slate-900">Local-first</p>
-            <p className="text-xs text-slate-600">Data blijft lokaal in je browser (standaard).</p>
+            <p className="text-xs text-slate-600">
+              Data blijft lokaal in je browser (standaard).
+            </p>
           </button>
           <button
             type="button"
+            disabled={business}
             onClick={() => onStorageModeChange("cloud")}
-            className={`rounded-xl border px-3 py-3 text-left transition ${
+            className={`rounded-xl border px-3 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed ${
               storageMode === "cloud"
                 ? "border-blue-400 bg-blue-50"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <p className="text-sm font-semibold text-slate-900">Cloud-opslag (beta)</p>
-            <p className="text-xs text-slate-600">Login + versleutelde snapshot synchronisatie.</p>
+            <p className="text-sm font-semibold text-slate-900">
+              Cloud-opslag (beta)
+            </p>
+            <p className="text-xs text-slate-600">
+              {business
+                ? "Nog niet beschikbaar voor Zakelijk."
+                : "Login + versleutelde snapshot synchronisatie."}
+            </p>
           </button>
         </div>
         {storageMode === "cloud" && (
@@ -72,7 +83,9 @@ export function StepSettings({
       <div className="card-shell p-4 text-slate-900 space-y-3">
         <h4 className="text-sm font-semibold">Gebruik</h4>
         <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-sm text-slate-700">Hulpmodus (hover tips in sidebar)</span>
+          <span className="text-sm text-slate-700">
+            Hulpmodus (hover tips in sidebar)
+          </span>
           <input
             type="checkbox"
             checked={helpMode}
@@ -80,7 +93,9 @@ export function StepSettings({
           />
         </label>
         <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <span className="text-sm text-slate-700">Toon modus-banner (persoonlijk/zakelijk)</span>
+          <span className="text-sm text-slate-700">
+            Toon modus-banner (persoonlijk/zakelijk)
+          </span>
           <input
             type="checkbox"
             checked={showModeBanner}

@@ -1,3 +1,19 @@
+import { BusinessAccounts } from "./BusinessAccounts";
+import { BackupCard } from "../components/BackupCard";
+import { StepSettings } from "../components/steps/StepSettings";
+import {
+  NavigationHint,
+  type NavigationHintValue,
+} from "../components/NavigationHint";
+import { PageIntro } from "../components/PageIntro";
+import { IntentQuestions } from "../components/IntentQuestions";
+import {
+  businessStrategies,
+  businessPressures,
+  emptyBusinessIntent,
+} from "../logic/businessIntent";
+import { BusinessGoals } from "./BusinessGoals";
+import { InputReview } from "../components/InputReview";
 import { AiAssistantCard } from "../components/AiAssistantCard";
 import {
   Input,
@@ -6,10 +22,7 @@ import {
   SurfaceCard,
   ReviewPanel,
 } from "../components/WorkspaceUI";
-import {
-  ApplicationLayout,
-  ModeBanner,
-} from "../components/ApplicationLayout";
+import { ApplicationLayout, ModeBanner } from "../components/ApplicationLayout";
 import {
   readBusinessStep,
   rememberWorkspaceStep,
@@ -49,13 +62,30 @@ import {
   type Movement,
   type Section,
 } from "./model";
-import {
-  loadBusiness,
-  restoreBusiness,
-  saveBusiness,
-} from "./storage";
+import { loadBusiness, restoreBusiness, saveBusiness } from "./storage";
 import "./business.css";
 
+const pageHelp: Record<string, string> = {
+  foundation:
+    "Hier leg je je zakelijke basis vast: omzetfacturen, bedrijfskosten en investeringen. Controleer de overzichten; daarna volgen de resultaten. Omzet is nog geen ontvangst.",
+  debts:
+    "Leg vast aan wie je bedrijf geld verschuldigd is, hoeveel en welke maandelijkse aflossing is afgesproken.",
+  assets:
+    "Breng bedrijfsmiddelen en reserveringen in kaart. Rekeninggeld telt niet nogmaals mee als bedrijfsmiddel.",
+  accounts:
+    "Voeg je betaal- en spaarrekeningen toe. Beginsaldi en geboekte betalingen vormen samen de geldstand.",
+  bank: "Beheer de herkomst van je bankgegevens. Zakelijke bankkoppeling is nog niet beschikbaar.",
+  patterns:
+    "Bekijk herhaling in gecontroleerde facturen en betalingen. Voeg ontbrekende betalingen toe en controleer opnieuw.",
+  inbox:
+    "Leg documenten vast als facturen, bonnetjes of investeringen. Koppel betalingen afzonderlijk.",
+  forecast:
+    "Bekijk de gevolgen van je gecontroleerde gegevens en aannames. Pas het scenario aan zonder je echte administratie te wijzigen.",
+  backup:
+    "Exporteer of herstel alleen je eigen zakelijke administratie. Maak vóór herstel een backup van de huidige gegevens.",
+  settings:
+    "Beheer je zakelijke aannames en bekijk hoe opslag, privacy en de AI-assistent werken.",
+};
 const currency = new Intl.NumberFormat("nl-NL", {
   style: "currency",
   currency: "EUR",
@@ -268,9 +298,11 @@ export default function BusinessWorkspace({
   const [error, setError] = useState(loaded.error);
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<BusinessTab>(readBusinessStep);
-  const [backup, setBackup] = useState("");
-  const [showRestore, setShowRestore] = useState(false);
   const [showModeBanner, setShowModeBanner] = useState(true);
+  const [helpMode, setHelpMode] = useState(false);
+  const [helpTooltip, setHelpTooltip] = useState<NavigationHintValue | null>(
+    null,
+  );
   const go = (next: BusinessTab) => {
     window.scrollTo({ top: 0, behavior: "instant" });
     setTab(next);
@@ -299,7 +331,13 @@ export default function BusinessWorkspace({
     setData(next);
     setMessage("Opgeslagen in deze browser.");
   };
-  const header = <ModeBanner mode="business" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />;
+  const header = (
+    <ModeBanner
+      mode="business"
+      visible={showModeBanner}
+      onHide={() => setShowModeBanner(false)}
+    />
+  );
   if (!data)
     return (
       <ApplicationLayout
@@ -338,49 +376,25 @@ export default function BusinessWorkspace({
   const check = (section: Section) => {
     const review = result.checks[section];
     return (
-      <ReviewPanel className="space-y-2" key={section}>
-        <strong>
-          {sectionLabels[section]} —{" "}
-          {review.ready
-            ? "Gecontroleerd"
-            : review.hasRows
-              ? "Nog te controleren"
-              : "Nog niet ingevuld"}
-        </strong>
-        <label className="mt-2 flex items-start gap-2">
-          <Input
-            type="checkbox"
-            checked={review.ready}
-            disabled={!review.valid}
-            onChange={(event) =>
-              perform(() => {
-                const next = confirmSection(
-                  data,
-                  section,
-                  event.target.checked,
-                );
-                saveBusiness(localStorage, workspace, next);
-                setData(next);
-                setMessage("Controlebevestiging opgeslagen.");
-              })
-            }
-          />
-          <span>
-            {review.hasRows
-              ? "Ik heb dit overzicht gecontroleerd en het is compleet voor deze berekening."
-              : "Ik bevestig dat dit overzicht volledig is en er geen posten zijn (expliciet € 0)."}
-          </span>
-        </label>
-        {!review.valid && (
-          <p>
-            Vul ontbrekende bedragen of percentages in. Vul 0 in als de waarde
-            echt nul is.
-          </p>
-        )}
-        <small className="block text-xs text-slate-400">
-          Wijzigingen die deze berekening raken maken de bevestiging ongeldig.
-        </small>
-      </ReviewPanel>
+      <InputReview
+        key={section}
+        section={{
+          ...review,
+          label: sectionLabels[section],
+          total: review.total / 100,
+        }}
+        showTotal={
+          section === "income" || section === "costs" || section === "assets"
+        }
+        onReview={(signature) =>
+          perform(() => {
+            const next = confirmSection(data, section, signature !== null);
+            saveBusiness(localStorage, workspace, next);
+            setData(next);
+            setMessage("Controlebevestiging opgeslagen.");
+          })
+        }
+      />
     );
   };
   const saveRow = <T extends { id: string }>(
@@ -416,6 +430,7 @@ export default function BusinessWorkspace({
     });
   const documentList = (kind?: Document["kind"]) => (
     <Collection<Document>
+      inline
       title={
         kind === "sale"
           ? "Omzetfacturen"
@@ -440,6 +455,7 @@ export default function BusinessWorkspace({
         saveRow("documents", { ...row, vatRate: Number(row.vatRate) })
       }
       onDelete={(id) => removeRow("documents", id)}
+      primaryValue={(d) => money(d.net)}
       summary={(d) => (
         <>
           <span>
@@ -464,8 +480,12 @@ export default function BusinessWorkspace({
   );
   const planPanel = (
     <SurfaceCard className="space-y-4">
-      <div className="biz-section-heading">
-        <h2>Maandplan voor nieuw werk</h2>
+      <h2>Maandplan voor nieuw werk</h2>
+      <p>
+        Leg aannames voor nieuw werk vast. Dit verandert geen geboekte facturen
+        of betalingen. Vul 0 in als een bedrag nul is.
+      </p>
+      <div>
         <EditDialog
           inline
           title="Maandplan aanpassen"
@@ -504,8 +524,12 @@ export default function BusinessWorkspace({
   );
   const reservePanel = (
     <SurfaceCard className="space-y-4">
-      <div className="biz-section-heading">
-        <h2>Reserveringen</h2>
+      <h2>Reserveringen</h2>
+      <p>
+        Kies je belastingreserve, buffer en betaalfrequentie. Dit zijn aannames
+        voor je planning, geen aangifteberekening.
+      </p>
+      <div>
         <EditDialog
           inline
           title="Reserveringen aanpassen"
@@ -606,6 +630,7 @@ export default function BusinessWorkspace({
         import in deze zakelijke versie.
       </p>
       <Collection<Movement>
+        inline
         title="Ontvangsten en betalingen"
         items={data.movements.filter((m) => m.date.slice(0, 7) === data.month)}
         fields={movementFields}
@@ -627,6 +652,7 @@ export default function BusinessWorkspace({
           })
         }
         onDelete={(id) => removeRow("movements", id)}
+        primaryValue={(m) => money(m.amount)}
         summary={(m) => (
           <>
             <span>
@@ -649,40 +675,61 @@ export default function BusinessWorkspace({
     switch (tab) {
       case "intent":
         return (
-          <SurfaceCard className="space-y-4 space-y-6">
-            <h2>Jouw onderneming en richting</h2>
-            <p className="text-sm text-slate-500">
-              Dit is het vertrekpunt van je zakelijke koers. Direct invullen,
-              later altijd aan te passen.
-            </p>
-            <div className="space-y-4">
-              {(
-                [
-                  ["name", "Bedrijfsnaam"],
-                  ["goal", "Wat wil je met je onderneming bereiken?"],
-                  ["pressure", "Waar ervaar je financiële druk?"],
-                  ["direction", "Welke richting wil je op?"],
-                ] as const
-              ).map(([key, label]) => (
-                <label
-                  key={key}
-                  className="block text-sm font-semibold text-slate-800"
-                >
-                  {label}
-                  {key === "name" ? (
-                    <Input
-                      value={data.profile[key]}
-                      onChange={(e) =>
-                        perform(() =>
-                          commit((next) => {
-                            next.profile[key] = e.target.value;
-                          }),
-                        )
-                      }
-                    />
-                  ) : (
+          <IntentQuestions
+            business
+            value={data.intent ?? emptyBusinessIntent()}
+            strategies={businessStrategies}
+            pressures={businessPressures}
+            onChange={(intent) =>
+              perform(() =>
+                commit((next) => {
+                  next.intent = intent;
+                }),
+              )
+            }
+          >
+            <div className="space-y-4 border-t border-slate-300 pt-4">
+              <label className="block text-sm font-semibold text-slate-800">
+                Bedrijfsnaam
+                <Input
+                  value={data.profile.name}
+                  onChange={(e) =>
+                    perform(() =>
+                      commit((next) => {
+                        next.profile.name = e.target.value;
+                      }),
+                    )
+                  }
+                />
+              </label>
+              <details
+                open={Boolean(
+                  data.profile.goal ||
+                  data.profile.pressure ||
+                  data.profile.direction,
+                )}
+              >
+                <summary className="cursor-pointer text-sm font-semibold">
+                  Aanvullende toelichting
+                </summary>
+                <p className="text-xs text-slate-500">
+                  Bestaande teksten blijven behouden. Ze kiezen geen strategie,
+                  drukfactor of termijn voor je.
+                </p>
+                {(
+                  [
+                    ["goal", "Toelichting bij je doel"],
+                    ["pressure", "Toelichting bij financiële druk"],
+                    ["direction", "Toelichting bij je richting"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="mt-3 block text-sm font-semibold text-slate-800"
+                  >
+                    {label}
                     <Textarea
-                      rows={3}
+                      rows={2}
                       value={data.profile[key]}
                       onChange={(e) =>
                         perform(() =>
@@ -692,15 +739,11 @@ export default function BusinessWorkspace({
                         )
                       }
                     />
-                  )}
-                </label>
-              ))}
+                  </label>
+                ))}
+              </details>
             </div>
-            <p className="text-sm text-slate-500">
-              Financiële conclusies volgen pas uit gecontroleerde bedragen, niet
-              uit je gekozen richting.
-            </p>
-          </SurfaceCard>
+          </IntentQuestions>
         );
       case "bank":
         return (
@@ -720,6 +763,11 @@ export default function BusinessWorkspace({
       case "foundation":
         return (
           <>
+            {documentList("sale")}
+            {check("income")}
+            {documentList("cost")}
+            {documentList("asset")}
+            {check("costs")}
             <Missing names={missingFor(data, "profit")} />
             <div className="biz-metrics">
               <Metric
@@ -755,11 +803,7 @@ export default function BusinessWorkspace({
                 detail="Geldmiddelen − maandreserves − buffer − open inkoopfacturen"
               />
             </div>
-            {documentList("sale")}
-            {check("income")}
-            {documentList("cost")}
-            {documentList("asset")}
-            {check("costs")}
+
             {planPanel}
           </>
         );
@@ -772,20 +816,7 @@ export default function BusinessWorkspace({
               ontvangsten en aflossingen koppel je bij Patronen. Rente is een
               aparte kostenpost.
             </p>
-            <div className="biz-metrics">
-              <Metric
-                label="Openstaande leningen en regelingen"
-                value={
-                  result.checks.debts.ready
-                    ? result.debts.reduce((s, d) => s + d.balance, 0)
-                    : null
-                }
-              />
-              <Metric
-                label="Open inkoopfacturen incl. btw"
-                value={missingFor(data, "vat").length ? null : result.payables}
-              />
-            </div>
+
             <Collection<Debt>
               inline
               title="Zakelijke leningen en regelingen"
@@ -798,6 +829,7 @@ export default function BusinessWorkspace({
               }}
               onSave={(row) => saveRow("debts", row)}
               onDelete={(id) => removeRow("debts", id)}
+              primaryValue={(d) => money(d.opening)}
               summary={(d) => (
                 <>
                   <span>
@@ -817,6 +849,20 @@ export default function BusinessWorkspace({
               )}
             />
             {check("debts")}
+            <div className="biz-metrics">
+              <Metric
+                label="Openstaande leningen en regelingen"
+                value={
+                  result.checks.debts.ready
+                    ? result.debts.reduce((s, d) => s + d.balance, 0)
+                    : null
+                }
+              />
+              <Metric
+                label="Open inkoopfacturen incl. btw"
+                value={missingFor(data, "vat").length ? null : result.payables}
+              />
+            </div>
             <SurfaceCard className="space-y-4">
               <h2>Openstaande leveranciersfacturen</h2>
               {result.outstanding
@@ -833,27 +879,6 @@ export default function BusinessWorkspace({
       case "assets":
         return (
           <>
-            <div className="biz-metrics">
-              <Metric
-                label="Liquide geldmiddelen"
-                value={missingFor(data, "cash").length ? null : result.cash}
-                detail={`Rekeningen t/m ${monthEnd(data.month)}`}
-              />
-              <Metric
-                label="Handmatige boekwaarde bedrijfsmiddelen"
-                value={result.checks.assets.ready ? result.assetValue : null}
-                detail="Geen beschikbaar geld; geen automatische afschrijving"
-              />
-              <Metric
-                label="Geschatte belastingreserve"
-                value={
-                  missingFor(data, "available").length
-                    ? null
-                    : result.taxReserve
-                }
-              />
-            </div>
-            {reservePanel}
             <Collection<Asset>
               inline
               title="Bedrijfsmiddelen"
@@ -875,6 +900,7 @@ export default function BusinessWorkspace({
               ]}
               onSave={(row) => saveRow("assets", row)}
               onDelete={(id) => removeRow("assets", id)}
+              primaryValue={(a) => money(a.value)}
               summary={(a) => (
                 <>
                   <span>{money(a.value)}</span>
@@ -883,88 +909,36 @@ export default function BusinessWorkspace({
               )}
             />
             {check("assets")}
+            {reservePanel}
+            <div className="biz-metrics">
+              <Metric
+                label="Liquide geldmiddelen"
+                value={missingFor(data, "cash").length ? null : result.cash}
+                detail={`Rekeningen t/m ${monthEnd(data.month)}`}
+              />
+              <Metric
+                label="Handmatige boekwaarde bedrijfsmiddelen"
+                value={result.checks.assets.ready ? result.assetValue : null}
+                detail="Geen beschikbaar geld; geen automatische afschrijving"
+              />
+              <Metric
+                label="Geschatte belastingreserve"
+                value={
+                  missingFor(data, "available").length
+                    ? null
+                    : result.taxReserve
+                }
+              />
+            </div>
           </>
         );
       case "goals":
         return (
-          <>
-            <p className="biz-notice">
-              Doelen zijn plannen. Een doel maakt geen betaling, kostenpost of
-              extra reserve aan. Verwerk een daadwerkelijke investering of
-              aflossing bij Inbox/Patronen.
-            </p>
-            <Collection<Goal>
-              inline
-              title="Zakelijke doelen"
-              items={data.goals}
-              defaults={{
-                kind: "buffer",
-                current: 0,
-                monthly: 0,
-                date: data.month + "-28",
-              }}
-              fields={[
-                { key: "label", label: "Doel" },
-                {
-                  key: "kind",
-                  label: "Soort doel",
-                  type: "select",
-                  options: [
-                    ["revenue", "Maandomzet"],
-                    ["buffer", "Bedrijfsbuffer"],
-                    ["investment", "Investering"],
-                    ["repay", "Aflossen"],
-                  ],
-                },
-                {
-                  key: "target",
-                  label: "Doelbedrag (€)",
-                  labelFor: (draft) =>
-                    draft.kind === "revenue"
-                      ? "Gewenste maandomzet excl. btw (€)"
-                      : draft.kind === "repay"
-                        ? "Totaal af te lossen bedrag (€)"
-                        : "Benodigd budget (€)",
-                  type: "money",
-                },
-                {
-                  key: "current",
-                  label: "Huidige voortgang (€)",
-                  visibleWhen: {
-                    key: "kind",
-                    values: ["buffer", "investment", "repay"],
-                  },
-                  labelFor: (draft) =>
-                    draft.kind === "repay"
-                      ? "Al afgeloste hoofdsom (€)"
-                      : "Al apart gezet (€)",
-                  type: "money",
-                },
-                {
-                  key: "monthly",
-                  label: "Maandelijks bedrag (€)",
-                  visibleWhen: {
-                    key: "kind",
-                    values: ["buffer", "investment", "repay"],
-                  },
-                  labelFor: (draft) =>
-                    draft.kind === "repay"
-                      ? "Geplande maandaflossing (€)"
-                      : "Maandelijks apart zetten (€)",
-                  type: "money",
-                },
-                { key: "date", label: "Streefdatum", type: "date" },
-              ]}
-              onSave={(row) =>
-                saveRow("goals", {
-                  ...row,
-                  monthly: row.kind === "revenue" ? 0 : row.monthly,
-                })
-              }
-              onDelete={(id) => removeRow("goals", id)}
-              summary={(g) => <GoalSummary data={data} goal={g} />}
-            />
-          </>
+          <BusinessGoals
+            data={data}
+            onSave={(goal) => saveRow("goals", goal)}
+            onDelete={(id) => removeRow("goals", id)}
+          />
         );
       case "accounts":
         return (
@@ -974,41 +948,20 @@ export default function BusinessWorkspace({
               geopend. Bevestig dat beginsaldi en betalingen volledig zijn
               voordat je de geldstand gebruikt.
             </p>
+
+            <BusinessAccounts
+              data={data}
+              fields={accountFields}
+              onSave={(row) => saveRow("accounts", row)}
+              onDelete={(id) => removeRow("accounts", id)}
+            />
+            {check("cash")}
             <div className="biz-metrics">
               <Metric
                 label="Totaal geldmiddelen"
                 value={missingFor(data, "cash").length ? null : result.cash}
               />
             </div>
-            <Collection<Account>
-              inline
-              title="Zakelijke rekeningen"
-              items={data.accounts}
-              fields={accountFields}
-              defaults={{ type: "payment", date: data.month + "-01" }}
-              onSave={(row) => saveRow("accounts", row)}
-              onDelete={(id) => removeRow("accounts", id)}
-              summary={(a) => (
-                <>
-                  <span>
-                    Beginsaldo {money(a.opening)} op {a.date}
-                  </span>
-                  <span>
-                    Stand t/m {monthEnd(data.month)}:{" "}
-                    {!result.checks.cash.ready
-                      ? "nog niet gecontroleerd"
-                      : result.accounts.find((x) => x.id === a.id)?.balance ===
-                          null
-                        ? "rekening begint later"
-                        : money(
-                            result.accounts.find((x) => x.id === a.id)!
-                              .balance!,
-                          )}
-                  </span>
-                </>
-              )}
-            />
-            {check("cash")}
             <Button onClick={() => go("patterns")}>
               Betalingen bekijken en toevoegen
             </Button>
@@ -1080,6 +1033,7 @@ export default function BusinessWorkspace({
                   <div className="biz-section-heading">
                     <h2>Verken een scenario</h2>
                     <EditDialog
+                      inline
                       title="Scenario aanpassen"
                       button="Scenario aanpassen"
                       value={scenario}
@@ -1183,95 +1137,54 @@ export default function BusinessWorkspace({
         );
       case "backup":
         return (
-          <SurfaceCard className="space-y-4">
-            <h2>
-              Backup van alleen{" "}
-              je eigen zakelijke administratie
-            </h2>
-            <p>
-              Persoonlijke en andere zakelijke administraties zitten niet in
-              deze export. Bewaar je backup op een veilige plek; browseropslag
-              is geen automatische backup.
-            </p>
-            <Button
-              variant="primary"
-              onClick={() =>
-                download(
-                  `moneylith-zakelijk-${workspace}-${data.month}.json`,
-                  data,
-                )
-              }
-            >
-              Backup downloaden
-            </Button>
-            <div className="biz-import">
-              <label>
-                Een backupbestand kiezen
-                <Input
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 2_000_000) {
-                      setError("Maximaal 2 MB.");
-                      return;
-                    }
-                    try {
-                      setBackup(await file.text());
-                      setShowRestore(true);
-                    } catch {
-                      setError("Het backupbestand kon niet worden gelezen.");
-                    }
-                  }}
-                />
-              </label>
-              {showRestore && (
-                <>
-                  <p>
-                    Dit vervangt uitsluitend deze{" "}
-                    eigen zakelijke administratie.
-                    Controlebevestigingen vervallen. Maak eerst een export als
-                    je de huidige inhoud wilt bewaren.
-                  </p>
-                  <ConfirmAction
-                    button="Deze backup bevestigen en herstellen"
-                    message="Deze eigen zakelijke administratie vervangen door de gekozen backup? Alleen deze administratie wordt gewijzigd."
-                    onConfirm={() => {
-                      setData(restoreBusiness(localStorage, workspace, backup));
-                      setBackup("");
-                      setShowRestore(false);
-                      setMessage(
-                        "Backup ingelezen. Controleer de gegevens opnieuw.",
-                      );
-                    }}
-                  />
-                  <Button
-                    onClick={() => {
-                      setShowRestore(false);
-                      setBackup("");
-                    }}
-                  >
-                    Annuleren
-                  </Button>
-                </>
-              )}
-            </div>
-          </SurfaceCard>
+          <div className="max-w-xl">
+            <BackupCard
+              scoped={{
+                snapshot: data as unknown as Record<string, unknown>,
+                versionKey: "moneylith.business.real.backup.versions",
+                restore: (restored) => {
+                  setData(
+                    restoreBusiness(
+                      localStorage,
+                      workspace,
+                      JSON.stringify(restored),
+                    ),
+                  );
+                },
+              }}
+            />
+          </div>
         );
       case "settings": {
         const context = businessAiContext(data);
         return (
           <>
+            <StepSettings
+              business
+              storageMode="local"
+              onStorageModeChange={() => {}}
+              helpMode={helpMode}
+              onHelpModeChange={setHelpMode}
+              showModeBanner={showModeBanner}
+              onShowModeBannerChange={setShowModeBanner}
+              onOpenBackup={() => go("backup")}
+              onResetIntro={() => {
+                setShowModeBanner(true);
+                go("intent");
+              }}
+            />
             {reservePanel}
             <SurfaceCard className="space-y-4">
               <h2>Administratie en privacy</h2>
               <p>
-                Je eigen zakelijke gegevens worden in deze browser bewaard. Persoonlijke gegevens blijven gescheiden.
+                Je eigen zakelijke gegevens worden in deze browser bewaard.
+                Persoonlijke gegevens blijven gescheiden.
               </p>
               <p>
-                Zakelijke bankkoppeling, automatische betalingen en cloudsync zijn niet actief.
-                Wanneer je een AI-vraag verstuurt, worden uitsluitend deze zakelijke context en dit gesprek voor het antwoord verwerkt.
+                Zakelijke bankkoppeling, automatische betalingen en cloudsync
+                zijn niet actief. Wanneer je een AI-vraag verstuurt, worden
+                uitsluitend deze zakelijke context en dit gesprek voor het
+                antwoord verwerkt.
               </p>
               <p>
                 Voor een eventuele analyse ontbreken nog:{" "}
@@ -1349,10 +1262,25 @@ export default function BusinessWorkspace({
                 ? "Actief"
                 : stepProgress(data, key, result.checks)
           }
-          onClick={() => go(key)}
+          onMouseEnter={(e) => {
+            if (!helpMode) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            setHelpTooltip({
+              label,
+              desc: detail,
+              x: rect.right + 8,
+              y: rect.top,
+            });
+          }}
+          onMouseLeave={() => setHelpTooltip(null)}
+          onClick={() => {
+            setHelpTooltip(null);
+            go(key);
+          }}
         />
       ))}
       guide={<AiAssistantCard scope="business-real" businessData={data} />}
+      overlays={<NavigationHint hint={helpMode ? helpTooltip : null} />}
     >
       <div className="business-content space-y-4">
         {tab !== "intent" && (
@@ -1386,10 +1314,17 @@ export default function BusinessWorkspace({
             {message}
           </p>
         )}
+        {tab !== "intent" && tab !== "goals" && tab !== "settings" && (
+          <PageIntro
+            title={businessTabs.find(([key]) => key === tab)?.[1] ?? ""}
+          >
+            {pageHelp[tab]}
+          </PageIntro>
+        )}
         {content()}
         <p className="text-[11px] text-slate-400">
-          Bedragen in euro · Geen belastingaangifteprogramma ·{" "}
-          Eigen zakelijke administratie
+          Bedragen in euro · Geen belastingaangifteprogramma · Eigen zakelijke
+          administratie
         </p>
       </div>
     </ApplicationLayout>

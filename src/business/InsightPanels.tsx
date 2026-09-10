@@ -73,7 +73,8 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
         ) : (
           <p>
             Nog geen herhaling aantoonbaar. Er zijn vergelijkbare facturen in
-            meerdere maanden nodig. Voeg facturen uit eerdere maanden toe om herhaling te kunnen herkennen.
+            meerdere maanden nodig. Voeg facturen uit eerdere maanden toe om
+            herhaling te kunnen herkennen.
           </p>
         )}
       </SurfaceCard>
@@ -123,16 +124,19 @@ export function GoalSummary({
   return (
     <>
       <span>
-        {title} · streefdatum {goal.date}
+        {title} ·{" "}
+        {goal.date ? `streefdatum ${goal.date}` : "Geen deadline gekozen"}
       </span>
       <span>
         {progress.source}:{" "}
         {progress.current === null
-          ? "Nog niet gecontroleerd"
+          ? goal.kind === "revenue"
+            ? "Nog niet gecontroleerd"
+            : "Nog niet ingevuld"
           : money(progress.current)}{" "}
-        / doel {money(goal.target)}
+        / doel {goal.target === null ? "Nog niet ingevuld" : money(goal.target)}
       </span>
-      {progress.current !== null && (
+      {progress.current !== null && goal.target !== null && (
         <progress
           max={Math.max(1, goal.target)}
           value={Math.min(progress.current, goal.target)}
@@ -141,7 +145,7 @@ export function GoalSummary({
       )}
       <span>
         {progress.remaining === null
-          ? "Controleer de omzet bij Fundament."
+          ? "Vul de ontbrekende doelbedragen in en controleer waar nodig de omzet bij Fundament."
           : progress.remaining === 0
             ? "Doelbedrag bereikt op basis van deze invoer."
             : `Nog ${money(progress.remaining)} ${goal.kind === "revenue" ? "maandomzet nodig" : goal.kind === "repay" ? "af te lossen" : "apart te zetten"}.`}
@@ -156,8 +160,9 @@ export function GoalSummary({
           {goal.kind === "repay"
             ? "Geplande aflossing"
             : "Gepland apart zetten"}
-          : {money(goal.monthly)} per maand. Dit is een plan, geen automatische
-          betaling of oordeel over haalbaarheid.
+          : {goal.monthly === null ? "Nog niet ingevuld" : money(goal.monthly)}{" "}
+          per maand. Dit is een plan, geen automatische betaling of oordeel over
+          haalbaarheid.
         </span>
       )}
     </>

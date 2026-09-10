@@ -1,3 +1,7 @@
+import {
+  validateBusinessIntent,
+  type BusinessIntent,
+} from "../logic/businessIntent.js";
 export type Workspace = "demo" | "real";
 export type Section =
   "income" | "costs" | "cash" | "debts" | "assets" | "plan" | "reserves";
@@ -51,10 +55,12 @@ export type Goal = {
   id: string;
   label: string;
   kind: "revenue" | "buffer" | "investment" | "repay";
-  target: number;
-  current: number;
-  monthly: number;
-  date: string;
+  target: number | null;
+  current: number | null;
+  monthly: number | null;
+  date: string | null;
+  isActive?: boolean;
+  priority?: number;
 };
 export type Plan = {
   taxPaymentCadence?: "monthly" | "quarterly" | "hold" | null;
@@ -71,6 +77,7 @@ export type BusinessData = {
   version: 1;
   workspace: Workspace;
   month: string;
+  intent?: BusinessIntent;
   profile: { name: string; goal: string; pressure: string; direction: string };
   documents: Document[];
   movements: Movement[];
@@ -223,6 +230,7 @@ export function validateBusiness(
     )
   )
     fail("Ongeldige controlebevestigingen.");
+  if (data.intent !== undefined) validateBusinessIntent(data.intent);
   const money = (n: unknown, name: string, signed = false) => {
     if (
       typeof n !== "number" ||
@@ -301,10 +309,14 @@ export function validateBusiness(
       fail("Ongeldige notitie bij bedrijfsmiddel.");
   }
   for (const goal of data.goals) {
-    money(goal.target, goal.label);
-    money(goal.current, goal.label);
-    money(goal.monthly, goal.label);
-    date(goal.date);
+    if (goal.target !== null) money(goal.target, goal.label);
+    if (goal.current !== null) money(goal.current, goal.label);
+    if (goal.monthly !== null) money(goal.monthly, goal.label);
+    if (goal.date !== null) date(goal.date);
+    if (goal.isActive !== undefined && typeof goal.isActive !== "boolean")
+      fail("Ongeldige doelstatus.");
+    if (goal.priority !== undefined && !Number.isSafeInteger(goal.priority))
+      fail("Ongeldige doelprioriteit.");
     if (!["revenue", "buffer", "investment", "repay"].includes(goal.kind))
       fail("Kies een geldig doeltype.");
   }

@@ -98,7 +98,10 @@ export function goalProgress(
       : goal.current;
   return {
     current,
-    remaining: current === null ? null : Math.max(0, goal.target - current),
+    remaining:
+      current === null || goal.target === null
+        ? null
+        : Math.max(0, goal.target - current),
     source:
       goal.kind === "revenue"
         ? `Gecontroleerde omzet excl. btw in ${data.month}`
@@ -144,7 +147,12 @@ export function stepProgress(
   if (tab === "forecast")
     return missingFor(data, "forecast").length ? "Nog te doen" : "Beschikbaar";
   if (tab === "intent")
-    return data.profile.name && data.profile.goal ? "Ingevuld" : "Nog te doen";
+    return data.intent?.primaryGoal &&
+      data.intent.mainPressure.length &&
+      data.intent.timeHorizon &&
+      data.intent.aiStyle
+      ? "Ingevuld"
+      : "Nog te doen";
   if (tab === "goals") return data.goals.length ? "Ingevuld" : "Optioneel";
   return "Optioneel";
 }

@@ -1,3 +1,5 @@
+import { NavigationHint } from "./components/NavigationHint";
+import { PageIntro } from "./components/PageIntro";
 import { toDebtCardItems, fromDebtCardItems } from "./logic/debtRecords";
 import { ApplicationLayout, ModeBanner } from "./components/ApplicationLayout";
 import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
@@ -1859,10 +1861,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
 
     return (
       <div className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold text-slate-50">{pageTitle}</h2>
-          <p className="text-sm text-slate-200">{pageIntro}</p>
-        </div>
+        <PageIntro title={pageTitle}>{pageIntro}</PageIntro>
         {!isBusinessVariant && (
           <div className="space-y-2">
             {incomeApplyCheck.ok && (
@@ -2379,15 +2378,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     })}</>}
       banner={<ModeBanner mode="personal" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />}
       guide={<AiAssistantCard scope="personal" userIntent={userIntent} readiness={personalSections} appSnapshot={moneylithSnapshot} />}
-      overlays={<>      {helpTooltip && helpMode && (
-        <div
-          className="pointer-events-none fixed z-[99] max-w-xs rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-lg"
-          style={{ top: helpTooltip.y, left: helpTooltip.x }}
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">{helpTooltip.label}</div>
-          <div className="text-amber-900">{helpTooltip.desc}</div>
-        </div>
-      )}
+      overlays={<>      <NavigationHint hint={helpMode ? helpTooltip : null}/>
 
       {showOverview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur">
