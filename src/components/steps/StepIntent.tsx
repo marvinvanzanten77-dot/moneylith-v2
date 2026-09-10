@@ -1,3 +1,4 @@
+import { Input, Select, SurfaceCard } from "../WorkspaceUI";
 import type { UserIntent } from "../../types";
 
 type StepIntentProps = {
@@ -97,15 +98,14 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
   };
 
   return (
-    <div className="space-y-6 card-shell p-5 text-slate-900">
+    <SurfaceCard className="space-y-6">
       <h2 className="text-lg font-semibold">{title}</h2>
       <p className="text-sm text-slate-500">{subtitle}</p>
 
       <div className="space-y-4">
         <label className="block text-sm font-semibold text-slate-800">
           {strategyQuestion}
-          <select
-            className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
+          <Select
             value={value.primaryGoal ?? ""}
             onChange={(e) => {
               if (isReadOnly) return;
@@ -119,7 +119,7 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
           {value.primaryGoal && (
             <p className="mt-1 text-xs text-slate-500">
               {strategyOptions.find((o) => o.value === value.primaryGoal)?.hint ?? ""}
@@ -135,7 +135,7 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
                 key={`${opt.label}-${opt.value}`}
                 className="flex items-center gap-2 rounded-lg border border-white/40 bg-white/70 px-3 py-2 text-sm text-slate-800"
               >
-                <input
+                <Input
                   type="checkbox"
                   checked={value.mainPressure?.includes(opt.value) ?? false}
                   onChange={() => togglePressure(opt.value)}
@@ -149,8 +149,7 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
 
         <label className="block text-sm font-semibold text-slate-800">
           {horizonQuestion}
-          <select
-            className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
+          <Select
             value={value.timeHorizon ?? ""}
             onChange={(e) => {
               if (isReadOnly) return;
@@ -164,13 +163,12 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <label className="block text-sm font-semibold text-slate-800">
           {aiToneQuestion}
-          <select
-            className="mt-1 block w-full rounded-lg border border-white/50 bg-white/80 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
+          <Select
             value={value.aiStyle ?? ""}
             onChange={(e) => {
               if (isReadOnly) return;
@@ -184,7 +182,7 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
           {value.aiStyle && (
             <p className="mt-1 text-xs text-slate-500">
               Voorbeeld: {aiToneOptions.find((o) => o.value === value.aiStyle)?.example ?? ""}
@@ -193,7 +191,7 @@ export function StepIntent({ value, onChange, variant = "personal", readOnly = f
         </label>
 
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 

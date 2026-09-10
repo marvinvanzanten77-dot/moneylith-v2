@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import PersonalApp from "./App";
 
-const BusinessWorkspace = lazy(() => import("./business/BusinessWorkspace"));
+import BusinessWorkspace from "./business/BusinessWorkspace";
 type Mode = "personal" | "demo" | "real";
 const modeKey = "moneylith.workspace.v1";
 const lastBusinessKey = "moneylith.business.lastWorkspace.v1";
@@ -25,6 +25,24 @@ function initialMode(): Mode {
 
 export default function WorkspaceApp() {
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [enteredWorkspace, setEnteredWorkspace] = useState(() => {
+    try {
+      return (
+        initialMode() !== "personal" ||
+        sessionStorage.getItem("moneylith.navigation.entered") === "true"
+      );
+    } catch {
+      return initialMode() !== "personal";
+    }
+  });
+  useEffect(() => {
+    try {
+      if (enteredWorkspace)
+        sessionStorage.setItem("moneylith.navigation.entered", "true");
+    } catch {
+      /* UI state is optional. */
+    }
+  }, [enteredWorkspace]);
   useEffect(() => {
     if (window.location.pathname !== "/") return;
     // Remember direct hash links as well as button navigation, without touching user records.
@@ -36,6 +54,7 @@ export default function WorkspaceApp() {
     }
   }, [mode]);
   const select = (next: Mode) => {
+    setEnteredWorkspace(true);
     history.replaceState(
       null,
       "",
@@ -45,7 +64,10 @@ export default function WorkspaceApp() {
     setMode(next);
   };
   useEffect(() => {
-    const changed = () => setMode(initialMode());
+    const changed = () => {
+      setEnteredWorkspace(true);
+      setMode(initialMode());
+    };
     window.addEventListener("hashchange", changed);
     return () => window.removeEventListener("hashchange", changed);
   }, []);
@@ -59,24 +81,18 @@ export default function WorkspaceApp() {
     select(next);
   };
   if (window.location.pathname !== "/" || mode === "personal")
-    return <PersonalApp onOpenBusiness={openBusiness} />;
-  return (
-    <Suspense
-      fallback={
-        <main
-          className="min-h-screen bg-slate-950 p-8 text-white"
-          role="status"
-        >
-          Zakelijke administratie openen…
-        </main>
-      }
-    >
-      <BusinessWorkspace
-        key={mode}
-        workspace={mode}
-        onWorkspace={select}
-        onPersonal={() => select("personal")}
+    return (
+      <PersonalApp
+        onOpenBusiness={openBusiness}
+        skipOnboarding={enteredWorkspace}
       />
-    </Suspense>
+    );
+  return (
+    <BusinessWorkspace
+      key={mode}
+      workspace={mode}
+      onWorkspace={select}
+      onPersonal={() => select("personal")}
+    />
   );
 }

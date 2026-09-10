@@ -1,3 +1,5 @@
+import { ApplicationLayout, ModeInformation } from "./components/ApplicationLayout";
+import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
 import { NavigationStep } from "./components/NavigationStep";
 import { InputReview } from "./components/InputReview";
 import { formatCurrency } from "./utils/format";
@@ -49,10 +51,8 @@ import { canApplyIncomeSuggestion, buildIncomePatchFromActions } from "./logic/a
 import { canApplyFixedCostsSuggestions, buildFixedCostsPatchesFromActions } from "./logic/applyFixedCostsSuggestions";
 import { LegalPage } from "./components/LegalPage";
 import { StatusPage } from "./components/StatusPage";
-import { CookieBanner } from "./components/CookieBanner";
 import { parseConsentCookie } from "./components/useConsentCookie";
 import { initAnalytics } from "./analytics/initAnalytics";
-import { AnalyticsGate } from "./components/AnalyticsGate";
 import LogoFull from "../logo/ChatGPT Image Dec 21, 2025, 01_47_34 PM.png";
 import { persistGateway } from "./storage/persistGateway";
 import { buildMoneylithSnapshot } from "./core/moneylithSnapshot";
@@ -260,7 +260,7 @@ const ActionZone = ({
   );
 };
 
-const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
+const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () => void; skipOnboarding?: boolean }) => {
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
   const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
@@ -302,7 +302,7 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
   );
   const [storageMode, setStorageMode] = useLocalStorage<"local" | "cloud">("moneylith.storage.mode", "local");
   const [settingsAuthMode, setSettingsAuthMode] = useState<"login" | "register" | null>(null);
-  const [currentStep, setCurrentStep] = useState<StepKey>("intent");
+  const [currentStep, setCurrentStep] = useState<StepKey>(() => readWorkspaceStep() as StepKey);
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
     ...personalTabs.map((t) => t.key),
@@ -355,17 +355,9 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
     };
   }, [helpMode]);
 
-  // Onboarding logic: set initial step based on onboarding mode
-  useEffect(() => {
-    if (onboardingMode === "bank") {
-      setCurrentStep("bank");
-    } else if (onboardingMode === "manual" || onboardingMode === "cloud") {
-      setCurrentStep("intent");
-    }
-  }, [onboardingMode]);
-
   const handleOnboardingChoice = (choice: "bank" | "manual" | "cloud" | null) => {
     setOnboardingMode(choice);
+    setCurrentStep(choice === "bank" ? "bank" : "intent");
   };
 
   const [debtsSummary, setDebtsSummary] = useState<DebtSummary>({ totalDebt: 0, totalMinPayment: 0, debtCount: 0 });
@@ -1863,6 +1855,8 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
     }
   }, [mode, activeTabs, currentStep]);
 
+  useEffect(() => { rememberWorkspaceStep(currentStep); window.scrollTo({ top: 0, behavior: "instant" }); }, [currentStep]);
+
   const handleStepClick = (step: StepKey) => {
     const unlocked =
       unlockedSteps.includes(step) || unlockedSteps.includes(normalizeStep(step));
@@ -2265,7 +2259,7 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
   };
 
   // Show onboarding screen if no choice made yet (after all hooks!)
-  if (!onboardingMode) {
+  if (!onboardingMode && !skipOnboarding) {
     return <OnboardingChoice onChoice={handleOnboardingChoice} onOpenBusiness={onOpenBusiness} />;
   }
 
@@ -2439,86 +2433,18 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
   };
 
   return (
-    <main
-      className={`min-h-screen text-slate-50 ${
-        isBusiness
-          ? "bg-gradient-to-br from-slate-950 via-blue-950 to-blue-900"
-          : "bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950"
-      }`}
-    >
-      <div className="grid min-h-screen grid-cols-1 gap-4 lg:grid-cols-[220px_1fr_320px]">
-        <aside
-          className={`px-4 py-6 backdrop-blur ${
-            isBusiness ? "border-r border-blue-400/20 bg-blue-950/40" : "border-r border-white/10 bg-white/10"
-          }`}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">Pad</h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsAuthMode(null);
-                  setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings");
-                }}
-                className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-white/40 hover:text-white"
-                aria-label="Open instellingen"
-              >
-                Instellingen
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStorageMode("cloud");
-                  setSettingsAuthMode("login");
-                  setCurrentStep(mode === "zakelijk" ? "biz-settings" : "settings");
-                }}
-                className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[10px] font-semibold text-blue-100 hover:border-blue-100 hover:text-white"
-                aria-label="Open login"
-              >
-                Login
-              </button>
-            </div>
-          </div>
-          <div className="mb-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setMode("persoonlijk")}
-              className={`flex-1 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                mode === "persoonlijk"
-                  ? "bg-white text-slate-900 border-white"
-                  : "bg-white/10 text-slate-200 border-white/20 hover:bg-white/20"
-              }`}
-            >
-              Persoonlijk
-            </button>
-            <button type="button" onClick={onOpenBusiness}
-              className="flex-1 rounded-full px-3 py-1 text-xs font-medium border border-white/20 bg-white/10 text-slate-200 hover:bg-white/20">
-              Zakelijk
-            </button>
-          </div>
-          <div className="space-y-2">
-            {activeTabs.map((step) => {
+    <ApplicationLayout
+      mode="personal"
+      onPersonal={() => setMode("persoonlijk")}
+      onBusiness={() => onOpenBusiness?.()}
+      onSettings={() => { setSettingsAuthMode(null); setCurrentStep("settings"); }}
+      onLogin={() => { setStorageMode("cloud"); setSettingsAuthMode("login"); setCurrentStep("settings"); }}
+      step={activeTabs.find((s) => s.key === currentStep)?.label}
+      navigation={<>{activeTabs.map((step) => {
               const unlocked =
                 unlockedSteps.includes(step.key) || unlockedSteps.includes(normalizeStep(step.key));
               const isBackup = normalizeStep(step.key) === "backup";
               const { active, label } = getStepStatus(step.key);
-              const activeClass = active
-                ? isBusiness
-                  ? isBackup
-                    ? "bg-gradient-to-r from-emerald-400 via-emerald-300 to-lime-200 text-slate-950 border border-emerald-200 shadow-md"
-                    : "bg-gradient-to-r from-blue-500 via-blue-400 to-amber-300 text-slate-950 border border-amber-200 shadow-md"
-                  : isBackup
-                  ? "bg-emerald-400/90 text-slate-950 border border-emerald-200 shadow-md"
-                  : "bg-amber-500/90 text-slate-950 border border-amber-300 shadow-md"
-                : "";
-              const inactiveClass = unlocked
-                ? isBackup
-                  ? "bg-emerald-900/40 text-emerald-100 border border-emerald-400/50 hover:bg-emerald-800/60 hover:border-emerald-200"
-                  : isBusiness
-                  ? "bg-blue-950/50 text-blue-100 border border-amber-300/40 hover:bg-blue-900/60 hover:border-amber-200"
-                  : "bg-amber-900/30 text-amber-100 border border-amber-700 hover:border-amber-500"
-                : "cursor-not-allowed bg-white/5 text-slate-500 border border-white/10";
               return (
                 <NavigationStep
                   key={step.key}
@@ -2537,73 +2463,25 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
                     });
                   }}
                   onMouseLeave={() => setHelpTooltip(null)}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${activeClass || inactiveClass}`}
+                  backup={isBackup}
                   label={step.label}
                   status={unlocked ? label : "Nog te doen"}
                   description={step.desc}
                   active={active}
                 />
       );
-    })}
-  </div>
-</aside>
-
-        <section className="px-4 py-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Moneylith / Finance OS</p>
-              <h1 className="text-2xl font-semibold text-white">Finance Planner</h1>
-            </div>
-            <div
-              className={`rounded-full px-3 py-1 text-xs ${
-                isBusiness ? "bg-blue-500/20 text-amber-100" : "bg-amber-500/20 text-amber-100"
-              }`}
-            >
-              Stap: {activeTabs.find((s) => s.key === currentStep)?.label}
-            </div>
+    })}</>}
+      banner={showModeBanner && <ModeInformation>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="font-semibold text-sm">Persoonlijke modus</p>
+            <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
+            <p className="text-[11px] text-slate-200">Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.</p>
           </div>
-          {showModeBanner && (
-            <div
-              className={`mb-4 rounded-xl border px-4 py-3 text-xs ${
-                isBusiness
-                  ? "border-blue-400/40 bg-blue-950/40 text-blue-50"
-                  : "border-amber-300/50 bg-amber-500/10 text-amber-50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                {isBusiness ? (
-                  <div className="space-y-1">
-                    <p className="font-semibold text-sm">Zakelijke modus</p>
-                    <p>Tabs richten zich op cashflow, verplichtingen en zakelijk kapitaal. Persoonlijke data blijft apart.</p>
-                    <p className="text-[11px] text-slate-200">
-                      Verschillen: vaste lasten/inkomen komen uit je zakelijke stromen; strategie en vooruitblik rekenen alleen je zakelijke cijfers.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="font-semibold text-sm">Persoonlijke modus</p>
-                    <p>Focus op privé-inkomen, vaste lasten, schulden, vermogen en doelen. Zakelijke data blijft gescheiden.</p>
-                    <p className="text-[11px] text-slate-200">
-                      Tip: schakel naar Zakelijk voor bedrijfsfinanciën; beide contexten delen geen data, maar de stappen werken hetzelfde.
-                    </p>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className={`text-[11px] underline ${isBusiness ? "text-blue-100" : "text-amber-100"}`}
-                  onClick={() => setShowModeBanner(false)}
-                >
-                  Verberg
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="space-y-4">{renderContent()}</div>
-        </section>
-
-        <aside className="border-l border-white/10 bg-white/10 px-4 py-6 backdrop-blur lg:sticky lg:top-4 lg:h-fit">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">AI gids</h2>
-      <AiAssistantCard
+          <button type="button" className="text-[11px] underline text-amber-100" onClick={() => setShowModeBanner(false)}>Verberg</button>
+        </div>
+      </ModeInformation>}
+      guide={      <AiAssistantCard
         mode={mode === "zakelijk" ? "business" : "personal"}
         actions={mode === "zakelijk" ? aiActionsBusiness : aiActionsPersonal}
         onActionsChange={handleAiActionsChange}
@@ -2638,10 +2516,8 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
             setAiAnalysisRaw(raw);
           }
         }}
-      />
-    </aside>
-  </div>
-      {helpTooltip && helpMode && (
+      />}
+      overlays={<>      {helpTooltip && helpMode && (
         <div
           className="pointer-events-none fixed z-[99] max-w-xs rounded-xl border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-lg"
           style={{ top: helpTooltip.y, left: helpTooltip.x }}
@@ -2710,7 +2586,7 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
         />
       )}
 
-      {!introSeen && (
+      {!introSeen && !skipOnboarding && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/80 backdrop-blur">
           <div className="card-shell max-w-3xl w-full p-8 text-slate-900">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -2753,30 +2629,10 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
         </div>
       )}
 
-      <footer className="mt-6 border-t border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-200 flex flex-wrap gap-3 justify-center">
-        <a href="/privacy" className="hover:text-white underline-offset-4 hover:underline">
-          Privacy
-        </a>
-        <span className="text-slate-500">•</span>
-        <a href="/disclaimer" className="hover:text-white underline-offset-4 hover:underline">
-          Disclaimer
-        </a>
-        <span className="text-slate-500">•</span>
-        <a href="/terms" className="hover:text-white underline-offset-4 hover:underline">
-          Voorwaarden
-        </a>
-        <span className="text-slate-500">•</span>
-        <a href="/cookies" className="hover:text-white underline-offset-4 hover:underline">
-          Cookies
-        </a>
-        <span className="text-slate-500">•</span>
-        <a href="/status" className="hover:text-white underline-offset-4 hover:underline">
-          Status
-        </a>
-      </footer>
-      <CookieBanner />
-      <AnalyticsGate />
-    </main>
+</>}
+    >
+      {renderContent()}
+    </ApplicationLayout>
   );
 };
 

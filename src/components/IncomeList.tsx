@@ -1,3 +1,4 @@
+import { Button } from "./WorkspaceUI";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -115,14 +116,13 @@ export function IncomeList({
             Vrije ruimte = inkomen - vaste lasten. Dit bedrag wordt in andere tabs gebruikt als startpunt.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={addItem}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-amber-400 hover:shadow"
           disabled={isReadOnly}
         >
           {addLabel ?? "+ Nieuwe inkomstenstroom"}
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-3">

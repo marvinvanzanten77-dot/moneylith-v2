@@ -1,3 +1,5 @@
+import { Button, SurfaceCard } from "../components/WorkspaceUI";
+import { GuideCard } from "../components/ApplicationLayout";
 import { analyzePatterns, goalProgress, guideFor } from "./insights";
 import type { BusinessData, Goal } from "./model";
 import type { BusinessTab } from "./copy";
@@ -11,17 +13,17 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
   const result = analyzePatterns(data);
   if (!result)
     return (
-      <section className="biz-card">
+      <SurfaceCard className="space-y-4">
         <h2>Inkomsten- en uitgavenpatronen</h2>
         <p>
           Nog onvoldoende gecontroleerde gegevens. Controleer rekeningen en
           betalingen voordat we patronen vergelijken.
         </p>
-      </section>
+      </SurfaceCard>
     );
   return (
     <>
-      <section className="biz-card">
+      <SurfaceCard className="space-y-4">
         <h2>Kasstroom door de maanden</h2>
         <p>
           Ontvangsten en uitgaven inclusief btw, leningen en privéonttrekkingen;
@@ -51,8 +53,8 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
             </tbody>
           </table>
         </div>
-      </section>
-      <section className="biz-card">
+      </SurfaceCard>
+      <SurfaceCard className="space-y-4">
         <h2>Terugkerende omzet en kosten</h2>
         <p>
           Dezelfde factuuromschrijving in ten minste twee verschillende maanden.
@@ -77,8 +79,8 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
             of zet uitsluitend de demo terug voor de uitgebreidere voorbeelden.
           </p>
         )}
-      </section>
-      <section className="biz-card">
+      </SurfaceCard>
+      <SurfaceCard className="space-y-4">
         <h2>Waar gaat de omzet naartoe?</h2>
         {result.largestShare === null ? (
           <p>Nog geen positieve omzetbasis voor een verdeling.</p>
@@ -102,7 +104,7 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
         ) : (
           <p>Geen kostenfacturen geregistreerd in deze maand.</p>
         )}
-      </section>
+      </SurfaceCard>
     </>
   );
 }
@@ -176,19 +178,19 @@ export function BusinessGuide({
 }) {
   const guide = guideFor(data, tab);
   return (
-    <aside className="biz-guide" aria-label="Zakelijke gids">
-      <section className="biz-card">
-        <p className="biz-eyebrow">GIDS</p>
-        <h2>Jouw volgende stap</h2>
+    <GuideCard>
+      <section className="space-y-3" aria-label="Zakelijke gids">
+        <p className="text-xs text-slate-400">
+          Lokale hulp · AI niet aangesloten
+        </p>
+        <h2 className="text-lg font-semibold">Jouw volgende stap</h2>
         <p>{guide.text}</p>
-        <button className="biz-button" onClick={() => go(guide.target)}>
-          {guide.action}
-        </button>
-        <small>
+        <Button onClick={() => go(guide.target)}>{guide.action}</Button>
+        <small className="block text-xs text-slate-400">
           Lokale hulp op basis van deze administratie. AI is niet aangesloten;
           er worden geen gegevens verstuurd.
         </small>
       </section>
-    </aside>
+    </GuideCard>
   );
 }

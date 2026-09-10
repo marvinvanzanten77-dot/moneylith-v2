@@ -26,7 +26,7 @@ Open [www.moneylith.nl/#zakelijk-demo](https://www.moneylith.nl/#zakelijk-demo).
 | `src/components/NavigationStep.tsx` | Gedeelde navigatieknop van Persoonlijk en Zakelijk, inclusief voortgang |
 | `src/business/insights.ts`, `InsightPanels.tsx` | Patronen, doeltypegebonden voortgang en lokale gids |
 | `src/business/Editor.tsx` | Gedeelde toegankelijke invoerdialogen en bewerkbare lijsten |
-| `src/business/business.css` | Zakelijke vormgeving en mobiele navigatie |
+| `src/business/business.css` | Indeling van zakelijke inhoud binnen de gedeelde persoonlijke interface |
 | `src/business/copy.ts` | Tabnamen, toelichtingen en centrale rekenaannames |
 | `src/business/demo.ts` | Alle fictieve voorbeeldgegevens van Studio Rivier |
 | `src/business/model.ts` | Versie/schema, centen, datum- en invoervalidatie, opslagsleutels |
@@ -100,3 +100,18 @@ Bij bestaande administraties ontbreekt de nieuwe belastingbetaalfrequentie. De v
 Een omzetdoel toont de gecontroleerde omzet van de geselecteerde maand en de afstand tot het omzetdoel. Het heeft geen veld voor spaarinleg of handmatige omzetvoortgang. Buffer- en investeringsdoelen vragen wat al apart staat; aflosdoelen vragen wat al is afgelost. Betaalformulieren tonen alleen de factuur-, lening- of doelrekeningselectie die bij de gekozen betaalsoort past.
 
 Deze vervolgstap bouwt voort op productiecommit `5a3533c882d551ce498664cd29c2ae7366de919e`. Gerichte suite: **42 tests geslaagd**, waaronder acht nieuwe tests voor patronen, doeltypen, gedeelde navigatie, belastingbetalingen en bestaande gegevens zonder betaalplan. De volledige TypeScript-controle blijft op 85 bestaande fouten zonder nieuwe meldingen. Browsercontrole omvat werkelijke formulieropslag en reload, contextvelden, desktop/mobiel en de persoonlijke navigatie.
+
+## Gedeelde applicatie-interface (10 september 2026)
+
+Persoonlijk is nu de bron voor de presentatie van beide modi. `ApplicationLayout` bevat de oorspronkelijke achtergrond, het raster (220 px navigatie / flexibele inhoud / 320 px gids vanaf `lg`), zijbalkkop, modusschakelaar, paginakop, contentruimte, gidskolom en juridische footer. Op mobiel stapelen dezelfde kolommen in dezelfde volgorde. De flexibele kolom gebruikt `minmax(0, 1fr)` zodat brede zakelijke tabellen binnen hun eigen vlak scrollen.
+
+- `NavigationStep` beheert ook de kleuren, randen, hover en disabled-weergave. De twaalf tabbladen staan in beide modi in dezelfde volgorde. Bank staat tussen Rekeningen en Patronen; Zakelijk toont daar **Niet beschikbaar** met uitleg, zonder koppelactie. De ruimte voor de drie langere persoonlijke navigatiebeschrijvingen is ook zakelijk gereserveerd.
+- `ModeInformation` bevat de modusbeschrijving. De zakelijke demo-aanduiding en bediening staan hier compact bij elkaar; er is geen afzonderlijke zakelijke bovenbalk. De demo-aanduiding kan niet per ongeluk worden verborgen.
+- `GuideCard` is de werkelijke container van zowel de persoonlijke AI-assistent als de zakelijke lokale gids. Alleen Persoonlijk heeft de bestaande chat. Zakelijk vermeldt expliciet dat AI niet is aangesloten. Het automatisch scrollen van de persoonlijke gids beperkt zich tot het gesprek en verplaatst de pagina niet meer.
+- `WorkspaceUI` levert gedeelde `SurfaceCard`, `Input`, `Select`, `Textarea`, `Button` en `ReviewPanel`. De stijlen komen uit persoonlijke Intentie, inkomstenlijst, rekeningformulier en invoercontrole. Deze persoonlijke onderdelen gebruiken dezelfde componenten. Het zakelijke stylesheet beschrijft alleen de indeling van zakelijke inhoud; de tweede applicatie-layout en het eigen kleurschema zijn verwijderd.
+- Zakelijke Intentie is direct bewerkbaar en slaat wijzigingen meteen op. Rekeningen, Schulden, Vermogen en Doelen hebben een formulier in de pagina voor toevoegen en bewerken. Het maandplan en de reserveringen zijn direct zichtbaar met Opslaan en Wijzigingen terugzetten. Facturen en betalingen behouden hun zakelijke registratievenster; de velden, knoppen en lichte kaartweergave volgen de persoonlijke componenten. Destructieve acties blijven bevestigd.
+- `workspaceNavigation` bewaart uitsluitend de tabkeuze in sessieopslag en vertaalt overeenkomstige tabbladen. `#persoonlijk`, `#zakelijk-demo` en `#zakelijk` blijven bestaan. Een wissel of herladen binnen een gestarte sessie brengt de gebruiker niet opnieuw naar de startkeuze. Beide modi beginnen een gekozen tabblad bovenaan; er is geen afzonderlijke horizontale zakelijke mobiele navigatie meer.
+
+De inhoudelijke verschillen blijven bewust bestaan: bedrijfsdoelen, omzetfacturen, kosten, btw, openstaande posten, leningen, privéonttrekkingen, belastingreserves en betaalplannen. Patroonanalyse en doeltypen blijven zakelijk. Rekenregels, readiness en de drie afzonderlijke gegevensopslagen zijn behouden. Een zakelijke login/cloudopslag en bankverbinding zijn niet beschikbaar; de overeenkomstige bediening zegt dat expliciet.
+
+Controle: 46 regressietests, productiebuild en vergelijking van de volledige TypeScript-uitvoer met de uitgangssituatie (85 bestaande fouten, geen nieuwe). Browsercontrole omvat alle twaalf tabbladen in Persoonlijk, zakelijke demo en lege eigen administratie, bij 1440 × 1000 en 390 × 844. Naast screenshots zijn de geometrie van zijbalk, modusschakelaar, navigatiekaarten, contentkolom, paginakop en gidskolom en horizontale overloop gecontroleerd. Invoercontrole omvat persoonlijke en zakelijke Intentie, rekening bewerken/opslaan/herladen, nul versus leeg, readiness, demo terugzetten, corresponderende tabs en gegevensscheiding.

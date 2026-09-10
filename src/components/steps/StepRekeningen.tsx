@@ -1,3 +1,4 @@
+import { Button } from "../WorkspaceUI";
 import { useEffect, useMemo, useState } from "react";
 
 import { formatCurrency } from "../../utils/format";
@@ -273,13 +274,13 @@ export function StepRekeningen({ accounts, onSaveAccount, onDeleteAccount }: Ste
             <p className="text-[11px] text-slate-700">
               De primaire rekening is alleen de standaardselectie; alle actieve rekeningen tellen mee in analyse en afschriften.
             </p>
-            <button
+            <Button variant="primary"
               type="button"
               className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
               onClick={handleSubmit}
             >
               {editingId ? "Rekening bijwerken" : "Rekening opslaan"}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

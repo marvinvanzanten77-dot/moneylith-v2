@@ -1,7 +1,23 @@
+import {
+  Input,
+  Textarea,
+  Button,
+  SurfaceCard,
+  ReviewPanel,
+} from "../components/WorkspaceUI";
+import {
+  ApplicationLayout,
+  ModeInformation,
+} from "../components/ApplicationLayout";
+import {
+  readBusinessStep,
+  rememberWorkspaceStep,
+  workspaceStepMap,
+} from "../components/workspaceNavigation";
 import { NavigationStep } from "../components/NavigationStep";
 import { BusinessGuide, GoalSummary, PatternsPanel } from "./InsightPanels";
 import { stepProgress } from "./insights";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Collection, ConfirmAction, EditDialog, type Field } from "./Editor";
 import {
   assumptions,
@@ -255,39 +271,15 @@ export default function BusinessWorkspace({
   const [data, setData] = useState<BusinessData | null>(loaded.data);
   const [error, setError] = useState(loaded.error);
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<BusinessTab>(() => {
-    try {
-      const saved = localStorage.getItem(workspaceKeys[workspace] + ".tab");
-      return businessTabs.some(([key]) => key === saved)
-        ? (saved as BusinessTab)
-        : "foundation";
-    } catch {
-      return "foundation";
-    }
-  });
-  const navigation = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const reveal = () => {
-      const nav = navigation.current;
-      const active = nav?.querySelector<HTMLButtonElement>(
-        "button[aria-current]",
-      );
-      if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
-      nav.scrollLeft +=
-        active.getBoundingClientRect().left -
-        nav.getBoundingClientRect().left -
-        (nav.clientWidth - active.clientWidth) / 2;
-    };
-    reveal();
-    window.addEventListener("resize", reveal);
-    return () => window.removeEventListener("resize", reveal);
-  }, [tab]);
+  const [formRevision, setFormRevision] = useState(0);
+  const [tab, setTab] = useState<BusinessTab>(readBusinessStep);
   const [backup, setBackup] = useState("");
   const [showRestore, setShowRestore] = useState(false);
   const isDemo = workspace === "demo";
   const go = (next: BusinessTab) => {
     window.scrollTo({ top: 0, behavior: "instant" });
     setTab(next);
+    rememberWorkspaceStep(workspaceStepMap[next]);
     setMessage("");
     try {
       localStorage.setItem(workspaceKeys[workspace] + ".tab", next);
@@ -314,59 +306,64 @@ export default function BusinessWorkspace({
   };
   const reset = () => {
     setData(resetBusinessDemo(localStorage));
+    setFormRevision((version) => version + 1);
     go("foundation");
     setMessage("Alleen de demo is teruggezet.");
     setError("");
   };
   const header = (
-    <header className={`biz-topbar ${isDemo ? "demo" : "real"}`}>
-      <div>
-        <b>
-          {isDemo
-            ? "Zakelijke demo — fictieve gegevens"
-            : "Zakelijk — eigen administratie"}
-        </b>
-        <span>
-          {isDemo
-            ? "Vrij bewerkbaar. Geen echte bank- of AI-verbinding."
-            : "Eigen gegevens, uitsluitend in deze browser opgeslagen."}
-        </span>
+    <ModeInformation>
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <p className="font-semibold text-sm">
+            {isDemo
+              ? "Zakelijke demo — fictieve gegevens"
+              : "Zakelijk — eigen administratie"}
+          </p>
+          <p>
+            {isDemo
+              ? "Vrij bewerkbaar. Geen echte bank- of AI-verbinding."
+              : "Eigen gegevens, uitsluitend in deze browser opgeslagen."}
+          </p>
+        </div>
+        <div className="biz-actions">
+          <Button onClick={() => onWorkspace(isDemo ? "real" : "demo")}>
+            {isDemo
+              ? "Open eigen zakelijke administratie"
+              : "Open zakelijke demo"}
+          </Button>
+          {isDemo && (
+            <ConfirmAction
+              button="Alleen demo terugzetten"
+              message="Je bewerkingen in de demo verdwijnen. Uitsluitend de fictieve demo wordt teruggezet. Persoonlijke en echte zakelijke gegevens blijven bewaard."
+              onConfirm={reset}
+            />
+          )}
+        </div>
       </div>
-      <div className="biz-actions">
-        <button className="biz-button" onClick={onPersonal}>
-          Persoonlijk
-        </button>
-        <button
-          className="biz-button"
-          onClick={() => onWorkspace(isDemo ? "real" : "demo")}
-        >
-          {isDemo
-            ? "Open eigen zakelijke administratie"
-            : "Open zakelijke demo"}
-        </button>
-        {isDemo && (
-          <ConfirmAction
-            button="Alleen demo terugzetten"
-            message="Je bewerkingen in de demo verdwijnen. Uitsluitend de fictieve demo wordt teruggezet. Persoonlijke en echte zakelijke gegevens blijven bewaard."
-            onConfirm={reset}
-          />
-        )}
-      </div>
-    </header>
+    </ModeInformation>
   );
   if (!data)
     return (
-      <main className="business-shell">
-        {header}
-        <div className="biz-content">
+      <ApplicationLayout
+        mode="business"
+        onPersonal={onPersonal}
+        onBusiness={() => {}}
+        onSettings={() => {}}
+        step="Opslag herstellen"
+        banner={header}
+        navigation={null}
+        guide={null}
+        guideTitle="Gids · lokale hulp"
+      >
+        <div className="card-shell p-5 text-slate-900 space-y-4">
           <h1>Gegevens konden niet worden geopend</h1>
           <p role="alert">{error}</p>
           <p>
             De opgeslagen inhoud is niet overschreven. Exporteer die voordat je
             een herstel uitvoert.
           </p>
-          <button
-            className="biz-button"
+          <Button
             onClick={() =>
               perform(() =>
                 download("moneylith-opslag-herstel.json", {
@@ -376,16 +373,16 @@ export default function BusinessWorkspace({
             }
           >
             Opgeslagen inhoud downloaden
-          </button>
+          </Button>
         </div>
-      </main>
+      </ApplicationLayout>
     );
   const scenario = data.scenario;
   const result = calculateBusiness(data);
   const check = (section: Section) => {
     const review = result.checks[section];
     return (
-      <div className="biz-review" key={section}>
+      <ReviewPanel className="space-y-2" key={section}>
         <strong>
           {sectionLabels[section]} —{" "}
           {review.ready
@@ -394,8 +391,8 @@ export default function BusinessWorkspace({
               ? "Nog te controleren"
               : "Nog niet ingevuld"}
         </strong>
-        <label>
-          <input
+        <label className="mt-2 flex items-start gap-2">
+          <Input
             type="checkbox"
             checked={review.ready}
             disabled={!review.valid}
@@ -424,10 +421,10 @@ export default function BusinessWorkspace({
             echt nul is.
           </p>
         )}
-        <small>
+        <small className="block text-xs text-slate-400">
           Wijzigingen die deze berekening raken maken de bevestiging ongeldig.
         </small>
-      </div>
+      </ReviewPanel>
     );
   };
   const saveRow = <T extends { id: string }>(
@@ -510,10 +507,11 @@ export default function BusinessWorkspace({
     />
   );
   const planPanel = (
-    <section className="biz-card">
+    <SurfaceCard className="space-y-4">
       <div className="biz-section-heading">
         <h2>Maandplan voor nieuw werk</h2>
         <EditDialog
+          inline
           title="Maandplan aanpassen"
           button="Maandplan aanpassen"
           value={data.plan}
@@ -546,13 +544,14 @@ export default function BusinessWorkspace({
         <Metric label="Privéonttrekking / maand" value={data.plan.draw} />
       </div>
       {check("plan")}
-    </section>
+    </SurfaceCard>
   );
   const reservePanel = (
-    <section className="biz-card">
+    <SurfaceCard className="space-y-4">
       <div className="biz-section-heading">
         <h2>Reserveringen</h2>
         <EditDialog
+          inline
           title="Reserveringen aanpassen"
           button="Reserveringen aanpassen"
           value={data.plan}
@@ -595,7 +594,7 @@ export default function BusinessWorkspace({
         betaaldata afzonderlijk.
       </p>
       {check("reserves")}
-    </section>
+    </SurfaceCard>
   );
   const movementFields: Field[] = [
     { key: "label", label: "Omschrijving" },
@@ -694,54 +693,73 @@ export default function BusinessWorkspace({
     switch (tab) {
       case "intent":
         return (
-          <section className="biz-card">
+          <SurfaceCard className="space-y-4 space-y-6">
             <h2>Jouw onderneming en richting</h2>
-            <dl className="biz-definition">
-              <dt>Onderneming</dt>
-              <dd>{data.profile.name || "Nog niet ingevuld"}</dd>
-              <dt>Bedrijfsdoel</dt>
-              <dd>{data.profile.goal || "Nog niet ingevuld"}</dd>
-              <dt>Financiële druk</dt>
-              <dd>{data.profile.pressure || "Nog niet ingevuld"}</dd>
-              <dt>Gewenste richting</dt>
-              <dd>{data.profile.direction || "Nog niet ingevuld"}</dd>
-            </dl>
-            <EditDialog
-              title="Bedrijfsrichting aanpassen"
-              button="Bedrijfsrichting aanpassen"
-              value={data.profile}
-              fields={[
-                { key: "name", label: "Bedrijfsnaam" },
-                {
-                  key: "goal",
-                  label: "Wat wil je met je onderneming bereiken?",
-                  type: "textarea",
-                  optional: true,
-                },
-                {
-                  key: "pressure",
-                  label: "Waar ervaar je financiële druk?",
-                  type: "textarea",
-                  optional: true,
-                },
-                {
-                  key: "direction",
-                  label: "Welke richting wil je op?",
-                  type: "textarea",
-                  optional: true,
-                },
-              ]}
-              onSave={(patch) =>
-                commit((next) => {
-                  Object.assign(next.profile, patch);
-                })
-              }
-            />
-            <p>
+            <p className="text-sm text-slate-500">
+              Dit is het vertrekpunt van je zakelijke koers. Direct invullen,
+              later altijd aan te passen.
+            </p>
+            <div className="space-y-4">
+              {(
+                [
+                  ["name", "Bedrijfsnaam"],
+                  ["goal", "Wat wil je met je onderneming bereiken?"],
+                  ["pressure", "Waar ervaar je financiële druk?"],
+                  ["direction", "Welke richting wil je op?"],
+                ] as const
+              ).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="block text-sm font-semibold text-slate-800"
+                >
+                  {label}
+                  {key === "name" ? (
+                    <Input
+                      value={data.profile[key]}
+                      onChange={(e) =>
+                        perform(() =>
+                          commit((next) => {
+                            next.profile[key] = e.target.value;
+                          }),
+                        )
+                      }
+                    />
+                  ) : (
+                    <Textarea
+                      rows={3}
+                      value={data.profile[key]}
+                      onChange={(e) =>
+                        perform(() =>
+                          commit((next) => {
+                            next.profile[key] = e.target.value;
+                          }),
+                        )
+                      }
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <p className="text-sm text-slate-500">
               Financiële conclusies volgen pas uit gecontroleerde bedragen, niet
               uit je gekozen richting.
             </p>
-          </section>
+          </SurfaceCard>
+        );
+      case "bank":
+        return (
+          <SurfaceCard className="space-y-4">
+            <h2>Zakelijke bankkoppeling</h2>
+            <p className="biz-notice">
+              Nog niet beschikbaar. Er is geen zakelijke bank verbonden en er
+              worden geen bankgegevens opgehaald.
+            </p>
+            <p>
+              Registreer rekeningen en betalingen handmatig. Facturen, leningen
+              en privéonttrekkingen blijven afzonderlijk verwerkt.
+            </p>
+            <Button onClick={() => go("accounts")}>Naar rekeningen</Button>
+          </SurfaceCard>
         );
       case "foundation":
         return (
@@ -813,6 +831,7 @@ export default function BusinessWorkspace({
               />
             </div>
             <Collection<Debt>
+              inline
               title="Zakelijke leningen en regelingen"
               items={data.debts}
               fields={debtFields}
@@ -842,7 +861,7 @@ export default function BusinessWorkspace({
               )}
             />
             {check("debts")}
-            <section className="biz-card">
+            <SurfaceCard className="space-y-4">
               <h2>Openstaande leveranciersfacturen</h2>
               {result.outstanding
                 .filter((d) => d.kind !== "sale" && d.unpaid > 0)
@@ -851,10 +870,8 @@ export default function BusinessWorkspace({
                     {d.number} · {d.label} · {money(d.unpaid)} · vervalt {d.due}
                   </p>
                 ))}
-              <button className="biz-button" onClick={() => go("inbox")}>
-                Open Inbox
-              </button>
-            </section>
+              <Button onClick={() => go("inbox")}>Open Inbox</Button>
+            </SurfaceCard>
           </>
         );
       case "assets":
@@ -882,6 +899,7 @@ export default function BusinessWorkspace({
             </div>
             {reservePanel}
             <Collection<Asset>
+              inline
               title="Bedrijfsmiddelen"
               items={data.assets}
               defaults={{ note: "" }}
@@ -920,6 +938,7 @@ export default function BusinessWorkspace({
               aflossing bij Inbox/Patronen.
             </p>
             <Collection<Goal>
+              inline
               title="Zakelijke doelen"
               items={data.goals}
               defaults={{
@@ -1006,6 +1025,7 @@ export default function BusinessWorkspace({
               />
             </div>
             <Collection<Account>
+              inline
               title="Zakelijke rekeningen"
               items={data.accounts}
               fields={accountFields}
@@ -1033,9 +1053,9 @@ export default function BusinessWorkspace({
               )}
             />
             {check("cash")}
-            <button className="biz-button" onClick={() => go("patterns")}>
+            <Button onClick={() => go("patterns")}>
               Betalingen bekijken en toevoegen
-            </button>
+            </Button>
           </>
         );
       case "patterns":
@@ -1070,9 +1090,9 @@ export default function BusinessWorkspace({
             {documentList()}
             {check("income")}
             {check("costs")}
-            <button className="biz-button" onClick={() => go("patterns")}>
+            <Button onClick={() => go("patterns")}>
               Betaling aan factuur koppelen
-            </button>
+            </Button>
           </>
         );
       case "forecast":
@@ -1084,7 +1104,11 @@ export default function BusinessWorkspace({
                 <div className="biz-metrics">
                   <Metric
                     label="Verwacht banksaldo over 12 maanden"
-                    detail={data.plan.taxPaymentCadence === "hold" ? "Zonder belastingbetalingen" : "Na geplande belastingbetalingen"}
+                    detail={
+                      data.plan.taxPaymentCadence === "hold"
+                        ? "Zonder belastingbetalingen"
+                        : "Na geplande belastingbetalingen"
+                    }
                     value={forecast[12].bank}
                   />
                   <Metric
@@ -1096,7 +1120,7 @@ export default function BusinessWorkspace({
                     value={forecast[12].available}
                   />
                 </div>
-                <section className="biz-card">
+                <SurfaceCard className="space-y-4">
                   <div className="biz-section-heading">
                     <h2>Verken een scenario</h2>
                     <EditDialog
@@ -1137,8 +1161,7 @@ export default function BusinessWorkspace({
                     {money(scenario.oneOff)}. Negatieve bedragen bij beschikbaar
                     geld blijven zichtbaar.
                   </p>
-                  <button
-                    className="biz-button"
+                  <Button
                     onClick={() =>
                       perform(() =>
                         commit((next) => {
@@ -1152,7 +1175,7 @@ export default function BusinessWorkspace({
                     }
                   >
                     Terug naar maandplan
-                  </button>
+                  </Button>
                   <div className="biz-table-scroll">
                     <table>
                       <caption>
@@ -1182,7 +1205,7 @@ export default function BusinessWorkspace({
                       </tbody>
                     </table>
                   </div>
-                </section>
+                </SurfaceCard>
               </>
             ) : (
               <p className="biz-notice">
@@ -1192,19 +1215,19 @@ export default function BusinessWorkspace({
             )}
             {planPanel}
             {reservePanel}
-            <section className="biz-card">
+            <SurfaceCard className="space-y-4">
               <h2>Aannames bij de vooruitblik</h2>
               <ul>
                 {forecastAssumptions.map((text) => (
                   <li key={text}>{text}</li>
                 ))}
               </ul>
-            </section>
+            </SurfaceCard>
           </>
         );
       case "backup":
         return (
-          <section className="biz-card">
+          <SurfaceCard className="space-y-4">
             <h2>
               Backup van alleen{" "}
               {isDemo ? "de demo" : "je eigen zakelijke administratie"}
@@ -1214,8 +1237,8 @@ export default function BusinessWorkspace({
               deze export. Bewaar je backup op een veilige plek; browseropslag
               is geen automatische backup.
             </p>
-            <button
-              className="biz-button primary"
+            <Button
+              variant="primary"
               onClick={() =>
                 download(
                   `moneylith-zakelijk-${workspace}-${data.month}.json`,
@@ -1224,11 +1247,11 @@ export default function BusinessWorkspace({
               }
             >
               Backup downloaden
-            </button>
+            </Button>
             <div className="biz-import">
               <label>
                 Een backupbestand kiezen
-                <input
+                <Input
                   type="file"
                   accept="application/json,.json"
                   onChange={async (e) => {
@@ -1267,26 +1290,25 @@ export default function BusinessWorkspace({
                       );
                     }}
                   />
-                  <button
-                    className="biz-button"
+                  <Button
                     onClick={() => {
                       setShowRestore(false);
                       setBackup("");
                     }}
                   >
                     Annuleren
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
-          </section>
+          </SurfaceCard>
         );
       case "settings": {
         const context = businessAiContext(data);
         return (
           <>
             {reservePanel}
-            <section className="biz-card">
+            <SurfaceCard className="space-y-4">
               <h2>Administratie en privacy</h2>
               <p>
                 {isDemo
@@ -1304,16 +1326,14 @@ export default function BusinessWorkspace({
                   : "geen noodzakelijke basisgegevens"}
                 . Onbekende bedragen blijven onbekend, ook in de analyse-invoer.
               </p>
-              <button
-                className="biz-button"
+              <Button
                 onClick={() =>
                   download(`moneylith-analyse-${workspace}.json`, context)
                 }
               >
                 Analyse-invoer lokaal downloaden
-              </button>
-              <button
-                className="biz-button"
+              </Button>
+              <Button
                 onClick={() =>
                   perform(() => {
                     const old: Record<string, unknown> = {};
@@ -1333,62 +1353,61 @@ export default function BusinessWorkspace({
                 }
               >
                 Oude zakelijke browsergegevens exporteren
-              </button>
+              </Button>
               <p>
                 Eventuele oudere zakelijke gegevens blijven op hun
                 oorspronkelijke plek staan. Ze worden niet automatisch
                 geïmporteerd of opgeteld; controleer eerst op overlap.
               </p>
-            </section>
-            <section className="biz-card">
+            </SurfaceCard>
+            <SurfaceCard className="space-y-4">
               <h2>Rekenafspraken en beperkingen</h2>
               <ul>
                 {assumptions.map((text) => (
                   <li key={text}>{text}</li>
                 ))}
               </ul>
-            </section>
+            </SurfaceCard>
           </>
         );
       }
     }
   };
   return (
-    <main className="business-shell">
-      {header}
-      <div className="biz-layout">
-        <aside className="biz-sidebar">
-          <div className="biz-brand">
-            MONEYLITH <span>ZAKELIJK</span>
-          </div>
-          <nav ref={navigation} aria-label="Zakelijke onderdelen">
-            {businessTabs.map(([key, label, detail]) => (
-              <NavigationStep
-                key={key}
-                label={label}
-                description={detail}
-                active={tab === key}
-                status={
-                  tab === key
-                    ? "Actief"
-                    : stepProgress(data, key, result.checks)
-                }
-                onClick={() => go(key)}
-              />
-            ))}
-          </nav>
-        </aside>
-        <div className="biz-content">
-          <div className="biz-page-heading">
-            <div>
-              <p className="biz-eyebrow">
-                {data.profile.name || "Jouw onderneming — nog niet ingevuld"}
-              </p>
-              <h1>{businessTabs.find(([key]) => key === tab)?.[1]}</h1>
-            </div>
-            <label className="biz-month">
+    <ApplicationLayout
+      mode="business"
+      onPersonal={onPersonal}
+      onBusiness={() => {}}
+      onSettings={() => go("settings")}
+      step={businessTabs.find(([key]) => key === tab)?.[1]}
+      banner={header}
+      navigation={businessTabs.map(([key, label, detail]) => (
+        <NavigationStep
+          key={key}
+          label={label}
+          description={detail}
+          active={tab === key}
+          backup={key === "backup"}
+          status={
+            key === "bank"
+              ? "Niet beschikbaar"
+              : tab === key
+                ? "Actief"
+                : stepProgress(data, key, result.checks)
+          }
+          onClick={() => go(key)}
+        />
+      ))}
+      guideTitle="Gids · lokale hulp"
+      guide={<BusinessGuide data={data} tab={tab} go={go} />}
+    >
+      <div key={formRevision} className="business-content space-y-4">
+        {tab !== "intent" && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+            <p>{data.profile.name || "Jouw onderneming — nog niet ingevuld"}</p>
+            <label className="flex items-center gap-2">
               Maand
-              <input
+              <Input
                 type="month"
                 min="2000-01"
                 max="2099-12"
@@ -1403,27 +1422,25 @@ export default function BusinessWorkspace({
               />
             </label>
           </div>
-          {error && (
-            <p className="biz-error" role="alert">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p className="biz-save" role="status">
-              {message}
-            </p>
-          )}
-          {content()}
-          <footer className="biz-footer">
-            {isDemo
-              ? "Zakelijke demo — fictieve gegevens"
-              : "Eigen zakelijke administratie"}{" "}
-            · Bedragen in euro · Geen belastingaangifteprogramma ·{" "}
-            <a href="/privacy">Privacy</a>
-          </footer>
-        </div>
-        <BusinessGuide data={data} tab={tab} go={go} />
+        )}
+        {error && (
+          <p className="biz-error" role="alert">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="text-xs text-emerald-200" role="status">
+            {message}
+          </p>
+        )}
+        {content()}
+        <p className="text-[11px] text-slate-400">
+          Bedragen in euro · Geen belastingaangifteprogramma ·{" "}
+          {isDemo
+            ? "Zakelijke demo — fictieve gegevens"
+            : "Eigen zakelijke administratie"}
+        </p>
       </div>
-    </main>
+    </ApplicationLayout>
   );
 }

@@ -1,3 +1,4 @@
+import { GuideCard } from "./ApplicationLayout";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAiOrchestrator, type TabKey } from "../hooks/useAiOrchestrator";
 import { analyseObservation } from "../logic/analysis";
@@ -89,8 +90,9 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Scroll naar onder bij nieuwe messages
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll the conversation, never move the surrounding workspace.
+    const conversation = messagesEndRef.current?.parentElement;
+    if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const handleChatSend = async () => {
@@ -126,7 +128,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-100">
+    <GuideCard>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">AI assistent</h2>
@@ -200,6 +202,6 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
         </button>
       </div>
       {aiError && <p className="mt-2 text-[11px] text-red-400">{aiError}</p>}
-    </div>
+    </GuideCard>
   );
 }
