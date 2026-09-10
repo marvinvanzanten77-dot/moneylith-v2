@@ -37,6 +37,7 @@ function confirmAll(data: BusinessData) {
 function zero() {
   const data = emptyBusiness("real", "2026-09");
   data.plan = {
+    taxPaymentCadence: "monthly",
     revenue: 0,
     costs: 0,
     salesVat: 0,
@@ -123,7 +124,11 @@ test("loan receipts, principal repayments and owner draws do not change invoice 
   const before = calculateBusiness(data);
   const without = changeBusiness(data, (next) => {
     next.movements = next.movements.filter(
-      (m) => !["loan_in", "loan_out", "owner_draw"].includes(m.kind),
+      (m) =>
+        !(
+          m.date.startsWith(next.month) &&
+          ["loan_in", "loan_out", "owner_draw"].includes(m.kind)
+        ),
     );
   });
   const after = calculateBusiness(without);
@@ -155,7 +160,7 @@ test("payment of an invoice changes cash and its open amount, never revenue twic
       }),
     /overschrijden/,
   );
-  assert.equal(changed.movements.length, 10);
+  assert.equal(changed.movements.length, data.movements.length + 1);
 });
 test("duplicate invoice references and orphan/invalid ledger links are rejected atomically", () => {
   const data = demo();
@@ -184,7 +189,7 @@ test("duplicate invoice references and orphan/invalid ledger links are rejected 
   assert.throws(
     () =>
       changeBusiness(data, (next) => {
-        next.movements[0].date = "2026-08-01";
+        next.movements[0].date = "2026-06-01";
       }),
     /rekening/,
   );

@@ -1,6 +1,8 @@
 import { confirmSection } from "./finance";
 import {
   addMonth,
+  cashSign,
+  gross,
   emptyBusiness,
   sections,
   type BusinessData,
@@ -227,6 +229,7 @@ export function createBusinessDemo(
     },
   ];
   data.plan = {
+    taxPaymentCadence: "monthly",
     revenue: 650000,
     costs: 160000,
     salesVat: 21,
@@ -236,6 +239,70 @@ export function createBusinessDemo(
     taxPercent: 30,
     buffer: 300000,
   };
+  // Two earlier months provide observed recurrence. Keep the selected month's opening
+  // balance unchanged by reconciling the earlier opening against those actual movements.
+  for (const offset of [-2, -1]) {
+    const past = addMonth(month, offset);
+    for (const [sourceId, net] of [
+      ["sale-web", 400000],
+      ["sale-brand", 200000],
+      ["cost-office", 65000],
+      ["cost-software", 4900],
+    ] as const) {
+      const source = data.documents.find((d) => d.id === sourceId)!;
+      const doc = {
+        ...source,
+        id: sourceId + past,
+        number: source.number + "-" + past,
+        net,
+        date: past + "-03",
+        due: past + "-10",
+      };
+      data.documents.push(doc);
+      data.movements.push(
+        movement(
+          "paid-" + doc.id,
+          "Betaling " + doc.label,
+          "document",
+          gross(doc),
+          past + "-10",
+          { documentId: doc.id },
+        ),
+      );
+    }
+    data.movements.push(
+      movement(
+        "draw-" + past,
+        "Privéonttrekking",
+        "owner_draw",
+        220000,
+        past + "-20",
+      ),
+    );
+    data.movements.push(
+      movement(
+        "vat-" + past,
+        "Fictieve btw-betaling",
+        "vat_payment",
+        120000,
+        past + "-20",
+      ),
+    );
+    data.movements.push(
+      movement(
+        "tax-" + past,
+        "Fictieve belastingbetaling",
+        "tax_payment",
+        120000,
+        past + "-20",
+      ),
+    );
+  }
+  data.accounts[0].date = addMonth(month, -2) + "-01";
+  const pastCashflow = data.movements
+    .filter((m) => m.date < month + "-01")
+    .reduce((sum, m) => sum + cashSign(m, data) * m.amount, 0);
+  data.accounts[0].opening -= pastCashflow;
   // These are explicitly reviewed fictional examples, not inferred real data.
   for (const section of sections) data = confirmSection(data, section, true);
   return data;

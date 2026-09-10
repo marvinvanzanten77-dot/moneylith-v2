@@ -5,7 +5,7 @@ export const businessTabs = [
   ["assets", "Vermogen", "Geldmiddelen, reserves en bedrijfsmiddelen"],
   ["goals", "Doelen", "Groei, buffer, investeren en aflossen"],
   ["accounts", "Rekeningen", "Zakelijke betaal- en spaarrekeningen"],
-  ["patterns", "Patronen", "Ontvangsten en betalingen"],
+  ["patterns", "Patronen", "Herhaling, verdeling en kasstroom"],
   ["inbox", "Inbox", "Facturen, bonnetjes en documenten"],
   ["forecast", "Vooruitblik", "Kasstroom en scenario’s"],
   ["backup", "Backup", "Alleen deze administratie"],
@@ -25,5 +25,5 @@ export const forecastAssumptions = [
   "Het maandplan betreft nieuw werk ná de gekozen maand. Nieuwe omzet en kosten worden volledig in dezelfde maand betaald. Het plan is een scenario, geen toezegging van klanten.",
   "Reeds uitgereikte open facturen worden éénmalig in hun vervalmaand betaald; achterstallige posten in de eerste prognosemaand. Voer die niet nogmaals als extra maandelijkse omzet of kosten in.",
   "Aflossingen stoppen bij een hoofdsom van nul. Rente zit alleen in het kostenplan; er is geen automatische renteberekening. Doelen maken geen automatische betalingen aan.",
-  "Btw en geschatte inkomstenbelasting blijven in het scenario gereserveerd op de bank; beschikbare ruimte trekt deze reserves af. Een verwachte btw-teruggaaf wordt niet als ontvangen geld geteld.",
+  "De gekozen betaalfrequentie boekt eerder opgebouwde btw- en belastingreserves af van het banksaldo én van de reserve. Dezelfde belasting wordt niet dubbel afgetrokken van de beschikbare ruimte. Alleen bij expliciet gekozen alleen reserveren blijft alles op de bank. Dit is een planningsafspraak, geen wettelijke betaaltermijn. Een btw-teruggaaf wordt niet als ontvangen geld geteld.",
 ];

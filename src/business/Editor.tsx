@@ -4,6 +4,8 @@ import { euros } from "./model";
 export type Field = {
   key: string;
   label: string;
+  visibleWhen?: { key: string; values: string[] };
+  labelFor?: (draft: Record<string, string | boolean>) => string;
   type?:
     "text" | "money" | "number" | "date" | "select" | "boolean" | "textarea";
   options?: [string, string][];
@@ -94,6 +96,11 @@ export function EditDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<Record<string, string | boolean>>({});
   const [error, setError] = useState("");
+  const visibleFields = fields.filter(
+    (field) =>
+      !field.visibleWhen ||
+      field.visibleWhen.values.includes(String(draft[field.visibleWhen.key])),
+  );
   const open = () => {
     setError("");
     setDraft(
@@ -126,7 +133,7 @@ export function EditDialog({
             event.preventDefault();
             try {
               const patch = Object.fromEntries(
-                fields.map((field) => {
+                visibleFields.map((field) => {
                   const raw = draft[field.key];
                   if (field.type === "boolean")
                     return [field.key, raw === true];
@@ -157,10 +164,10 @@ export function EditDialog({
         >
           <h2 id={headingId}>{title}</h2>
           <div className="biz-form-grid">
-            {fields.map((field) => (
+            {visibleFields.map((field) => (
               <label key={field.key}>
                 <span>
-                  {field.label}
+                  {field.labelFor?.(draft) ?? field.label}
                   {field.nullable ? " (leeg = onbekend)" : ""}
                 </span>
                 {field.type === "select" ? (

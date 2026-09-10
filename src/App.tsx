@@ -1,3 +1,4 @@
+import { NavigationStep } from "./components/NavigationStep";
 import { InputReview } from "./components/InputReview";
 import { formatCurrency } from "./utils/format";
 import { reviewSection, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
@@ -2519,7 +2520,7 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
                   : "bg-amber-900/30 text-amber-100 border border-amber-700 hover:border-amber-500"
                 : "cursor-not-allowed bg-white/5 text-slate-500 border border-white/10";
               return (
-                <button
+                <NavigationStep
                   key={step.key}
                   type="button"
                   disabled={!unlocked}
@@ -2537,13 +2538,11 @@ const App = ({ onOpenBusiness }: { onOpenBusiness?: () => void }) => {
                   }}
                   onMouseLeave={() => setHelpTooltip(null)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${activeClass || inactiveClass}`}
-                >
-          <div className="flex items-center justify-between">
-            <span className="font-semibold">{step.label}</span>
-            <span className="text-[10px]">{unlocked ? label : "Nog te doen"}</span>
-          </div>
-          <p className={`text-[11px] ${active ? "text-slate-900" : "text-slate-400"}`}>{step.desc}</p>
-        </button>
+                  label={step.label}
+                  status={unlocked ? label : "Nog te doen"}
+                  description={step.desc}
+                  active={active}
+                />
       );
     })}
   </div>

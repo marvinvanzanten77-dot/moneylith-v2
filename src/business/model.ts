@@ -57,6 +57,7 @@ export type Goal = {
   date: string;
 };
 export type Plan = {
+  taxPaymentCadence?: "monthly" | "quarterly" | "hold" | null;
   revenue: number | null;
   costs: number | null;
   salesVat: number | null;
@@ -375,6 +376,11 @@ export function validateBusiness(
   money(data.scenario.extraCost, "extra kosten");
   money(data.scenario.oneOff, "eenmalige tegenvaller");
   if (!data.plan) fail("Maandplan ontbreekt.");
+  if (
+    data.plan.taxPaymentCadence != null &&
+    !["monthly", "quarterly", "hold"].includes(data.plan.taxPaymentCadence)
+  )
+    fail("Kies een geldige belastingbetaalfrequentie.");
   for (const key of ["revenue", "costs", "draw", "buffer"] as const)
     if (data.plan[key] !== null) money(data.plan[key], key);
   for (const key of ["salesVat", "costsVat"] as const)

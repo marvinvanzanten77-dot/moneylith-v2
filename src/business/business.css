@@ -509,3 +509,47 @@
     grid-template-columns: 1fr;
   }
 }
+
+.biz-sidebar .step-status {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.biz-sidebar .step-description {
+  font-size: 11px;
+}
+.biz-guide {
+  padding: 32px 18px 24px 0;
+}
+.biz-guide .biz-card {
+  position: sticky;
+  top: 100px;
+  font-size: 13px;
+}
+.biz-guide small {
+  color: #a6b6cb;
+}
+@media (min-width: 1200px) {
+  .biz-layout {
+    grid-template-columns: 230px minmax(0, 1fr) 270px;
+  }
+}
+@media (max-width: 1199px) {
+  .biz-guide {
+    grid-column: 1 / -1;
+    padding: 16px;
+  }
+}
+@media (max-width: 850px) {
+  .biz-sidebar .step-description {
+    display: none;
+  }
+  .biz-sidebar nav button {
+    max-width: none;
+  }
+  .biz-sidebar nav button > span:first-child {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+}

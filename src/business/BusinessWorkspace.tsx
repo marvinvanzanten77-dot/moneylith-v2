@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { NavigationStep } from "../components/NavigationStep";
+import { BusinessGuide, GoalSummary, PatternsPanel } from "./InsightPanels";
+import { stepProgress } from "./insights";
+import { useEffect, useRef, useState } from "react";
 import { Collection, ConfirmAction, EditDialog, type Field } from "./Editor";
 import {
   assumptions,
@@ -171,6 +174,17 @@ const planFields: Field[] = [
 ];
 const reserveFields: Field[] = [
   {
+    key: "taxPaymentCadence",
+    label: "Belastingbetalingen in de prognose",
+    type: "select",
+    nullable: true,
+    options: [
+      ["monthly", "Elke prognosemaand"],
+      ["quarterly", "Elke drie prognosemaanden"],
+      ["hold", "Alleen reserveren, geen betalingen"],
+    ],
+  },
+  {
     key: "taxPercent",
     label: "Geschatte inkomstenbelastingreserve (%)",
     type: "number",
@@ -251,6 +265,23 @@ export default function BusinessWorkspace({
       return "foundation";
     }
   });
+  const navigation = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const reveal = () => {
+      const nav = navigation.current;
+      const active = nav?.querySelector<HTMLButtonElement>(
+        "button[aria-current]",
+      );
+      if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+      nav.scrollLeft +=
+        active.getBoundingClientRect().left -
+        nav.getBoundingClientRect().left -
+        (nav.clientWidth - active.clientWidth) / 2;
+    };
+    reveal();
+    window.addEventListener("resize", reveal);
+    return () => window.removeEventListener("resize", reveal);
+  }, [tab]);
   const [backup, setBackup] = useState("");
   const [showRestore, setShowRestore] = useState(false);
   const isDemo = workspace === "demo";
@@ -549,6 +580,20 @@ export default function BusinessWorkspace({
         . Geld op een spaarrekening is al onderdeel van je geldmiddelen en wordt
         niet nogmaals opgeteld.
       </p>
+      <p>
+        Betaalplan:{" "}
+        {data.plan.taxPaymentCadence === "monthly"
+          ? "iedere prognosemaand"
+          : data.plan.taxPaymentCadence === "quarterly"
+            ? "iedere derde prognosemaand"
+            : data.plan.taxPaymentCadence === "hold"
+              ? "geen betalingen, alleen reserveren"
+              : "nog niet gekozen"}
+        . Op die momenten wordt de opgebouwde reserve van vóór die maand
+        afgeboekt. Dit is een vereenvoudigd scenario voor btw en
+        inkomstenbelasting samen, geen aangifteschema; controleer je echte
+        betaaldata afzonderlijk.
+      </p>
       {check("reserves")}
     </section>
   );
@@ -575,24 +620,27 @@ export default function BusinessWorkspace({
     },
     {
       key: "documentId",
+      visibleWhen: { key: "kind", values: ["document"] },
       label: "Factuur (verplicht bij factuur/bon)",
       type: "select",
       options: data.documents.map((d) => [d.id, `${d.number} — ${d.label}`]),
-      optional: true,
+      optional: false,
     },
     {
       key: "debtId",
+      visibleWhen: { key: "kind", values: ["loan_in", "loan_out"] },
       label: "Lening/regeling (verplicht bij lening of aflossing)",
       type: "select",
       options: data.debts.map((d) => [d.id, d.label]),
-      optional: true,
+      optional: false,
     },
     {
       key: "toAccountId",
+      visibleWhen: { key: "kind", values: ["transfer"] },
       label: "Naar eigen rekening (alleen bij overboeking)",
       type: "select",
       options: data.accounts.map((a) => [a.id, a.label]),
-      optional: true,
+      optional: false,
     },
   ];
   const payments = (
@@ -874,7 +922,12 @@ export default function BusinessWorkspace({
             <Collection<Goal>
               title="Zakelijke doelen"
               items={data.goals}
-              defaults={{ kind: "buffer", date: data.month + "-28" }}
+              defaults={{
+                kind: "buffer",
+                current: 0,
+                monthly: 0,
+                date: data.month + "-28",
+              }}
               fields={[
                 { key: "label", label: "Doel" },
                 {
@@ -890,40 +943,51 @@ export default function BusinessWorkspace({
                 },
                 {
                   key: "target",
-                  label: "Doelbedrag (€), omzet excl. btw",
+                  label: "Doelbedrag (€)",
+                  labelFor: (draft) =>
+                    draft.kind === "revenue"
+                      ? "Gewenste maandomzet excl. btw (€)"
+                      : draft.kind === "repay"
+                        ? "Totaal af te lossen bedrag (€)"
+                        : "Benodigd budget (€)",
                   type: "money",
                 },
                 {
                   key: "current",
                   label: "Huidige voortgang (€)",
+                  visibleWhen: {
+                    key: "kind",
+                    values: ["buffer", "investment", "repay"],
+                  },
+                  labelFor: (draft) =>
+                    draft.kind === "repay"
+                      ? "Al afgeloste hoofdsom (€)"
+                      : "Al apart gezet (€)",
                   type: "money",
                 },
                 {
                   key: "monthly",
-                  label: "Voorgenomen maandinleg (€), 0 bij alleen omzetdoel",
+                  label: "Maandelijks bedrag (€)",
+                  visibleWhen: {
+                    key: "kind",
+                    values: ["buffer", "investment", "repay"],
+                  },
+                  labelFor: (draft) =>
+                    draft.kind === "repay"
+                      ? "Geplande maandaflossing (€)"
+                      : "Maandelijks apart zetten (€)",
                   type: "money",
                 },
                 { key: "date", label: "Streefdatum", type: "date" },
               ]}
-              onSave={(row) => saveRow("goals", row)}
+              onSave={(row) =>
+                saveRow("goals", {
+                  ...row,
+                  monthly: row.kind === "revenue" ? 0 : row.monthly,
+                })
+              }
               onDelete={(id) => removeRow("goals", id)}
-              summary={(g) => (
-                <>
-                  <span>
-                    {money(g.current)} van {money(g.target)} · streefdatum{" "}
-                    {g.date}
-                  </span>
-                  <progress
-                    max={Math.max(1, g.target)}
-                    value={Math.min(g.current, g.target)}
-                    aria-label={`Voortgang ${g.label}`}
-                  />
-                  <span>
-                    Voorgenomen inleg {money(g.monthly)} per maand. Nog geen
-                    oordeel over haalbaarheid.
-                  </span>
-                </>
-              )}
+              summary={(g) => <GoalSummary data={data} goal={g} />}
             />
           </>
         );
@@ -977,6 +1041,7 @@ export default function BusinessWorkspace({
       case "patterns":
         return (
           <>
+            <PatternsPanel data={data} />
             <div className="biz-metrics">
               <Metric
                 label="Werkelijke maandkasstroom"
@@ -1018,7 +1083,8 @@ export default function BusinessWorkspace({
               <>
                 <div className="biz-metrics">
                   <Metric
-                    label="Geldmiddelen over 12 maanden"
+                    label="Verwacht banksaldo over 12 maanden"
+                    detail={data.plan.taxPaymentCadence === "hold" ? "Zonder belastingbetalingen" : "Na geplande belastingbetalingen"}
                     value={forecast[12].bank}
                   />
                   <Metric
@@ -1096,6 +1162,7 @@ export default function BusinessWorkspace({
                         <tr>
                           <th>Maand</th>
                           <th>Geldmiddelen</th>
+                          <th>Belasting betaald</th>
                           <th>Btw/belastingreserve</th>
                           <th>Beschikbaar</th>
                           <th>Restant leningen</th>
@@ -1106,6 +1173,7 @@ export default function BusinessWorkspace({
                           <tr key={row.month}>
                             <th>{row.month}</th>
                             <td>{money(row.bank)}</td>
+                            <td>{money(row.taxPaid)}</td>
                             <td>{money(row.reserves)}</td>
                             <td>{money(row.available)}</td>
                             <td>{money(row.loanBalance)}</td>
@@ -1293,17 +1361,20 @@ export default function BusinessWorkspace({
           <div className="biz-brand">
             MONEYLITH <span>ZAKELIJK</span>
           </div>
-          <nav aria-label="Zakelijke onderdelen">
+          <nav ref={navigation} aria-label="Zakelijke onderdelen">
             {businessTabs.map(([key, label, detail]) => (
-              <button
-                type="button"
+              <NavigationStep
                 key={key}
-                aria-current={tab === key ? "page" : undefined}
+                label={label}
+                description={detail}
+                active={tab === key}
+                status={
+                  tab === key
+                    ? "Actief"
+                    : stepProgress(data, key, result.checks)
+                }
                 onClick={() => go(key)}
-              >
-                <strong>{label}</strong>
-                <small>{detail}</small>
-              </button>
+              />
             ))}
           </nav>
         </aside>
@@ -1351,6 +1422,7 @@ export default function BusinessWorkspace({
             <a href="/privacy">Privacy</a>
           </footer>
         </div>
+        <BusinessGuide data={data} tab={tab} go={go} />
       </div>
     </main>
   );

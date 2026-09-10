@@ -94,6 +94,7 @@ export function reviewSections(
       name: key,
       amount: data.plan[key as "taxPercent" | "buffer"] ?? 0,
       complete: data.plan[key as "taxPercent" | "buffer"] !== null,
+      details: { taxPaymentCadence: data.plan.taxPaymentCadence ?? null },
     })),
   };
   return Object.fromEntries(
@@ -286,9 +287,12 @@ export function missingFor(
   metric: keyof typeof requirements,
 ) {
   const checks = reviewSections(data);
-  return requirements[metric]
+  const missing = requirements[metric]
     .filter((key) => !checks[key].ready)
     .map((key) => sectionLabels[key]);
+  if (metric === "forecast" && !data.plan.taxPaymentCadence)
+    missing.push("Betaalfrequentie belastingen");
+  return missing;
 }
 export type Scenario = {
   revenueDelta: number;
@@ -324,6 +328,7 @@ export function forecastBusiness(
   const result = [
     {
       month: data.month,
+      taxPaid: 0,
       bank,
       reserves,
       available: bank - reserves - plan.buffer! - now.payables,
@@ -359,6 +364,13 @@ export function forecastBusiness(
       debtPayment +
       settlement -
       (step === 1 ? scenario.oneOff : 0);
+    const taxPaid =
+      plan.taxPaymentCadence === "monthly" ||
+      (plan.taxPaymentCadence === "quarterly" && step % 3 === 0)
+        ? reserves
+        : 0;
+    bank -= taxPaid;
+    reserves -= taxPaid;
     reserves +=
       Math.max(0, revenueVat - (plan.deductible ? costsVat : 0)) +
       Math.round((Math.max(0, profit) * plan.taxPercent!) / 100);
@@ -366,6 +378,7 @@ export function forecastBusiness(
       .filter((d) => d.kind !== "sale" && d.due.slice(0, 7) > month)
       .reduce((sum, d) => sum + d.unpaid, 0);
     result.push({
+      taxPaid,
       month,
       bank,
       reserves,
