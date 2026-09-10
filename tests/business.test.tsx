@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBusinessDemo } from "../src/business/demo";
+import { createBusinessDemo } from "./fixtures/business";
 import {
   businessAiContext,
   calculateBusiness,
@@ -24,7 +24,6 @@ import {
 } from "../src/business/model";
 import {
   loadBusiness,
-  resetBusinessDemo,
   restoreBusiness,
   saveBusiness,
 } from "../src/business/storage";
@@ -386,8 +385,9 @@ test("scenario is persisted as explicit deltas, does not mutate actual month, an
   assert.equal(scenario[1].bank, base[1].bank - 195200);
   assert.deepEqual(businessAiContext(data).forecast, scenario);
   const storage = new MemoryStorage();
-  saveBusiness(storage, "demo", data);
-  assert.deepEqual(loadBusiness(storage, "demo").scenario, data.scenario);
+  const own = { ...data, workspace: "real" as const };
+  saveBusiness(storage, "real", own);
+  assert.deepEqual(loadBusiness(storage, "real").scenario, data.scenario);
   assert.throws(
     () =>
       changeBusiness(data, (next) => {
@@ -396,28 +396,22 @@ test("scenario is persisted as explicit deltas, does not mutate actual month, an
     /Ongeldig bedrag/,
   );
 });
-test("demo edits, reload and reset never touch personal, legacy or real business data", () => {
+test("own administration and chat survive while retired demo data stay inert", () => {
   const storage = new MemoryStorage();
-  storage.setItem("moneylith.personal.income", "personal-sentinel");
-  storage.setItem("moneylith.business.income", "legacy-sentinel");
-  const real = emptyBusiness("real", "2026-09");
-  real.profile.name = "Echte onderneming";
-  saveBusiness(storage, "real", real);
-  const realRaw = storage.getItem(workspaceKeys.real);
-  let data = loadBusiness(storage, "demo");
-  data = changeBusiness(data, (next) => {
-    next.profile.name = "Bewerkte demo";
-  });
-  saveBusiness(storage, "demo", data);
-  assert.equal(loadBusiness(storage, "demo").profile.name, "Bewerkte demo");
-  assert.equal(loadBusiness(storage, "real").profile.name, "Echte onderneming");
-  assert.notEqual(resetBusinessDemo(storage).profile.name, "Bewerkte demo");
-  assert.equal(
-    storage.getItem("moneylith.personal.income"),
-    "personal-sentinel",
-  );
-  assert.equal(storage.getItem("moneylith.business.income"), "legacy-sentinel");
-  assert.equal(storage.getItem(workspaceKeys.real), realRaw);
+  storage.setItem(workspaceKeys.demo, "DO_NOT_READ_DEMO");
+  storage.setItem("moneylith.chat.v1.business-demo", "OLD_DEMO_CHAT");
+  storage.setItem("moneylith.chat.v1.business-real", "OWN_CHAT");
+  storage.setItem("moneylith.personal.income", "PERSONAL");
+  const own = emptyBusiness("real"); own.profile.name = "Bestaand bedrijf";
+  saveBusiness(storage, "real", own);
+  const before = storage.getItem(workspaceKeys.real);
+  assert.equal(loadBusiness(storage, "real").profile.name, "Bestaand bedrijf");
+  assert.equal(storage.getItem(workspaceKeys.real), before);
+  assert.equal(storage.getItem("moneylith.chat.v1.business-real"), "OWN_CHAT");
+  assert.equal(storage.getItem("moneylith.personal.income"), "PERSONAL");
+  assert.throws(() => loadBusiness(storage, "demo"), /niet beschikbaar/);
+  assert.equal(storage.getItem(workspaceKeys.demo), "DO_NOT_READ_DEMO");
+  assert.equal(storage.getItem("moneylith.chat.v1.business-demo"), "OLD_DEMO_CHAT");
 });
 test("real business starts empty; corrupt storage and foreign backups never get overwritten", () => {
   const storage = new MemoryStorage();
@@ -427,7 +421,7 @@ test("real business starts empty; corrupt storage and foreign backups never get 
   const before = storage.getItem(workspaceKeys.real);
   assert.throws(
     () => restoreBusiness(storage, "real", JSON.stringify(demo())),
-    /demo-backup/,
+    /niet bij de eigen/,
   );
   assert.throws(
     () => saveBusiness(storage, "real", demo()),
@@ -441,16 +435,17 @@ test("real business starts empty; corrupt storage and foreign backups never get 
 test("backup restore validates references and clears all reviews before calculation", () => {
   const storage = new MemoryStorage();
   const data = demo();
-  const restored = restoreBusiness(storage, "demo", JSON.stringify(data));
+  data.workspace = "real";
+  const restored = restoreBusiness(storage, "real", JSON.stringify(data));
   assert.deepEqual(restored.reviews, {});
   assert.equal(forecastBusiness(restored), null);
-  const before = storage.getItem(workspaceKeys.demo);
+  const before = storage.getItem(workspaceKeys.real);
   data.movements[0].amount = gross(data.documents[0]) + 1;
   assert.throws(
-    () => restoreBusiness(storage, "demo", JSON.stringify(data)),
+    () => restoreBusiness(storage, "real", JSON.stringify(data)),
     /overschrijden/,
   );
-  assert.equal(storage.getItem(workspaceKeys.demo), before);
+  assert.equal(storage.getItem(workspaceKeys.real), before);
 });
 test("money parsing, VAT rounding and calendar boundaries avoid silent normalization", () => {
   assert.equal(euros("1250,50"), 125050);
@@ -469,4 +464,19 @@ test("money parsing, VAT rounding and calendar boundaries avoid silent normaliza
       }),
     /geldige datum/,
   );
+});
+
+test("new own storage never reads or copies a pre-existing retired demo", () => {
+ const values = new Map<string, string>([[workspaceKeys.demo, JSON.stringify(demo())]]);
+ const storedDemo = values.get(workspaceKeys.demo);
+ const storage = {
+   getItem(key: string) { assert.notEqual(key, workspaceKeys.demo); return values.get(key) ?? null; },
+   setItem(key: string, value: string) { assert.equal(key, workspaceKeys.real); values.set(key, value); },
+ };
+ const own = loadBusiness(storage, "real");
+ assert.equal(own.workspace, "real");
+ assert.equal(own.profile.name, "");
+ assert.deepEqual(own.documents, []);
+ assert.equal(own.plan.revenue, null);
+ assert.equal(values.get(workspaceKeys.demo), storedDemo);
 });

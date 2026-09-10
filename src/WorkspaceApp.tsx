@@ -2,25 +2,13 @@ import { useEffect, useState } from "react";
 import PersonalApp from "./App";
 
 import BusinessWorkspace from "./business/BusinessWorkspace";
-type Mode = "personal" | "demo" | "real";
+import { resolveWorkspaceMode, type WorkspaceMode as Mode } from "./components/workspaceMode";
 const modeKey = "moneylith.workspace.v1";
-const lastBusinessKey = "moneylith.business.lastWorkspace.v1";
-const hashes: Record<Mode, string> = {
-  personal: "#persoonlijk",
-  demo: "#zakelijk-demo",
-  real: "#zakelijk",
-};
+const hashes: Record<Mode, string> = { personal: "#persoonlijk", real: "#zakelijk" };
 function initialMode(): Mode {
-  const requested = (Object.keys(hashes) as Mode[]).find(
-    (key) => hashes[key] === window.location.hash,
-  );
-  if (requested) return requested;
-  try {
-    const saved = localStorage.getItem(modeKey);
-    return saved === "demo" || saved === "real" ? saved : "personal";
-  } catch {
-    return "personal";
-  }
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(modeKey); } catch { /* Navigation works without storage. */ }
+  return resolveWorkspaceMode(window.location.hash, saved);
 }
 
 export default function WorkspaceApp() {
@@ -45,10 +33,11 @@ export default function WorkspaceApp() {
   }, [enteredWorkspace]);
   useEffect(() => {
     if (window.location.pathname !== "/") return;
+    if (window.location.hash === "#zakelijk-demo")
+      history.replaceState(null, "", window.location.pathname + window.location.search + "#zakelijk");
     // Remember direct hash links as well as button navigation, without touching user records.
     try {
       localStorage.setItem(modeKey, mode);
-      if (mode !== "personal") localStorage.setItem(lastBusinessKey, mode);
     } catch {
       /* The business workspace reports any data-storage error. */
     }
@@ -66,20 +55,15 @@ export default function WorkspaceApp() {
   useEffect(() => {
     const changed = () => {
       setEnteredWorkspace(true);
-      setMode(initialMode());
+      const next = initialMode();
+      if (window.location.hash === "#zakelijk-demo")
+        history.replaceState(null, "", window.location.pathname + window.location.search + "#zakelijk");
+      setMode(next);
     };
     window.addEventListener("hashchange", changed);
     return () => window.removeEventListener("hashchange", changed);
   }, []);
-  const openBusiness = () => {
-    let next: Mode = "demo";
-    try {
-      if (localStorage.getItem(lastBusinessKey) === "real") next = "real";
-    } catch {
-      /* Default is the isolated demo. */
-    }
-    select(next);
-  };
+  const openBusiness = () => select("real");
   if (window.location.pathname !== "/" || mode === "personal")
     return (
       <PersonalApp
@@ -90,8 +74,6 @@ export default function WorkspaceApp() {
   return (
     <BusinessWorkspace
       key={mode}
-      workspace={mode}
-      onWorkspace={select}
       onPersonal={() => select("personal")}
     />
   );

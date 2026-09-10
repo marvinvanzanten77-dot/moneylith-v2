@@ -64,7 +64,7 @@ function ScopedAssistant({ scope, businessData, appSnapshot, userIntent, readine
         <div>
           <h2 className="text-lg font-semibold">AI assistent</h2>
           <p className="text-xs text-slate-400">
-            {scope === "business-demo" ? "Analyse van fictieve demogegevens." : "Stel een vraag of laat de assistent je huidige gegevens analyseren."}
+            Stel een vraag of laat de assistent je huidige gegevens analyseren.
           </p>
         </div>
         <button

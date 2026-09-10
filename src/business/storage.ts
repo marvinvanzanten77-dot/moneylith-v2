@@ -1,4 +1,3 @@
-import { createBusinessDemo } from "./demo";
 import {
   emptyBusiness,
   validateBusiness,
@@ -13,6 +12,7 @@ export function saveBusiness(
   workspace: Workspace,
   data: BusinessData,
 ) {
+  if (workspace !== "real") throw new Error("Deze administratie is niet beschikbaar.");
   validateBusiness(data);
   if (data.workspace !== workspace)
     throw new Error("Deze gegevens horen bij een andere administratie.");
@@ -22,7 +22,8 @@ export function loadBusiness(
   storage: StoragePort,
   workspace: Workspace,
 ): BusinessData {
-  const raw = storage.getItem(workspaceKeys[workspace]);
+  if (workspace !== "real") throw new Error("Deze administratie is niet beschikbaar.");
+  const raw = storage.getItem(workspaceKeys.real);
   if (raw !== null) {
     const data: unknown = JSON.parse(raw);
     validateBusiness(data);
@@ -32,14 +33,8 @@ export function loadBusiness(
       );
     return data;
   }
-  const data =
-    workspace === "demo" ? createBusinessDemo() : emptyBusiness("real");
+  const data = emptyBusiness("real");
   saveBusiness(storage, workspace, data);
-  return data;
-}
-export function resetBusinessDemo(storage: StoragePort) {
-  const data = createBusinessDemo();
-  saveBusiness(storage, "demo", data);
   return data;
 }
 export function restoreBusiness(
@@ -53,7 +48,7 @@ export function restoreBusiness(
   validateBusiness(data);
   if (data.workspace !== workspace)
     throw new Error(
-      "Een demo-backup kan niet in de echte administratie worden geladen, of andersom.",
+      "Deze backup hoort niet bij de eigen zakelijke administratie.",
     );
   data.reviews = {};
   saveBusiness(storage, workspace, data);

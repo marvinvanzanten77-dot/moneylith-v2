@@ -1,4 +1,4 @@
-import { confirmSection } from "./finance";
+import { confirmSection } from "../../src/business/finance";
 import {
   addMonth,
   cashSign,
@@ -7,7 +7,7 @@ import {
   sections,
   type BusinessData,
   type Movement,
-} from "./model";
+} from "../../src/business/model";
 
 /** Fictional examples live here only. Never use these as defaults for real business data. */
 export function createBusinessDemo(

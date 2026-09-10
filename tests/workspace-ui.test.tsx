@@ -94,3 +94,14 @@ test("both modes use identical banner structure and hide control", () => {
     assert.equal(renderToStaticMarkup(<ModeBanner mode={mode} visible={false} onHide={() => {}} />), "");
   }
 });
+
+test("business navigation always resolves to own records, including old demo links/preferences", async () => {
+ const { resolveWorkspaceMode } = await import("../src/components/workspaceMode");
+ for (const saved of [null, "demo", "real", "personal"]) {
+   assert.equal(resolveWorkspaceMode("#zakelijk", saved), "real");
+   assert.equal(resolveWorkspaceMode("#zakelijk-demo", saved), "real");
+   assert.equal(resolveWorkspaceMode("#persoonlijk", saved), "personal");
+ }
+ assert.equal(resolveWorkspaceMode("", "demo"), "real");
+ assert.equal(resolveWorkspaceMode("", null), "personal");
+});

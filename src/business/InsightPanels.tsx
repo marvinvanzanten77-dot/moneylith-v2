@@ -73,8 +73,7 @@ export function PatternsPanel({ data }: { data: BusinessData }) {
         ) : (
           <p>
             Nog geen herhaling aantoonbaar. Er zijn vergelijkbare facturen in
-            meerdere maanden nodig. Bestaande demo behouden? Voeg historie toe,
-            of zet uitsluitend de demo terug voor de uitgebreidere voorbeelden.
+            meerdere maanden nodig. Voeg facturen uit eerdere maanden toe om herhaling te kunnen herkennen.
           </p>
         )}
       </SurfaceCard>

@@ -1,4 +1,3 @@
-import { saveChat } from "../ai/conversation";
 import { AiAssistantCard } from "../components/AiAssistantCard";
 import {
   Input,
@@ -49,11 +48,9 @@ import {
   type Goal,
   type Movement,
   type Section,
-  type Workspace,
 } from "./model";
 import {
   loadBusiness,
-  resetBusinessDemo,
   restoreBusiness,
   saveBusiness,
 } from "./storage";
@@ -252,14 +249,11 @@ function Missing({ names }: { names: string[] }) {
   ) : null;
 }
 export default function BusinessWorkspace({
-  workspace,
-  onWorkspace,
   onPersonal,
 }: {
-  workspace: Workspace;
-  onWorkspace: (workspace: Workspace) => void;
   onPersonal: () => void;
 }) {
+  const workspace = "real" as const;
   const [loaded] = useState(() => {
     try {
       return { data: loadBusiness(localStorage, workspace), error: "" };
@@ -273,12 +267,10 @@ export default function BusinessWorkspace({
   const [data, setData] = useState<BusinessData | null>(loaded.data);
   const [error, setError] = useState(loaded.error);
   const [message, setMessage] = useState("");
-  const [formRevision, setFormRevision] = useState(0);
   const [tab, setTab] = useState<BusinessTab>(readBusinessStep);
   const [backup, setBackup] = useState("");
   const [showRestore, setShowRestore] = useState(false);
   const [showModeBanner, setShowModeBanner] = useState(true);
-  const isDemo = workspace === "demo";
   const go = (next: BusinessTab) => {
     window.scrollTo({ top: 0, behavior: "instant" });
     setTab(next);
@@ -307,46 +299,7 @@ export default function BusinessWorkspace({
     setData(next);
     setMessage("Opgeslagen in deze browser.");
   };
-  const reset = () => {
-    saveChat("business-demo", []);
-    setData(resetBusinessDemo(localStorage));
-    setFormRevision((version) => version + 1);
-    go("foundation");
-    setMessage("Alleen de demo is teruggezet.");
-    setError("");
-  };
-  const header = (
-    <ModeBanner mode="business" visible={showModeBanner} onHide={() => setShowModeBanner(false)}>
-      <div data-demo-controls className="mt-3 border-t border-amber-200/20 pt-2 space-y-2 text-[11px] [&_button]:text-[11px] [&_button]:bg-transparent [&_button]:text-amber-100 [&_button]:shadow-none">
-        <div className="space-y-1">
-          <p className="font-semibold">
-            {isDemo
-              ? "Demo — fictieve gegevens"
-              : "Zakelijk — eigen administratie"}
-          </p>
-          <p>
-            {isDemo
-              ? "Vrij bewerkbaar. Bankverbinding niet beschikbaar."
-              : "Eigen gegevens, uitsluitend in deze browser opgeslagen. Bankverbinding niet beschikbaar."}
-          </p>
-        </div>
-        <div className="biz-actions">
-          <Button onClick={() => onWorkspace(isDemo ? "real" : "demo")}>
-            {isDemo
-              ? "Open eigen zakelijke administratie"
-              : "Open zakelijke demo"}
-          </Button>
-          {isDemo && (
-            <ConfirmAction
-              button="Alleen demo terugzetten"
-              message="Je bewerkingen in de demo verdwijnen. Uitsluitend de fictieve demo wordt teruggezet. Persoonlijke en echte zakelijke gegevens blijven bewaard."
-              onConfirm={reset}
-            />
-          )}
-        </div>
-      </div>
-    </ModeBanner>
-  );
+  const header = <ModeBanner mode="business" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />;
   if (!data)
     return (
       <ApplicationLayout
@@ -1233,7 +1186,7 @@ export default function BusinessWorkspace({
           <SurfaceCard className="space-y-4">
             <h2>
               Backup van alleen{" "}
-              {isDemo ? "de demo" : "je eigen zakelijke administratie"}
+              je eigen zakelijke administratie
             </h2>
             <p>
               Persoonlijke en andere zakelijke administraties zitten niet in
@@ -1277,13 +1230,13 @@ export default function BusinessWorkspace({
                 <>
                   <p>
                     Dit vervangt uitsluitend deze{" "}
-                    {isDemo ? "demo" : "echte zakelijke administratie"}.
+                    eigen zakelijke administratie.
                     Controlebevestigingen vervallen. Maak eerst een export als
                     je de huidige inhoud wilt bewaren.
                   </p>
                   <ConfirmAction
                     button="Deze backup bevestigen en herstellen"
-                    message={`Deze ${isDemo ? "demo" : "echte zakelijke administratie"} vervangen door de gekozen backup? Alleen deze administratie wordt gewijzigd.`}
+                    message="Deze eigen zakelijke administratie vervangen door de gekozen backup? Alleen deze administratie wordt gewijzigd."
                     onConfirm={() => {
                       setData(restoreBusiness(localStorage, workspace, backup));
                       setBackup("");
@@ -1314,13 +1267,11 @@ export default function BusinessWorkspace({
             <SurfaceCard className="space-y-4">
               <h2>Administratie en privacy</h2>
               <p>
-                {isDemo
-                  ? "Je bewerkt uitsluitend fictieve demo-data. De knop bovenaan opent een aparte eigen administratie, zonder voorbeeldgegevens. Bestaan daar al gegevens, dan blijven die behouden."
-                  : "Deze eigen administratie start leeg. De demo blijft afzonderlijk bestaan. Er wordt niets automatisch samengevoegd."}
+                Je eigen zakelijke gegevens worden in deze browser bewaard. Persoonlijke gegevens blijven gescheiden.
               </p>
               <p>
-                Zakelijke bankkoppeling, betalingen, cloudsync en externe AI
-                zijn niet actief. Er worden geen gegevens automatisch verstuurd.
+                Zakelijke bankkoppeling, automatische betalingen en cloudsync zijn niet actief.
+                Wanneer je een AI-vraag verstuurt, worden uitsluitend deze zakelijke context en dit gesprek voor het antwoord verwerkt.
               </p>
               <p>
                 Voor een eventuele analyse ontbreken nog:{" "}
@@ -1401,9 +1352,9 @@ export default function BusinessWorkspace({
           onClick={() => go(key)}
         />
       ))}
-      guide={<AiAssistantCard key={formRevision} scope={isDemo ? "business-demo" : "business-real"} businessData={data} />}
+      guide={<AiAssistantCard scope="business-real" businessData={data} />}
     >
-      <div key={formRevision} className="business-content space-y-4">
+      <div className="business-content space-y-4">
         {tab !== "intent" && (
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
             <p>{data.profile.name || "Jouw onderneming — nog niet ingevuld"}</p>
@@ -1438,9 +1389,7 @@ export default function BusinessWorkspace({
         {content()}
         <p className="text-[11px] text-slate-400">
           Bedragen in euro · Geen belastingaangifteprogramma ·{" "}
-          {isDemo
-            ? "Zakelijke demo — fictieve gegevens"
-            : "Eigen zakelijke administratie"}
+          Eigen zakelijke administratie
         </p>
       </div>
     </ApplicationLayout>
