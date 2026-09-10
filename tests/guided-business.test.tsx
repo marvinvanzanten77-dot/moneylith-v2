@@ -296,3 +296,37 @@ test("business reuses personal backup controls with a whole-ledger scope and ind
   assert.ok(html.includes("Facturen, betalingen en rekeningen blijven samen"));
   assert.ok(!html.includes("Persoonlijk</label>"));
 });
+
+test("zero expected revenue is never represented as known realized revenue in provider context, including direct style", () => {
+  const data = emptyBusiness("real");
+  data.plan.revenue = 0;
+  data.plan.costs = 0;
+  data.intent = { ...emptyBusinessIntent(), aiStyle: "confronterend" };
+  const request = buildChatRequest({
+    scope: "business-real",
+    context: data,
+    history: [
+      {
+        role: "assistant",
+        content: "Eerdere onjuiste uitspraak: je hebt nul omzet.",
+      },
+    ],
+    question: "Wat is bekend?",
+  });
+  const context = JSON.parse(
+    request.messages
+      .at(-1)!
+      .content.split("Actieve gegevens (JSON): ")[1]
+      .split("\n\nVraag:")[0],
+  );
+  assert.equal(context.financialMeanings.realizedRevenue.amount, null);
+  assert.equal(context.financialMeanings.expectedNewRevenue.amount, 0);
+  assert.equal(context.financialMeanings.expectedNewRevenue.reviewed, false);
+  assert.equal(context.financialMeanings.realizedCosts.amount, null);
+  assert.equal(context.financialMeanings.expectedCosts.amount, 0);
+  assert.equal(context.verifiedTotals.income, null);
+  assert.match(request.messages[0].content, /VERWACHTE NIEUWE OMZET/);
+  assert.match(request.messages[0].content, /Zeg dan nooit/);
+  assert.match(request.messages[0].content, /corrigeer eerdere onjuiste/);
+  assert.match(request.messages[0].content, /geen verwijten/);
+});
