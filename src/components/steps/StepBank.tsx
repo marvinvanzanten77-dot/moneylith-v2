@@ -284,7 +284,7 @@ export const StepBank = ({
             type="button"
             onClick={() => void exchangePublicToken(persistGateway.get("moneylith.plaid.access_token") || "")}
             className="rounded-full border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-60"
-            disabled={loading || state === "disconnected" || state === "connecting"}
+            disabled={loading || state === "disconnected"}
           >
             {loading ? "Bezig..." : "Sync nu"}
           </button>

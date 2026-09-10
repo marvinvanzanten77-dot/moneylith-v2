@@ -48,15 +48,6 @@ export type SchuldItem = {
   afschrijfDag?: number; // 0-31 (0 = geen vaste dag)
 };
 
-export type Transaction = {
-  id: string;
-  date: string; // ISO string, bv. "2025-12-06"
-  description: string;
-  amount: number; // negatief = uitgaven, positief = inkomsten
-  accountId?: string;
-  raw?: unknown;
-};
-
 // Canonical moneylith transaction/bucket types
 export type MoneylithTransaction = {
   id: string;

@@ -1,3 +1,5 @@
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
+
 type ExtractResult = {
   text: string;
   note?: string;
@@ -28,21 +30,18 @@ export async function extractTextFromImageFile(file: File): Promise<ExtractResul
 }
 
 async function extractTextLayerFromPdf(data: ArrayBuffer, maxPages: number): Promise<{ text: string; pageCount: number }> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-  const { getDocument, GlobalWorkerOptions } = pdfjs as any;
-  GlobalWorkerOptions.workerSrc = new URL(
-    /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
-    import.meta.url
-  ).toString();
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const { getDocument, GlobalWorkerOptions } = pdfjs;
+  GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-  const doc = await getDocument({ data }).promise;
+  const doc = await getDocument({ data: data.slice(0) }).promise;
   const pageCount = Math.min(doc.numPages, maxPages);
   let text = "";
   for (let i = 1; i <= pageCount; i += 1) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
     const pageText = content.items
-      .map((item: any) => (item?.str ? String(item.str) : ""))
+      .map((item) => ("str" in item ? item.str : ""))
       .join(" ");
     text += `${pageText}\n`;
   }
@@ -53,14 +52,11 @@ async function extractTextLayerFromPdf(data: ArrayBuffer, maxPages: number): Pro
 }
 
 async function extractPdfViaOcr(data: ArrayBuffer, maxPages: number): Promise<string> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf");
-  const { getDocument, GlobalWorkerOptions } = pdfjs as any;
-  GlobalWorkerOptions.workerSrc = new URL(
-    /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.min.js",
-    import.meta.url
-  ).toString();
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const { getDocument, GlobalWorkerOptions } = pdfjs;
+  GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-  const doc = await getDocument({ data }).promise;
+  const doc = await getDocument({ data: data.slice(0) }).promise;
   const pageCount = Math.min(doc.numPages, maxPages);
   let text = "";
 
@@ -72,7 +68,7 @@ async function extractPdfViaOcr(data: ArrayBuffer, maxPages: number): Promise<st
     canvas.height = Math.ceil(viewport.height);
     const ctx = canvas.getContext("2d");
     if (!ctx) continue;
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
     const dataUrl = canvas.toDataURL("image/png");
     const pageText = await runOcr(dataUrl);
     text += `${pageText}\n`;

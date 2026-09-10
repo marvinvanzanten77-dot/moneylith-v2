@@ -552,7 +552,7 @@ export function StepAfschriften({
         tab: "ai-analyse" as TabKey,
         system,
         user,
-        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken ?? undefined,
       });
       if (!result) {
         setAiError("AI-analyse is mislukt. Probeer het later opnieuw.");
@@ -563,7 +563,7 @@ export function StepAfschriften({
       const at = new Date().toISOString();
       onAiAnalysisComplete?.({ raw: result, at });
       onBucketsRefresh?.();
-      await runAiBuckets(turnstileOptional ? undefined : turnstileToken);
+      await runAiBuckets(turnstileOptional ? undefined : turnstileToken ?? undefined);
       setTurnstileToken(null);
       setTurnstileNonce((prev) => prev + 1);
     } catch (err) {
@@ -757,6 +757,7 @@ export function StepAfschriften({
                 </div>
                 <TurnstileWidget
                   key={`afschriften-turnstile-${turnstileNonce}`}
+                  siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ""}
                   onVerify={(token) => setTurnstileToken(token)}
                   theme="dark"
                 />

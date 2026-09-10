@@ -107,7 +107,7 @@ export function buildMoneylithPrompt(
   lines.push(`Modus: ${modeLabel}`);
   lines.push(`Algemene score: ${overallScore.toFixed(0)} / 100 (${overallLevel}).`);
 
-  ("income,fixedCosts,cashflow,debts,assets,goals,risk,overview".split(",") as const).forEach((key) => {
+  (["income", "fixedCosts", "cashflow", "debts", "assets", "goals", "risk", "overview"] as const).forEach((key) => {
     const tab = tabs[key];
     if (!tab) return;
 

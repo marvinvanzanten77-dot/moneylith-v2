@@ -50,8 +50,8 @@ const safeSumFixedCosts = (fixedCosts: any): number => {
       return sum + (v || 0);
     }, 0);
   }
-  const manualItems = Array.isArray(fixedCosts.manual) ? fixedCosts.manual : [];
-  const autoItems = Array.isArray(fixedCosts.auto) ? fixedCosts.auto : [];
+  const manualItems: { bedrag?: number }[] = Array.isArray(fixedCosts.manual) ? fixedCosts.manual : [];
+  const autoItems: { customMonthlyAmount?: number; estimatedMonthlyAmount?: number }[] = Array.isArray(fixedCosts.auto) ? fixedCosts.auto : [];
   const manualSum = manualItems.reduce((sum, item) => sum + (typeof item?.bedrag === "number" ? item.bedrag : 0), 0);
   const autoSum = autoItems.reduce((sum, item) => {
     const v = item?.customMonthlyAmount ?? item?.estimatedMonthlyAmount ?? 0;

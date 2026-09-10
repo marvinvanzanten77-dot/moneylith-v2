@@ -1,3 +1,4 @@
+import { toDebtCardItems, fromDebtCardItems } from "./logic/debtRecords";
 import { ApplicationLayout, ModeInformation } from "./components/ApplicationLayout";
 import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
 import { NavigationStep } from "./components/NavigationStep";
@@ -6,7 +7,6 @@ import { formatCurrency } from "./utils/format";
 import { reviewSection, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FixedCostsList } from "./components/FixedCostsList";
-import { SchuldenkaartCard } from "./components/SchuldenkaartCard";
 import { VermogenCard } from "./components/VermogenCard";
 import { AiAssistantCard } from "./components/AiAssistantCard";
 import { FixedCostsWizard } from "./components/FixedCostsWizard";
@@ -25,7 +25,7 @@ import { StepBackup } from "./components/steps/StepBackup";
 import { StepSettings } from "./components/steps/StepSettings";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
 import { useLocalStorage } from "./hooks/useLocalStorage";
-import { detectRecurringCandidates } from "./utils/recurring";
+import { detectRecurringCandidates, type RecurringCandidate } from "./utils/recurring";
 import { FutureIncomeList } from "./components/FutureIncomeList";
 import type {
   FixedCostItem,
@@ -163,102 +163,6 @@ const businessTabs: TabConfig[] = [
   { key: "biz-settings", label: "Instellingen", desc: "Opslag, hulp en app-opties" },
 ];
 const useActiveTabs = (mode: Mode) => useMemo(() => (mode === "zakelijk" ? businessTabs : personalTabs), [mode]);
-
-const ActionZone = ({
-  type,
-  onDebtSummary,
-  aflosMode,
-  setAflosMode,
-  debtClearMonthsAggressive,
-  onAssetSummary,
-}: {
-  type: ActionZoneType;
-  onDebtSummary: (s: DebtSummary) => void;
-  aflosMode: AflosMode;
-  setAflosMode: (mode: AflosMode) => void;
-  debtClearMonthsAggressive: number | null;
-  onAssetSummary: (s: AssetSummary) => void;
-}) => {
-  let primary: React.ReactNode = (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Primary slot (leeg)</div>
-  );
-  let secondary: React.ReactNode = (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Secondary slot (leeg)</div>
-  );
-  let timeline: React.ReactNode = (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">Timeline slot (leeg)</div>
-  );
-
-  if (type === "aflossen") {
-    primary = (
-      <div className="space-y-3">
-        <div className="mb-2 flex flex-col gap-2 text-sm text-slate-800 md:flex-row md:items-center md:gap-4">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              name="aflosMode"
-              value="minimum"
-              checked={aflosMode === "minimum"}
-              onChange={() => setAflosMode("minimum")}
-            />
-            Aflossen op minimum (minimale maandlast)
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              name="aflosMode"
-              value="aggressive"
-              checked={aflosMode === "aggressive"}
-              onChange={() => setAflosMode("aggressive")}
-              disabled={!debtClearMonthsAggressive}
-            />
-            Aflossen op maximale ruimte
-          </label>
-        </div>
-        <SchuldenkaartCard onSummaryChange={onDebtSummary} />
-      </div>
-    );
-    secondary = (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
-        Hier komt later offersimulatie.
-      </div>
-    );
-    timeline = (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
-        Hier komt later een aflostijdlijn.
-      </div>
-    );
-  }
-
-  if (type === "opbouwen") {
-    primary = <VermogenCard onSummaryChange={onAssetSummary} />;
-    secondary = (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
-        Hier komt later een groeiplan.
-      </div>
-    );
-    timeline = (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 text-sm text-slate-700">
-        Hier komt later een vermogenslijn.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="card-shell p-4 text-slate-900 space-y-3">
-        <p className="text-sm text-slate-600">Actiepad</p>
-        <h3 className="text-lg font-semibold text-slate-900">Actiemodules voor {type}</h3>
-        <p className="text-sm text-slate-700">Actiemodules voor {type} komen hier.</p>
-        <div className="space-y-2 text-xs text-slate-500">
-          <div className="action-primary">{primary}</div>
-          <div className="action-secondary">{secondary}</div>
-          <div className="action-timeline">{timeline}</div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () => void; skipOnboarding?: boolean }) => {
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
@@ -638,7 +542,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
                 openBedrag: amount,
                 minimaleMaandlast: undefined,
                 minBetaling: undefined,
-                opmerking: noteParts || undefined,
+                gebruikerOpmerking: noteParts || undefined,
               });
             }
             break;
@@ -774,7 +678,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
                 openBedrag: saldo,
                 minimaleMaandlast: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
                 minBetaling: minimaleMaandlast && minimaleMaandlast > 0 ? minimaleMaandlast : undefined,
-                opmerking: noteParts || undefined,
+                gebruikerOpmerking: noteParts || undefined,
               });
             }
             break;
@@ -1056,11 +960,11 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     setAccountsBusiness((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const addTransaction = (tx: Transaction) => {
+  const addTransaction = (tx: MoneylithTransaction) => {
     setTransactions((prev) => [...prev, tx]);
   };
 
-  const addTransactionBusiness = (tx: Transaction) => {
+  const addTransactionBusiness = (tx: MoneylithTransaction) => {
     setTransactionsBusiness((prev) => [...prev, tx]);
   };
 
@@ -1123,7 +1027,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     }
   };
 
-  const updateTransaction = (tx: Transaction) => {
+  const updateTransaction = (tx: MoneylithTransaction) => {
     setTransactions((prev) => {
       const idx = prev.findIndex((t) => t.id === tx.id);
       if (idx === -1) return [...prev, tx];
@@ -1133,7 +1037,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     });
   };
 
-  const updateTransactionBusiness = (tx: Transaction) => {
+  const updateTransactionBusiness = (tx: MoneylithTransaction) => {
     setTransactionsBusiness((prev) => {
       const idx = prev.findIndex((t) => t.id === tx.id);
       if (idx === -1) return [...prev, tx];
@@ -1341,7 +1245,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const recurringCandidates = useMemo(() => detectRecurringCandidates(transactions), [transactions]);
   const recurringCandidatesBusiness = useMemo(() => detectRecurringCandidates(transactionsBusiness), [transactionsBusiness]);
 
-  const mergeFixedItems = (candidates: FixedCostItem[], base: FixedCostItem[]) => {
+  const mergeFixedItems = (candidates: RecurringCandidate[], base: FixedCostItem[]) => {
     if (!candidates.length && !base.length) return [] as FixedCostItem[];
     const byPattern = new Map<string, FixedCostItem>();
     for (const item of base) {
@@ -1709,7 +1613,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     setStoredBuckets([]);
     setStoredBucketsBusiness([]);
   }, [setStoredBuckets, setStoredBucketsBusiness]);
-  const activeBuckets = [];
+  const activeBuckets: MoneylithBucket[] = [];
   const activeNetFree = mode === "zakelijk" ? netIncomeBusiness - fixedCostsBusiness : netIncome - fixedCosts;
   const spendBuckets: SpendBucket[] = [];
 
@@ -1786,12 +1690,11 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     derivedFixedFromTransactions,
   ]);
 
-  const focusLabelMap: Record<MonthFocus, string> = {
+  const focusLabelMap: Record<NonNullable<MonthFocus>, string> = {
     schulden_afbouwen: "Schulden afbouwen",
     vermogen_opbouwen: "Vermogen opbouwen",
     overleven: "Overleven & stabiliseren",
     experiment: "Experiment",
-    null: "Nog geen focus gekozen",
   };
 
   const quickSummary = useMemo(() => {
@@ -1799,7 +1702,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     return {
       free,
       month: selectedMonth,
-      focus: focusLabelMap[monthFocus ?? null],
+      focus: monthFocus ? focusLabelMap[monthFocus] : "Nog geen focus gekozen",
       status: free >= 0 ? "Onder controle" : "Kwetsbaar",
     };
   }, [netIncome, fixedCosts, selectedMonth, monthFocus, focusLabelMap]);
@@ -2144,6 +2047,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   };
 
 
+  const personalDebtCards = useMemo(() => toDebtCardItems(debts), [debts]);
+  const businessDebtCards = useMemo(() => toDebtCardItems(debtsBusiness), [debtsBusiness]);
+
   const renderSchulden = (variant: "personal" | "business" = "personal") => {
     const isBusinessVariant = variant === "business";
     const debtsSource = isBusinessVariant ? debtsBusiness : debts;
@@ -2158,8 +2064,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     return (
       <StepSchulden
         financialSnapshot={isBusinessVariant ? undefined : financialSnapshot}
-        debts={debtsSource}
-        onDebtsChange={setDebtsFn}
+        debts={isBusinessVariant ? businessDebtCards : personalDebtCards}
+        onDebtsChange={items => setDebtsFn(fromDebtCardItems(items))}
         debtSummary={summary}
         onDebtSummary={setSummaryFn}
         variant={variant}
@@ -2193,11 +2099,11 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const onComplete = isBusinessVariant ? handleAiAnalysisCompleteBusiness : handleAiAnalysisComplete;
     const fixedLabels = isBusinessVariant
       ? [
-          ...fixedCostManualItemsBusiness.map((i) => i.description ?? i.name ?? "").filter(Boolean),
+          ...fixedCostManualItemsBusiness.map((i) => i.naam).filter(Boolean),
           ...fixedCostItemsBusiness.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
         ]
       : [
-          ...fixedCostManualItems.map((i) => i.description ?? i.name ?? "").filter(Boolean),
+          ...fixedCostManualItems.map((i) => i.naam).filter(Boolean),
           ...fixedCostItems.map((i) => i.descriptionPattern ?? i.customLabel ?? "").filter(Boolean),
         ];
     const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
@@ -2313,7 +2219,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const isBusiness = mode === "zakelijk";
   const totalIncomeDisplay = snapshot?.totalIncome?.value ?? (activeNetIncome ?? 0);
   const fixedCostsDisplay = snapshot?.fixedCostsTotal?.value ?? (activeFixedCosts ?? 0);
-  const netFreeDisplay = snapshot?.netFree ?? activeNetIncome - activeFixedCosts ?? quickSummary.free ?? 0;
+  const netFreeDisplay = snapshot?.netFree ?? (activeNetIncome - activeFixedCosts);
   const totalDebtDisplay = snapshot?.totalDebt ?? activeDebtsSummary.totalDebt ?? 0;
   const assetsTotalDisplay = snapshot?.assetsTotal ?? activeAssetsSummary.totalAssets ?? 0;
   const monthlyPressureDisplay = snapshot?.monthlyPressure ?? activeDebtsSummary.totalMinPayment ?? 0;

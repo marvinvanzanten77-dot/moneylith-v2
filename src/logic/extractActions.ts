@@ -5,6 +5,7 @@ export type AiActions = Partial<{
   fixedCosts: Array<{ name: string; amount: number; cadence: AiCadence; confidence: number }>;
   debts: Array<{ name: string; amount: number; confidence: number }>;
   goals: Array<{ name: string; target: number; deadline?: string; confidence: number }>;
+  buckets: Array<{ name?: string; amount?: number; share?: number; confidence: number; type?: import("../types").MoneylithBucketType; recurring?: boolean }>;
   notes: string[];
 }>;
 

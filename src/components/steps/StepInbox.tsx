@@ -278,11 +278,11 @@ export function StepInbox({ items, onItemsChange, onApplySuggestions, mode = "pe
         system,
         user,
         displayUserMessage: "Analyseer Inbox document",
-        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken ?? undefined,
       });
       if (!result) throw new Error("AI-analyse mislukt");
       const parsed = parseSuggestions(result);
-      const next = items.map((entry) =>
+      const next = items.map<InboxItem>((entry) =>
         entry.id === id
           ? {
               ...entry,

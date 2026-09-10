@@ -64,7 +64,7 @@ export function BackupCard() {
     return [];
   });
 
-  const deriveKey = async (pwd: string, salt: Uint8Array) => {
+  const deriveKey = async (pwd: string, salt: Uint8Array<ArrayBuffer>) => {
     const enc = new TextEncoder();
     const baseKey = await crypto.subtle.importKey("raw", enc.encode(pwd), "PBKDF2", false, ["deriveKey"]);
     return crypto.subtle.deriveKey(
@@ -99,7 +99,7 @@ export function BackupCard() {
     return new TextDecoder().decode(plain);
   };
 
-  const moduleLabels = useMemo(
+  const moduleLabels = useMemo<Record<string, string>>(
     () => ({
       income: "Inkomen",
       fixed: "Vaste lasten",

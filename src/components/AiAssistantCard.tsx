@@ -112,7 +112,7 @@ export function AiAssistantCard({ mode = "personal", actions, onActionsChange, o
         system: aiPayload.system,
         user: `${aiPayload.user}\n\nVraag: ${question}`,
         displayUserMessage: question,
-        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken ?? undefined,
         snapshot: appSnapshot,
       });
       if (result) {

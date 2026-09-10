@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { formatCurrency } from "../../utils/format";
 import { VermogenCard } from "../VermogenCard";
 import type { FinancialSnapshot } from "../../types";
-import type { FinanceMode } from "../../logic/snapshot";
+import type { SnapshotMode } from "../../logic/snapshot";
 
 type AssetItem = {
   id: string;
@@ -25,7 +25,7 @@ interface StepVermogenProps {
   financialSnapshot?: FinancialSnapshot | null;
   variant?: "personal" | "business";
   readOnly?: boolean;
-  mode?: FinanceMode;
+  mode?: SnapshotMode;
 }
 
 export function StepVermogen({

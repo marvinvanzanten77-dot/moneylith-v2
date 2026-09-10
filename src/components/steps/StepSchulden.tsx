@@ -18,7 +18,9 @@ import { TurnstileWidget } from "../TurnstileWidget";
 
 import { formatCurrency } from "../../utils/format";
 
-import { simulatePayoff, type StrategyKey } from "../../logic/debtSimulator";
+import { simulatePayoff, type StrategyKey as SimulatorStrategyKey } from "../../logic/debtSimulator";
+
+type StrategyKey = SimulatorStrategyKey | "steady" | "buffered";
 
 type StrategyCard = {
   key: StrategyKey;
@@ -302,7 +304,8 @@ export function StepSchulden({
     [view, includePatterns, capacityRealistic, capacityAggressive],
   );
 
-  const strategyKey: StrategyKey = (selectedStrategy as StrategyKey | null) ?? "balanced";
+  const strategyKey: SimulatorStrategyKey = selectedStrategy === "steady" || selectedStrategy === "buffered"
+    ? "balanced" : selectedStrategy ?? "balanced";
 
   const monthlyBudget = Math.max(
 
@@ -353,7 +356,7 @@ export function StepSchulden({
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const applyFullpayOverride = (proposal: { minPayment: number; note: string; month?: number; monthLabel?: string; freeAfter?: number }, month: number) => {
+  const applyFullpayOverride = (proposal: { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey; month?: number; monthLabel?: string; freeAfter?: number }, month: number) => {
     const monthBudget = computeFullpayBudget() + (futureIncomeByMonth.get(month) || 0);
     const monthLabel = formatMonthLabel(new Date(), month);
     const freeAfter = Math.max(0, monthBudget - (proposal.minPayment || 0));
@@ -912,7 +915,7 @@ export function StepSchulden({
         user,
 
 
-        turnstileToken: turnstileOptional ? undefined : turnstileToken,
+        turnstileToken: turnstileOptional ? undefined : turnstileToken ?? undefined,
 
 
       });
@@ -1049,7 +1052,7 @@ export function StepSchulden({
 
     const proposals: Record<
       string,
-      { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey; month?: number; freeAfter?: number }
+      { minPayment: number; monthsToClear: number | null; note: string; strategyKey?: StrategyKey; month?: number; freeAfter?: number; monthLabel?: string }
     > = {};
 
     if (strategy.key === "fullpay") {
