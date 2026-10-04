@@ -4,6 +4,10 @@ import { rateLimit } from "../../server/utils/rateLimit.js";
 import { verifyTurnstile } from "../../server/utils/verifyTurnstile.js";
 import { auditLog } from "../../server/utils/audit.js";
 
+import {
+  businessReplyIssue,
+  type BusinessReplyPolicy,
+} from "../../src/ai/replyPolicy.js";
 import { buildChatRequest } from "../../src/ai/context.js";
 
 const MODEL = "gpt-4.1-mini";
@@ -44,40 +48,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  let messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
   let scope: string | undefined;
+  let businessReplyPolicy: BusinessReplyPolicy | undefined;
   try {
     if (req.body?.scope !== undefined) {
       const selected = buildChatRequest(req.body);
       messages = selected.messages;
       scope = selected.scope;
+      businessReplyPolicy = selected.businessReplyPolicy;
     } else {
       // Existing per-tab analysis contract; the shared chat always uses the scoped protocol.
       const { system, user } = req.body ?? {};
-      if (typeof system !== "string" || typeof user !== "string" || !system || !user || system.length + user.length > 500_000) throw new Error("Ongeldige analysevraag.");
-      messages = [{ role: "system", content: system }, { role: "user", content: user }];
+      if (
+        typeof system !== "string" ||
+        typeof user !== "string" ||
+        !system ||
+        !user ||
+        system.length + user.length > 500_000
+      )
+        throw new Error("Ongeldige analysevraag.");
+      messages = [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ];
     }
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Ongeldige AI-context." });
+    res
+      .status(400)
+      .json({
+        error: error instanceof Error ? error.message : "Ongeldige AI-context.",
+      });
     return;
   }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ error: "AI niet beschikbaar: OPENAI_API_KEY ontbreekt op de server." });
+    res
+      .status(503)
+      .json({
+        error: "AI niet beschikbaar: OPENAI_API_KEY ontbreekt op de server.",
+      });
     return;
   }
 
   const client = new OpenAI({ apiKey, timeout: 25_000, maxRetries: 0 });
 
   try {
-    const completion = await client.chat.completions.create({
+    let completion = await client.chat.completions.create({
       model: MODEL,
       messages,
       max_tokens: 600,
       temperature: 0.3,
     });
 
-    const content = completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
+    let content =
+      completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
+    const issue = businessReplyIssue(content, businessReplyPolicy);
+    if (issue) {
+      // Keep the user's stored conversation intact. Retry only the provider's
+      // unsupported response, once; never publish an unverified fallback.
+      completion = await client.chat.completions.create({
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content: messages[0].content + "\nAntwoordcontrole: " + issue,
+          },
+          ...messages.slice(1),
+        ],
+        max_tokens: 600,
+        temperature: 0.3,
+      });
+      content =
+        completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
+      if (businessReplyIssue(content, businessReplyPolicy)) {
+        throw new Error("Unsupported financial assessment");
+      }
+    }
     if (!content) throw new Error("Empty AI response");
     auditLog({
       ts: new Date().toISOString(),
@@ -95,7 +145,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     res.status(200).json({ content, ...(scope ? { scope } : {}) });
   } catch (error) {
-    res.status(502).json({ error: "AI-service kon geen antwoord geven. Probeer het later opnieuw." });
+    res
+      .status(502)
+      .json({
+        error: "AI-service kon geen antwoord geven. Probeer het later opnieuw.",
+      });
     auditLog({
       ts: new Date().toISOString(),
       route: "api/moneylith/analyse",
@@ -106,4 +160,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
-

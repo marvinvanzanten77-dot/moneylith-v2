@@ -25,6 +25,7 @@ Bestaande `ApplicationLayout`, `ModeBanner`, `NavigationStep` en `AiAssistantCar
 
 - `BusinessData.intent` is optioneel voor bestaande opslag. Oude intentieteksten blijven ongewijzigd. Nieuwe selecties worden alleen door gebruikershandelingen vastgelegd.
 - Bestaande doelen met numerieke bedragen en ISO-deadlines blijven geldig. Nieuwe zakelijke doelbedragen/deadlines kunnen `null` zijn; expliciete nul blijft nul.
+- Een gerichte antwoordcontrole houdt bekende ongefundeerde situatieoordelen en onjuiste nulomzetclaims tegen bij onvoldoende gecontroleerde gegevens. De provider krijgt maximaal één herstelpoging; een opnieuw afgekeurd antwoord wordt niet gepubliceerd. Oudere, inmiddels niet-onderbouwde assistentuitspraken worden niet opnieuw als modelcontext gebruikt; de opgeslagen chats blijven intact. Dit filter is geen algemene feitencontrole.
 - De server benoemt gerealiseerde omzet/kosten en verwachte omzet/kosten afzonderlijk in `financialMeanings`. Een nul in het maandplan is nooit bewijs van nul gerealiseerde omzet. Ook de confronterende stijl moet dit onderscheid en respectvolle formuleringen behouden; oudere onjuiste chatberichten zijn niet leidend.
 - AI-context gebruikt een serverzijdige allowlist. Strategie, drukfactoren, termijn en stijl komen uit de actieve zakelijke administratie. Onbekende/ongecontroleerde financiële totalen blijven afgeschermd.
 - Wijzigingen aan financiële bronregels maken hun eerdere exacte controlebevestigingen ongeldig. Een intentiewijziging verandert financiële bevestigingen niet.

@@ -330,3 +330,54 @@ test("zero expected revenue is never represented as known realized revenue in pr
   assert.match(request.messages[0].content, /corrigeer eerdere onjuiste/);
   assert.match(request.messages[0].content, /geen verwijten/);
 });
+
+test("unsupported diagnoses and false actual-zero claims are filtered from provider history without changing stored input history", async () => {
+  const { businessReplyIssue } = await import("../src/ai/replyPolicy");
+  const policy = {
+    canAssessFinancialSituation: false,
+    actualRevenueUnknown: true,
+  };
+  for (const answer of [
+    "Dit is een onhoudbare situatie.",
+    "Je bedrijf is financieel gezond.",
+    "Je hebt nul omzet.",
+    "Je gerealiseerde omzet is €0.",
+  ])
+    assert.ok(businessReplyIssue(answer, policy));
+  assert.equal(
+    businessReplyIssue(
+      "Je hebt €0 verwachte nieuwe omzet ingevoerd. Gerealiseerde omzet is onbekend.",
+      policy,
+    ),
+    null,
+  );
+  assert.equal(
+    businessReplyIssue(
+      "Op basis van je gecontroleerde gegevens is dit een onhoudbare situatie.",
+      { canAssessFinancialSituation: true, actualRevenueUnknown: false },
+    ),
+    null,
+  );
+  const history = [
+    { role: "assistant", content: "Je hebt nul omzet." },
+    { role: "user", content: "Wat ontbreekt?" },
+    { role: "assistant", content: "Vul de omzetfacturen aan." },
+  ];
+  const original = JSON.stringify(history);
+  const request = buildChatRequest({
+    scope: "business-real",
+    context: emptyBusiness("real"),
+    history,
+    question: "Wat is de volgende stap?",
+  });
+  assert.equal(JSON.stringify(history), original);
+  assert.ok(
+    !request.messages.some(
+      (m) => m.role === "assistant" && m.content === "Je hebt nul omzet.",
+    ),
+  );
+  assert.ok(
+    request.messages.some((m) => m.content === "Vul de omzetfacturen aan."),
+  );
+  assert.equal(request.businessReplyPolicy?.canAssessFinancialSituation, false);
+});

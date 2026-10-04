@@ -32,7 +32,7 @@ export function OnboardingChoice({ onChoice, onOpenBusiness }: OnboardingChoiceP
             <button type="button" onClick={onOpenBusiness} className="rounded-lg border border-amber-300 bg-amber-100 px-6 py-3 font-semibold text-slate-900">
               Open Zakelijk
             </button>
-            <p className="mt-2 text-sm text-slate-300">Bekijk de fictieve zzp-onderneming of hervat je eigen zakelijke administratie.</p>
+            <p className="mt-2 text-sm text-slate-300">Open je eigen zakelijke administratie. Je persoonlijke gegevens blijven gescheiden.</p>
           </div>
         )}
         <div className="grid gap-6 md:grid-cols-3">
@@ -113,4 +113,3 @@ export function OnboardingChoice({ onChoice, onOpenBusiness }: OnboardingChoiceP
     </div>
   );
 }
-
