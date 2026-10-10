@@ -1,3 +1,6 @@
+import { ProjectionView } from "../components/ProjectionView";
+import { businessInput } from "../projection/adapters";
+import { emptyOptions, today, type Scenario as ProjectionScenario } from "../projection/engine";
 import { BusinessAccounts } from "./BusinessAccounts";
 import { BackupCard } from "../components/BackupCard";
 import { StepSettings } from "../components/steps/StepSettings";
@@ -36,7 +39,6 @@ import { Collection, ConfirmAction, EditDialog, type Field } from "./Editor";
 import {
   assumptions,
   businessTabs,
-  forecastAssumptions,
   type BusinessTab,
 } from "./copy";
 import {
@@ -44,9 +46,7 @@ import {
   calculateBusiness,
   changeBusiness,
   confirmSection,
-  forecastBusiness,
   missingFor,
-  type Scenario,
 } from "./finance";
 import {
   gross,
@@ -284,6 +284,8 @@ export default function BusinessWorkspace({
   onPersonal: () => void;
 }) {
   const workspace = "real" as const;
+  const [projectionOptions, setProjectionOptions] = useState(emptyOptions);
+  const [projectionScenario, setProjectionScenario] = useState<ProjectionScenario | null>(null);
   const [loaded] = useState(() => {
     try {
       return { data: loadBusiness(localStorage, workspace), error: "" };
@@ -371,7 +373,6 @@ export default function BusinessWorkspace({
         </div>
       </ApplicationLayout>
     );
-  const scenario = data.scenario;
   const result = calculateBusiness(data);
   const check = (section: Section) => {
     const review = result.checks[section];
@@ -669,8 +670,6 @@ export default function BusinessWorkspace({
       {check("cash")}
     </>
   );
-  const missingForecast = missingFor(data, "forecast");
-  const forecast = forecastBusiness(data, scenario);
   const content = () => {
     switch (tab) {
       case "intent":
@@ -1005,136 +1004,7 @@ export default function BusinessWorkspace({
           </>
         );
       case "forecast":
-        return (
-          <>
-            <Missing names={missingForecast} />
-            {forecast ? (
-              <>
-                <div className="biz-metrics">
-                  <Metric
-                    label="Verwacht banksaldo over 12 maanden"
-                    detail={
-                      data.plan.taxPaymentCadence === "hold"
-                        ? "Zonder belastingbetalingen"
-                        : "Na geplande belastingbetalingen"
-                    }
-                    value={forecast[12].bank}
-                  />
-                  <Metric
-                    label="Daarvan gereserveerd voor btw/belasting"
-                    value={forecast[12].reserves}
-                  />
-                  <Metric
-                    label="Beschikbaar na reserves, buffer en open inkoop"
-                    value={forecast[12].available}
-                  />
-                </div>
-                <SurfaceCard className="space-y-4">
-                  <div className="biz-section-heading">
-                    <h2>Verken een scenario</h2>
-                    <EditDialog
-                      inline
-                      title="Scenario aanpassen"
-                      button="Scenario aanpassen"
-                      value={scenario}
-                      fields={[
-                        {
-                          key: "revenueDelta",
-                          label:
-                            "Extra of minder omzet excl. btw per maand (€), negatief mag",
-                          type: "money",
-                        },
-                        {
-                          key: "extraCost",
-                          label: "Extra bedrijfskosten excl. btw per maand (€)",
-                          type: "money",
-                        },
-                        {
-                          key: "oneOff",
-                          label:
-                            "Eenmalige netto tegenvaller in eerste maand (€), zonder btw/belastingeffect",
-                          type: "money",
-                        },
-                      ]}
-                      onSave={(patch) => {
-                        const next = patch as Scenario;
-                        forecastBusiness(data, next);
-                        commit((data) => {
-                          data.scenario = next;
-                        });
-                      }}
-                    />
-                  </div>
-                  <p>
-                    Extra omzet {money(scenario.revenueDelta)} p/m · extra
-                    kosten {money(scenario.extraCost)} p/m · eenmalig{" "}
-                    {money(scenario.oneOff)}. Negatieve bedragen bij beschikbaar
-                    geld blijven zichtbaar.
-                  </p>
-                  <Button
-                    onClick={() =>
-                      perform(() =>
-                        commit((next) => {
-                          next.scenario = {
-                            revenueDelta: 0,
-                            extraCost: 0,
-                            oneOff: 0,
-                          };
-                        }),
-                      )
-                    }
-                  >
-                    Terug naar maandplan
-                  </Button>
-                  <div className="biz-table-scroll">
-                    <table>
-                      <caption>
-                        Verwachte kaspositie — geen gegarandeerde uitkomst
-                      </caption>
-                      <thead>
-                        <tr>
-                          <th>Maand</th>
-                          <th>Geldmiddelen</th>
-                          <th>Belasting betaald</th>
-                          <th>Btw/belastingreserve</th>
-                          <th>Beschikbaar</th>
-                          <th>Restant leningen</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {forecast.map((row) => (
-                          <tr key={row.month}>
-                            <th>{row.month}</th>
-                            <td>{money(row.bank)}</td>
-                            <td>{money(row.taxPaid)}</td>
-                            <td>{money(row.reserves)}</td>
-                            <td>{money(row.available)}</td>
-                            <td>{money(row.loanBalance)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </SurfaceCard>
-              </>
-            ) : (
-              <p className="biz-notice">
-                Vul de genoemde onderdelen aan. Zonder gecontroleerde basis
-                tonen we geen scenario of financiële conclusie.
-              </p>
-            )}
-            {planPanel}
-            {reservePanel}
-            <SurfaceCard className="space-y-4">
-              <h2>Aannames bij de vooruitblik</h2>
-              <ul>
-                {forecastAssumptions.map((text) => (
-                  <li key={text}>{text}</li>
-                ))}
-              </ul>
-            </SurfaceCard>
-          </>
-        );
+        return <ProjectionView input={businessInput(data, projectionOptions, today())} options={projectionOptions} onOptions={setProjectionOptions} scenario={projectionScenario} onScenario={setProjectionScenario} />;
       case "backup":
         return (
           <div className="max-w-xl">
@@ -1279,7 +1149,7 @@ export default function BusinessWorkspace({
           }}
         />
       ))}
-      guide={<AiAssistantCard scope="business-real" businessData={data} />}
+      guide={<AiAssistantCard scope="business-real" businessData={data} projectionOptions={projectionOptions} projectionScenario={projectionScenario} />}
       overlays={<NavigationHint hint={helpMode ? helpTooltip : null} />}
     >
       <div className="business-content space-y-4">

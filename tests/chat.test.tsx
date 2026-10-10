@@ -277,7 +277,8 @@ test("sanitization preserves exact-input review receipts for the complete demo",
       (check: unknown) => (check as { ready: boolean }).ready,
     ),
   );
-  assert.ok(context.forecast);
+  assert.equal(context.forecast, null);
+  assert.ok(context.projection.baseline.missing.length);
   assert.equal(context.verifiedTotals.profit, 726100);
 });
 
@@ -384,5 +385,19 @@ test("backend retries an unsupported business diagnosis once and never returns i
       if (value === undefined) delete process.env[name!];
       else process.env[name!] = value;
     }
+  }
+});
+
+test('projection answers append server figures and retry invented provider amounts', async () => {
+  const oldKey=process.env.OPENAI_API_KEY, oldOptional=process.env.TURNSTILE_OPTIONAL, oldSecret=process.env.TURNSTILE_SECRET_KEY, oldFetch=globalThis.fetch;
+  let calls=0,status=200,result:Record<string,unknown>={};
+  try {
+    process.env.OPENAI_API_KEY='test-key-not-real';process.env.TURNSTILE_OPTIONAL='true';delete process.env.TURNSTILE_SECRET_KEY;
+    globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{message:{content:++calls===1?'Over 30 dagen heb je €999999.':'Controleer eerst de ontbrekende gegevens. De rekenuitkomst staat hieronder.'}}]}),{status:200,headers:{'content-type':'application/json'}});
+    await handler({method:'POST',body:{...input(),question:'Waar sta ik over 30 dagen?'},headers:{'x-real-ip':'projection-answer-test'},socket:{}} as VercelRequest,{status(n:number){status=n;return this;},json(v:Record<string,unknown>){result=v;return this;}} as VercelResponse);
+    assert.equal(status,200);assert.equal(calls,2);assert.match(String(result.content),/Berekend door Moneylith/);assert.match(String(result.content),/30 dagen: beschikbaar onbekend/);assert.ok(!String(result.content).includes('999999'));
+  } finally {
+    globalThis.fetch=oldFetch;
+    for(const [name,value] of [['OPENAI_API_KEY',oldKey],['TURNSTILE_OPTIONAL',oldOptional],['TURNSTILE_SECRET_KEY',oldSecret]]){if(value===undefined)delete process.env[name!];else process.env[name!]=value;}
   }
 });

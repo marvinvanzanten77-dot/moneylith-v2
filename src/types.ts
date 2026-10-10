@@ -99,6 +99,7 @@ export type FixedCostItem = {
 };
 
 export type IncomeItem = {
+  dagVanMaand?: number; // Optional expected receipt day; absent remains unknown.
   amountEntered?: boolean;
   id: string;
   naam: string;

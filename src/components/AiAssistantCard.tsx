@@ -1,3 +1,4 @@
+import type { Options, Scenario } from "../projection/engine";
 import { GuideCard } from "./ApplicationLayout";
 import { useEffect, useRef, useState } from "react";
 import { TurnstileWidget } from "./TurnstileWidget";
@@ -6,6 +7,8 @@ import { businessChatData, type ChatScope, type ChatMessage } from "../ai/contex
 import { ChatRequestGuard, loadChat, saveChat } from "../ai/conversation";
 import type { BusinessData } from "../business/model";
 interface Props {
+  projectionOptions?: Options;
+  projectionScenario?: Scenario | null;
   scope?: ChatScope;
   businessData?: BusinessData;
   appSnapshot?: MoneylithSnapshot;
@@ -16,7 +19,7 @@ export function AiAssistantCard(props: Props) {
   const scope = props.scope ?? "personal";
   return <ScopedAssistant key={scope} {...props} scope={scope} />;
 }
-function ScopedAssistant({ scope, businessData, appSnapshot, userIntent, readiness }: Props & { scope: ChatScope }) {
+function ScopedAssistant({ scope, businessData, appSnapshot, userIntent, readiness, projectionOptions, projectionScenario }: Props & { scope: ChatScope }) {
   const [messages, setMessages] = useState(() => loadChat(scope));
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ function ScopedAssistant({ scope, businessData, appSnapshot, userIntent, readine
         : businessChatData(businessData);
       const response = await fetch("/api/moneylith/analyse", {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: request.signal,
-        body: JSON.stringify({ scope, context, question, history: messages.slice(-24), turnstileToken: turnstileToken ?? undefined }),
+        body: JSON.stringify({ scope, context, question, projectionOptions, projectionScenario, history: messages.slice(-24), turnstileToken: turnstileToken ?? undefined }),
       });
       const result = await response.json() as { content?: string; error?: string; scope?: ChatScope };
       if (!response.ok || result.error) throw new Error(result.error || "AI-service niet bereikbaar. Probeer het later opnieuw.");

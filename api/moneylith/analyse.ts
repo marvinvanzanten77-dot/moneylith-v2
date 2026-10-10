@@ -54,12 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }>;
   let scope: string | undefined;
   let businessReplyPolicy: BusinessReplyPolicy | undefined;
+  let computedReply: string | undefined;
   try {
     if (req.body?.scope !== undefined) {
       const selected = buildChatRequest(req.body);
       messages = selected.messages;
       scope = selected.scope;
       businessReplyPolicy = selected.businessReplyPolicy;
+      computedReply = selected.computedReply;
     } else {
       // Existing per-tab analysis contract; the shared chat always uses the scoped protocol.
       const { system, user } = req.body ?? {};
@@ -106,7 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let content =
       completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
-    const issue = businessReplyIssue(content, businessReplyPolicy);
+    const replyIssue = (text: string) => businessReplyIssue(text, businessReplyPolicy) ?? (computedReply && /[0-9€]|\b(?:nul|honderd|duizend|euro)\b/iu.test(text.replace(/\b(?:7|30|90|365)\s*dagen\b/giu, "")) ? "Geef uitsluitend een korte kwalitatieve toelichting zonder cijfers, bedragen of eurobedragen. De server voegt de berekende cijfers toe." : null);
+    const issue = replyIssue(content);
     if (issue) {
       // Keep the user's stored conversation intact. Retry only the provider's
       // unsupported response, once; never publish an unverified fallback.
@@ -124,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       content =
         completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
-      if (businessReplyIssue(content, businessReplyPolicy)) {
+      if (replyIssue(content)) {
         throw new Error("Unsupported financial assessment");
       }
     }
@@ -143,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         : undefined,
     });
-    res.status(200).json({ content, ...(scope ? { scope } : {}) });
+    res.status(200).json({ content: computedReply ? content + "\n\n" + computedReply : content, ...(scope ? { scope } : {}) });
   } catch (error) {
     res
       .status(502)

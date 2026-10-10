@@ -154,10 +154,10 @@ export function confirmSection(
   });
 }
 
-export function calculateBusiness(data: BusinessData) {
+export function calculateBusiness(data: BusinessData, asOf = monthEnd(data.month)) {
   validateBusiness(data);
-  const end = monthEnd(data.month);
-  const docs = data.documents.filter((d) => d.date.slice(0, 7) === data.month);
+  const end = asOf;
+  const docs = data.documents.filter((d) => d.date.slice(0, 7) === data.month && d.date <= end);
   const movements = data.movements.filter((m) => m.date <= end);
   const currentMovements = movements.filter(
     (m) => m.date.slice(0, 7) === data.month,
@@ -366,7 +366,7 @@ export function forecastBusiness(
       (step === 1 ? scenario.oneOff : 0);
     const taxPaid =
       plan.taxPaymentCadence === "monthly" ||
-      (plan.taxPaymentCadence === "quarterly" && step % 3 === 0)
+      (plan.taxPaymentCadence === "quarterly" && Number(month.slice(5, 7)) % 3 === 0)
         ? reserves
         : 0;
     bank -= taxPaid;

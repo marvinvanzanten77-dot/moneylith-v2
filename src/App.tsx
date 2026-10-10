@@ -1,3 +1,5 @@
+import { personalInput } from "./projection/adapters";
+import { emptyOptions, today, type Scenario as ProjectionScenario } from "./projection/engine";
 import { NavigationHint } from "./components/NavigationHint";
 import { PageIntro } from "./components/PageIntro";
 import { toDebtCardItems, fromDebtCardItems } from "./logic/debtRecords";
@@ -787,87 +789,6 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       transactionsBusiness,
     ]
   );
-  const moneylithSnapshot = useMemo(() => {
-    const rawLastSync = persistGateway.get("moneylith.personal.bank.lastSync");
-    let lastSyncAt: string | undefined;
-    if (rawLastSync) {
-      try {
-        const parsed = JSON.parse(rawLastSync);
-        if (typeof parsed === "string") lastSyncAt = parsed;
-      } catch {
-        // ignore malformed persisted lastSync
-      }
-    }
-    return buildMoneylithSnapshot({
-      meta: {
-        selectedMonth,
-        monthFocus,
-        bank: {
-          connected: bankConnectedPersonal,
-          lastSyncAt,
-        },
-      },
-      personal: {
-        accounts,
-        transactions,
-        income: incomeItems,
-        fixedCosts: fixedCostManualItems,
-        debts,
-        assets,
-        goals,
-        statements,
-        inbox: inboxItems,
-        aiBuckets: aiBucketsStoredPersonal,
-        fuelOverrides: fuelOverridesStoredPersonal,
-      },
-      business: {
-        accounts: accountsBusiness,
-        transactions: transactionsBusiness,
-        income: incomeItemsBusiness,
-        fixedCosts: fixedCostManualItemsBusiness,
-        debts: debtsBusiness,
-        assets: assetsBusiness,
-        goals: goalsBusiness,
-        statements: statementsBusiness,
-        inbox: inboxItemsBusiness,
-        aiBuckets: aiBucketsStoredBusiness,
-        fuelOverrides: fuelOverridesStoredBusiness,
-      },
-      ai: {
-        messages: getMessages(),
-        analysisRaw: aiAnalysisRaw,
-        analysisRawBusiness: aiAnalysisRawBusiness,
-      },
-    });
-  }, [
-    accounts,
-    accountsBusiness,
-    aiAnalysisRaw,
-    aiAnalysisRawBusiness,
-    aiBucketsStoredBusiness,
-    aiBucketsStoredPersonal,
-    bankConnectedPersonal,
-    debts,
-    debtsBusiness,
-    fixedCostManualItems,
-    fixedCostManualItemsBusiness,
-    fuelOverridesStoredBusiness,
-    fuelOverridesStoredPersonal,
-    goals,
-    goalsBusiness,
-    inboxItems,
-    inboxItemsBusiness,
-    incomeItems,
-    incomeItemsBusiness,
-    monthFocus,
-    selectedMonth,
-    statements,
-    statementsBusiness,
-    transactions,
-    transactionsBusiness,
-  ]);
-
-  const observation = useObserver(mode === "zakelijk" ? "business" : "personal", moneylithSnapshot);
   const activeTabs = useActiveTabs(mode);
 
   const [personalReviews, setPersonalReviews] = useLocalStorage<InputReviews>("moneylith.personal.inputReviews.v1", {});
@@ -1374,6 +1295,98 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       })), receipts),
     };
   };
+  const moneylithSnapshot = useMemo(() => {
+    const rawLastSync = persistGateway.get("moneylith.personal.bank.lastSync");
+    let lastSyncAt: string | undefined;
+    if (rawLastSync) {
+      try {
+        const parsed = JSON.parse(rawLastSync);
+        if (typeof parsed === "string") lastSyncAt = parsed;
+      } catch {
+        // ignore malformed persisted lastSync
+      }
+    }
+    return buildMoneylithSnapshot({
+      meta: {
+        selectedMonth,
+        monthFocus,
+        bank: {
+          connected: bankConnectedPersonal,
+          lastSyncAt,
+        },
+      },
+      personal: {
+        accounts,
+        futureIncome: futureIncomeItems,
+        detectedFixedCosts: mergedFixedCostItems,
+        inputReviews: personalReviews,
+        transactions,
+        income: incomeItems,
+        fixedCosts: fixedCostManualItems,
+        debts,
+        assets,
+        goals,
+        statements,
+        inbox: inboxItems,
+        aiBuckets: aiBucketsStoredPersonal,
+        fuelOverrides: fuelOverridesStoredPersonal,
+      },
+      business: {
+        accounts: accountsBusiness,
+        transactions: transactionsBusiness,
+        income: incomeItemsBusiness,
+        fixedCosts: fixedCostManualItemsBusiness,
+        debts: debtsBusiness,
+        assets: assetsBusiness,
+        goals: goalsBusiness,
+        statements: statementsBusiness,
+        inbox: inboxItemsBusiness,
+        aiBuckets: aiBucketsStoredBusiness,
+        fuelOverrides: fuelOverridesStoredBusiness,
+      },
+      ai: {
+        messages: getMessages(),
+        analysisRaw: aiAnalysisRaw,
+        analysisRawBusiness: aiAnalysisRawBusiness,
+      },
+    });
+  }, [
+    accounts,
+    futureIncomeItems,
+    mergedFixedCostItems,
+    personalReviews,
+    accountsBusiness,
+    aiAnalysisRaw,
+    aiAnalysisRawBusiness,
+    aiBucketsStoredBusiness,
+    aiBucketsStoredPersonal,
+    bankConnectedPersonal,
+    debts,
+    debtsBusiness,
+    fixedCostManualItems,
+    fixedCostManualItemsBusiness,
+    fuelOverridesStoredBusiness,
+    fuelOverridesStoredPersonal,
+    goals,
+    goalsBusiness,
+    inboxItems,
+    inboxItemsBusiness,
+    incomeItems,
+    incomeItemsBusiness,
+    monthFocus,
+    selectedMonth,
+    statements,
+    statementsBusiness,
+    transactions,
+    transactionsBusiness,
+  ]);
+
+  const observation = useObserver(mode === "zakelijk" ? "business" : "personal", moneylithSnapshot);
+  const [projectionOptions, setProjectionOptions] = useState(emptyOptions);
+  const [projectionScenario, setProjectionScenario] = useState<ProjectionScenario | null>(null);
+  const projectionDate = today();
+  const personalProjection = useMemo(() => personalInput(moneylithSnapshot.personal, projectionOptions, projectionDate), [moneylithSnapshot.personal, projectionOptions, projectionDate]);
+  useEffect(() => { setProjectionOptions(p => p.confirmOpening ? {...p, confirmOpening:false} : p); }, [accounts, projectionDate]);
   const personalSections = inputSections("personal");
   const businessSections = inputSections("business");
   // Invalidate receipts even when the relevant form is not currently mounted.
@@ -1994,24 +2007,11 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   // Schrijft: setDebtsSummary, setAssetsSummary, setAflosMode (lokale state in App)
   // Gebruikt totals: debtsSummary, assetsSummary, aflosMode
   const renderAction = (variant: "personal" | "business" = "personal") => {
-    const sections = variant === "business" ? businessSections : personalSections;
-    const debtItems = variant === "business" ? debtsBusiness : debts;
-    const missing = missingInputs(Object.values(sections));
-    const forecastSnapshot: FinancialSnapshot = {
-      totalIncome: { value: sections.income.total, source: "manual" },
-      fixedCostsTotal: { value: sections.fixed.total, source: "manual" },
-      netFree: sections.income.total - sections.fixed.total,
-      totalDebt: sections.debts.total,
-      assetsTotal: sections.assets.total,
-      monthlyPressure: debtItems.reduce((sum, item) => sum + (item.minimaleMaandlast ?? item.minBetaling ?? 0), 0),
-      runwayMonths: null,
-    };
     return (
       <div className="space-y-4">
-        <StepVooruitblik financialSnapshot={forecastSnapshot} missingInputs={missing} variant={variant} />
-        <p className="text-sm text-slate-300">Controleer inkomen en vaste lasten bij Fundament. Vul schulden en vermogen aan in de bijbehorende tabbladen en bevestig hieronder dat die overzichten compleet zijn.</p>
+        <StepVooruitblik input={personalProjection} options={projectionOptions} onOptions={setProjectionOptions} scenario={projectionScenario} onScenario={setProjectionScenario} />
+        <p className="text-sm text-slate-300">Controleer inkomen en vaste lasten bij Fundament en saldi bij Rekeningen. Bevestig hieronder dat je schuldenoverzicht compleet is.</p>
         {renderInputReview(variant, "debts")}
-        {renderInputReview(variant, "assets")}
       </div>
     );
   };
@@ -2377,7 +2377,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       );
     })}</>}
       banner={<ModeBanner mode="personal" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />}
-      guide={<AiAssistantCard scope="personal" userIntent={userIntent} readiness={personalSections} appSnapshot={moneylithSnapshot} />}
+      guide={<AiAssistantCard scope="personal" projectionOptions={projectionOptions} projectionScenario={projectionScenario} userIntent={userIntent} readiness={personalSections} appSnapshot={moneylithSnapshot} />}
       overlays={<>      <NavigationHint hint={helpMode ? helpTooltip : null}/>
 
       {showOverview && (

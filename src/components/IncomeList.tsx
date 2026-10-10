@@ -204,6 +204,13 @@ export function IncomeList({
                       />
                     </label>
                     <label className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-slate-600">Verwachte ontvangstdag (optioneel, 1–31)</span>
+                      <input type="number" min={1} max={31} className={recordControlClass} value={item.dagVanMaand ?? ""} readOnly={isReadOnly} onChange={e => {
+                        const n = Number(e.target.value);
+                        updateItem(item.id, {dagVanMaand:e.target.value && Number.isInteger(n) && n>=1 && n<=31 ? n : undefined});
+                      }} />
+                    </label>
+                    <label className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-slate-600">
                         Opmerking
                       </span>

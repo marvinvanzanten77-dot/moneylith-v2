@@ -6,6 +6,9 @@ export type SnapshotAiMessage = {
 };
 
 export type MoneylithSnapshotDomain = {
+  futureIncome?: unknown;
+  detectedFixedCosts?: unknown;
+  inputReviews?: unknown;
   accounts?: unknown[];
   transactions?: unknown[];
   income?: unknown;
@@ -51,6 +54,9 @@ const asObject = (value: unknown): Record<string, unknown> =>
 const asString = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value : undefined);
 
 const normalizeDomain = (domain?: MoneylithSnapshotDomain): MoneylithSnapshotDomain => ({
+  futureIncome: asArray(domain?.futureIncome),
+  detectedFixedCosts: asArray(domain?.detectedFixedCosts),
+  inputReviews: asObject(domain?.inputReviews),
   accounts: asArray(domain?.accounts),
   transactions: asArray(domain?.transactions),
   income: domain?.income ?? [],

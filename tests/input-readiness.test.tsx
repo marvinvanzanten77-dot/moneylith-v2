@@ -68,18 +68,17 @@ test("debt payment changes invalidate the forecast even with unchanged principal
   assert.equal(changed.ready, false);
 });
 
-test("empty forecast renders guidance without conclusions or scenario controls", () => {
-  for (const props of [{}, { financialSnapshot: snapshot }, { financialSnapshot: snapshot, missingInputs: ["Schulden"] }]) {
-    const html = renderToStaticMarkup(<StepVooruitblik {...props} />);
-    assert.match(html, /Nog onvoldoende gegevens/);
-    assert.doesNotMatch(html, /kwetsbaarheid|Wat kost niets doen|schuld na 12m|Huidig pad|Onhoudbaar/);
-  }
-});
-
-test("complete zero input enables forecast; missing snapshot never does", () => {
-  assert.match(renderToStaticMarkup(<StepVooruitblik financialSnapshot={snapshot} missingInputs={[]} />), /Huidig pad/);
-  assert.match(renderToStaticMarkup(<StepVooruitblik missingInputs={[]} />), /Nog onvoldoende gegevens/);
-  assert.match(renderToStaticMarkup(<StepVooruitblik financialSnapshot={{ ...snapshot, assetsTotal: NaN }} missingInputs={[]} />), /ongeldig bedrag/);
+test("projection renders unknown separately from confirmed zero", async () => {
+  const { emptyOptions } = await import("../src/projection/engine");
+  const props = {options:emptyOptions(), onOptions:()=>{}, scenario:null, onScenario:()=>{}};
+  const input = {scope:"personal" as const,asOf:"2026-10-01",opening:null,reserve:0,events:[],debts:{},missing:["Rekeningsaldo"],assumptions:[],goals:[]};
+  const html = renderToStaticMarkup(<StepVooruitblik {...props} input={input} />);
+  assert.match(html,/Nog niet ingevuld/);
+  assert.match(html,/Nog onvoldoende gegevens om de krapste week/);
+  assert.doesNotMatch(html,/Onhoudbaar|Onbenutte vrije ruimte/);
+  const zero = renderToStaticMarkup(<StepVooruitblik {...props} input={{...input,opening:0,missing:[]}} />);
+  assert.match(zero,/Laagste ruimte in de week/);
+  assert.match(zero,/€\s*0/);
 });
 
 test("unknown versus confirmed zero is visible in review UI", () => {

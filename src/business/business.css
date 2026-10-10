@@ -94,19 +94,19 @@
 .biz-table-scroll {
   @apply max-w-full overflow-auto;
 }
-.business-content table {
+.business-content table:not([data-projection-table]) {
   @apply w-full text-xs text-slate-700;
   border-collapse: collapse;
   white-space: nowrap;
 }
-.business-content th,
-.business-content td {
+.business-content table:not([data-projection-table]) th,
+.business-content table:not([data-projection-table]) td {
   @apply p-2 text-right border-b border-slate-200;
 }
-.business-content th:first-child {
+.business-content table:not([data-projection-table]) th:first-child {
   @apply text-left;
 }
-.business-content caption {
+.business-content table:not([data-projection-table]) caption {
   @apply p-2 text-left text-slate-500;
 }
 .biz-import {
