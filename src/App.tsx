@@ -1,3 +1,5 @@
+import { LunchflowCard } from "./components/LunchflowCard";
+import { mergeLunchflow, persistLunchflow } from "./bank/lunchflowMerge";
 import { personalInput } from "./projection/adapters";
 import { emptyOptions, today, type Scenario as ProjectionScenario } from "./projection/engine";
 import { NavigationHint } from "./components/NavigationHint";
@@ -1006,7 +1008,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const purgePersonalBankData = useCallback(() => {
     const bankAccountIds = new Set<string>();
     accounts.forEach((a) => {
-      if (a.source === "bank") bankAccountIds.add(a.id);
+      if (a.source === "bank" && a.bankProvider !== "lunchflow") bankAccountIds.add(a.id);
     });
     try {
       const legacyRaw = persistGateway.get("moneylith.personal.truelayer.accounts");
@@ -1023,9 +1025,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     }
 
     setTransactions((prev) =>
-      prev.filter((t) => t.source !== "bank" && !bankAccountIds.has(t.accountId))
+      prev.filter((t) => t.provider === "lunchflow" || (t.source !== "bank" && !bankAccountIds.has(t.accountId)))
     );
-    setAccounts((prev) => prev.filter((a) => a.source !== "bank"));
+    setAccounts((prev) => prev.filter((a) => a.source !== "bank" || a.bankProvider === "lunchflow"));
     persistGateway.removeMany(["moneylith.personal.truelayer.accounts", "moneylith.personal.bank.lastSync"]);
   }, [accounts, setAccounts, setTransactions]);
 
@@ -1036,15 +1038,13 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         const data = (await resp.json().catch(() => ({}))) as { connected?: boolean };
         const connected = Boolean(resp.ok && data.connected);
         setBankConnectedPersonal(connected);
-        if (!connected) {
-          purgePersonalBankData();
-        }
+        // A missing/expired provider session must never delete stored financial data.
       } catch {
         setBankConnectedPersonal(false);
       }
     };
     void hydrateBankStatus();
-  }, [purgePersonalBankData, setBankConnectedPersonal]);
+  }, []);
 
   const deleteStatement = (id: string) => {
     setStatements((prev) => prev.filter((s) => s.id !== id));
@@ -2181,6 +2181,14 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     if (normalizedStep === "rekeningen") return renderRekeningen("personal");
     if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
     if (normalizedStep === "bank") return (
+      <div className="space-y-4">
+      <LunchflowCard accounts={accounts} onApply={(snapshots, mappings) => {
+        const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
+        persistLunchflow(window.localStorage, result);
+        setAccounts(result.accounts);
+        setTransactions(result.transactions);
+        return result.reports;
+      }} />
       <StepBank
         onAutoFillDebts={setDebts}
         onAutoFillIncomes={setIncomeItems}
@@ -2188,7 +2196,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         onAutoFillBuckets={setStoredBuckets}
         onSyncAccounts={(synced) =>
           setAccounts((prev) => {
-            const nonBank = prev.filter((a) => a.source !== "bank");
+            const nonBank = prev.filter((a) => a.source !== "bank" || a.bankProvider === "lunchflow");
             return [...nonBank, ...synced];
           })
         }
@@ -2197,6 +2205,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         onPurgeBankData={purgePersonalBankData}
         onboardingMode={onboardingMode}
       />
+      </div>
     );
     if (normalizedStep === "inbox") return renderInbox("personal");
     if (normalizedStep === "biz-inbox") return renderInbox("business");

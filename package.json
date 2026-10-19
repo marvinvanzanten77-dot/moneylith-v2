@@ -13,7 +13,9 @@
     "audit": "npm audit",
     "audit:ci": "npm audit --production --audit-level=moderate",
     "test": "node --import tsx --test tests/*.test.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:lunchflow": "node --import tsx scripts/test-lunchflow.ts",
+    "dev:local": "vite --host 127.0.0.1 --port 5173 --strictPort"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

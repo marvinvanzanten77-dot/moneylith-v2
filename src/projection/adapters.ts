@@ -126,7 +126,7 @@ export function personalInput(
   for (const check of Object.values(checks))
     if (!check.ready) input.missing.push(check.label + " nog controleren");
   const accounts = rows(data.accounts).filter((r) => r.active === true);
-  if (!accounts.length || accounts.some((r) => amount(r.startBalance) === null))
+  if (!accounts.length || accounts.some((r) => amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance) === null))
     input.missing.push("Actieve rekeningen met ingevulde saldi");
   else if (!options.confirmOpening)
     input.missing.push(
@@ -134,7 +134,7 @@ export function personalInput(
     );
   else {
     input.opening = accounts.reduce(
-      (sum, r) => sum + amount(r.startBalance)!,
+      (sum, r) => sum + amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance)!,
       0,
     );
     input.assumptions.push(

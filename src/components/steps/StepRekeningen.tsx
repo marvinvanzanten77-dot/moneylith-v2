@@ -71,6 +71,7 @@ export function StepRekeningen({
     const id =
       editingId ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     onSaveAccount({
+      ...accountToEdit,
       id,
       name: name.trim(),
       type,
@@ -184,6 +185,9 @@ export function StepRekeningen({
                         </span>
                       </div>
                     </div>
+                    {typeof acc.bankBalance === "number" ? (
+                      <p className="mt-2 text-xs text-slate-800">Lunch Flow-saldo: {formatCurrency(acc.bankBalance)} · opgehaald {acc.bankBalanceFetchedAt ? new Date(acc.bankBalanceFetchedAt).toLocaleString("nl-NL") : "onbekend"}. Bankactualiteit kan achterlopen.</p>
+                    ) : null}
                     {typeof acc.startBalance === "number" ? (
                       <p className="mt-2 text-xs text-slate-800">
                         Startsaldo: {formatCurrency(acc.startBalance)}

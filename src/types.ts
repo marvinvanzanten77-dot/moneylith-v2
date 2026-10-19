@@ -58,6 +58,12 @@ export type MoneylithTransaction = {
   counterparty?: string;
   category?: string | null;
   external_id?: string;
+  currency?: string;
+  provider?: "lunchflow";
+  providerAccountId?: string;
+  providerTransactionId?: string;
+  notes?: string;
+  providerData?: { description: string; counterparty?: string; amount: number; date: string };
   source?: "bank" | "csv" | "manual" | "inbox";
 };
 
@@ -156,6 +162,12 @@ export interface MoneylithAccount {
   description?: string;
   isPrimary?: boolean;
   startBalance?: number;
+  currency?: string;
+  bankProvider?: "lunchflow";
+  bankAccountId?: string;
+  bankBalance?: number;
+  bankBalanceFetchedAt?: string;
+  bankLastSync?: string;
   active: boolean;
   source?: "bank" | "manual";
 }
