@@ -4,8 +4,8 @@ import type {
   LunchSnapshot,
   LunchTransaction,
   Result,
-} from "../../src/bank/lunchflowTypes";
-import { maskedAccount } from "../../src/bank/lunchflowTypes";
+} from "../../src/bank/lunchflowTypes.js";
+import { maskedAccount } from "../../src/bank/lunchflowTypes.js";
 export class LunchError extends Error {
   constructor(public detail: LunchFailure) {
     super(detail.message);

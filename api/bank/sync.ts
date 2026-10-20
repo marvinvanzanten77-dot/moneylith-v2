@@ -1,8 +1,10 @@
+import privateLunchflow from "../../server/lunchflow/privateHandler.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { ensureValidToken, persistTokens, readTokens } from "../../server/utils/bankAuth.js";
 import { runBankSync } from "../../server/utils/bankSync.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.query.provider === "lunchflow") return privateLunchflow(req, res);
   if (req.method !== "POST" && req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });
     return;

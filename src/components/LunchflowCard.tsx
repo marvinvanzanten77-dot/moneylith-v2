@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { SurfaceCard, Button, Select } from "./WorkspaceUI";
 import type { MoneylithAccount } from "../types";
-import type { LunchAccount, LunchSnapshot } from "../bank/lunchflowTypes";
+import type {
+  LunchAccount,
+  LunchSnapshot,
+  LunchDiagnostic,
+} from "../bank/lunchflowTypes";
 import type { LunchMapping, mergeLunchflow } from "../bank/lunchflowMerge";
 type Report = ReturnType<typeof mergeLunchflow>["reports"];
 export function LunchflowCard({
   accounts,
   onApply,
+  remoteAccess,
 }: {
   accounts: MoneylithAccount[];
+  remoteAccess?: { endpoint: string; onExpired: () => void };
   onApply: (snapshots: LunchSnapshot[], mappings: LunchMapping[]) => Report;
 }) {
   const [remote, setRemote] = useState<LunchAccount[]>([]),
@@ -17,6 +23,7 @@ export function LunchflowCard({
     [error, setError] = useState(""),
     [reports, setReports] = useState<Report>([]),
     [loaded, setLoaded] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<LunchDiagnostic | null>(null);
   const controller = useRef<AbortController | null>(null),
     apply = useRef(onApply);
   apply.current = onApply;
@@ -25,30 +32,42 @@ export function LunchflowCard({
     import.meta.env.DEV &&
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
-  async function request(action: "accounts" | "sync") {
+  const available = isLocal || Boolean(remoteAccess);
+  async function request(action: "accounts" | "sync" | "test") {
     const abort = new AbortController();
     controller.current = abort;
     setBusy(true);
     setError("");
     setReports([]);
+    setDiagnostic(null);
     try {
       const ids = remote.filter((a) => selection[a.id]).map((a) => a.id);
-      const response = await fetch("/api/lunchflow", {
+      const response = await fetch(remoteAccess?.endpoint ?? "/api/lunchflow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Moneylith-Local": "1",
+          ...(remoteAccess
+            ? { "X-Moneylith-Private": "1" }
+            : { "X-Moneylith-Local": "1" }),
         },
         body: JSON.stringify({ action, ids }),
         signal: abort.signal,
       });
       const data = await response.json();
+      if (response.status === 401 && remoteAccess) {
+        remoteAccess.onExpired();
+        return;
+      }
       if (!response.ok)
         throw Error(
           data?.error?.message ||
             "Lunch Flow-verzoek mislukt. Bestaande gegevens zijn behouden.",
         );
       if (abort.signal.aborted) return;
+      if (action === "test") {
+        setDiagnostic(data.diagnostic);
+        return;
+      }
       if (action === "accounts") {
         setRemote(data.accounts);
         setLoaded(true);
@@ -103,7 +122,7 @@ export function LunchflowCard({
         Flow beschikbaar heeft; het garandeert geen nieuwe verversing bij ING.
         Alleen geboekte transacties worden geïmporteerd.
       </p>
-      {!isLocal ? (
+      {!available ? (
         <p className="text-sm">
           Deze proef is uitsluitend lokaal beschikbaar. Je persoonlijke sleutel
           en bankgegevens worden niet via deze website aangeboden.
@@ -115,6 +134,17 @@ export function LunchflowCard({
             uitdrukkelijk een nieuwe aan. Import vindt alleen plaats in
             Persoonlijk. Bestaande startsaldi, categorieën en notities blijven
             behouden.
+          </p>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() => void request("test")}
+          >
+            {busy ? "Bezig…" : "Verbinding testen"}
+          </Button>
+          <p className="text-xs text-slate-600">
+            De verbindingstest controleert rekeningen, saldi en transacties. Er
+            wordt niets in je administratie opgeslagen.
           </p>
           <Button disabled={busy} onClick={() => void request("accounts")}>
             {busy ? "Bezig…" : "Rekeningen ophalen"}
@@ -196,6 +226,34 @@ export function LunchflowCard({
           </Button>
         </>
       )}
+      {diagnostic ? (
+        <div
+          role="status"
+          className="space-y-2 text-sm"
+          data-lunchflow-diagnostic
+        >
+          <p className="font-semibold">
+            {diagnostic.checks.length > 0 &&
+            diagnostic.checks.every((c) => c.balance.ok && c.transactions.ok)
+              ? "Verbindingstest geslaagd."
+              : "Verbindingstest uitgevoerd; controleer de resultaten."}
+          </p>
+          <p>
+            Rekeningenlijst geslaagd: {diagnostic.accountCount} rekening(en).
+            Niets opgeslagen.
+          </p>
+          {diagnostic.checks.map((c, i) => (
+            <p key={i}>
+              {c.label}: saldo{" "}
+              {c.balance.ok ? "geslaagd" : c.balance.error.message}; transacties{" "}
+              {c.transactions.ok
+                ? `geslaagd (${c.transactions.count})`
+                : c.transactions.error.message}
+              .
+            </p>
+          ))}
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm text-red-800">
           {error}

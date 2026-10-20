@@ -41,3 +41,15 @@ export type LunchSnapshot = {
 };
 export type LunchSync = { results: LunchSnapshot[] };
 export const maskedAccount = (id: string) => `••••${id.slice(-2)}`;
+
+export type LunchDiagnostic = {
+  accountCount: number;
+  testedAt: string;
+  checks: Array<{
+    label: string;
+    status: string;
+    balance: { ok: true } | { ok: false; error: LunchFailure };
+    transactions:
+      { ok: true; count: number } | { ok: false; error: LunchFailure };
+  }>;
+};

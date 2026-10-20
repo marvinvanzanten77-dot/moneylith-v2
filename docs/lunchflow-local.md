@@ -1,5 +1,7 @@
 # Lunch Flow: persoonlijke lokale koppeling
 
+> Historisch verslag van de lokale fase (19 oktober 2026). Voor de aanvullende afgeschermde liveproef en de huidige toegangscontrole: zie [lunchflow-private.md](./lunchflow-private.md).
+
 ## Audit en afbakening
 
 Onderzocht op 19 oktober 2026 vanaf `8276807`. Geen toepasselijk AGENTS.md aangetroffen in de repository of bovenliggende projectmappen. De bestaande wijziging in `.vscode/settings.json` is ongemoeid gelaten.

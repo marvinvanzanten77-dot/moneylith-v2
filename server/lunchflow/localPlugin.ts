@@ -1,3 +1,4 @@
+import { testConnection } from "./diagnostic.js";
 import type { Plugin } from "vite";
 import type { IncomingMessage } from "node:http";
 import { LunchClient, safeFailure } from "./client";
@@ -78,10 +79,16 @@ export function lunchflowLocal(key: string): Plugin {
             });
             return;
           }
-          if (body?.action !== "accounts" && body?.action !== "sync")
+          if (
+            body?.action !== "accounts" &&
+            body?.action !== "sync" &&
+            body?.action !== "test"
+          )
             return send(400, {
               error: { code: "format", message: "Onbekende actie." },
             });
+          if (body.action === "test")
+            return send(200, { diagnostic: await testConnection(client) });
           const accounts = await client.accounts();
           if (body.action === "accounts") return send(200, { accounts });
           if (

@@ -1,4 +1,4 @@
-import { LunchflowCard } from "./components/LunchflowCard";
+import { LunchflowAccess } from "./components/LunchflowAccess";
 import { mergeLunchflow, persistLunchflow } from "./bank/lunchflowMerge";
 import { personalInput } from "./projection/adapters";
 import { emptyOptions, today, type Scenario as ProjectionScenario } from "./projection/engine";
@@ -26,7 +26,6 @@ import { StepVermogen } from "./components/steps/StepVermogen";
 import { StepRitme } from "./components/steps/StepRitme";
 import { StepRekeningen } from "./components/steps/StepRekeningen";
 import { StepAfschriften, type AiBucketItem } from "./components/steps/StepAfschriften";
-import { StepBank } from "./components/steps/StepBank";
 import { StepBackup } from "./components/steps/StepBackup";
 import { StepSettings } from "./components/steps/StepSettings";
 import { StepInbox, type InboxItem, type InboxSuggestion } from "./components/steps/StepInbox";
@@ -147,7 +146,7 @@ const personalTabs: TabConfig[] = [
   { key: "vermogen", label: "Vermogen", desc: "Sparen, buffers, bezittingen" },
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
-  { key: "bank", label: "Bank", desc: "PSD2 bankkoppeling" },
+  { key: "bank", label: "Bank", desc: "Lunch Flow-bankkoppeling" },
   { key: "afschriften", label: "Patronen", desc: "Maandelijkse afschriften" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
@@ -1005,31 +1004,6 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     setFn(next);
   };
 
-  const purgePersonalBankData = useCallback(() => {
-    const bankAccountIds = new Set<string>();
-    accounts.forEach((a) => {
-      if (a.source === "bank" && a.bankProvider !== "lunchflow") bankAccountIds.add(a.id);
-    });
-    try {
-      const legacyRaw = persistGateway.get("moneylith.personal.truelayer.accounts");
-      if (legacyRaw) {
-        const legacy = JSON.parse(legacyRaw) as Array<{ account_id?: string }>;
-        if (Array.isArray(legacy)) {
-          legacy.forEach((a) => {
-            if (a?.account_id) bankAccountIds.add(a.account_id);
-          });
-        }
-      }
-    } catch {
-      // ignore legacy parse errors
-    }
-
-    setTransactions((prev) =>
-      prev.filter((t) => t.provider === "lunchflow" || (t.source !== "bank" && !bankAccountIds.has(t.accountId)))
-    );
-    setAccounts((prev) => prev.filter((a) => a.source !== "bank" || a.bankProvider === "lunchflow"));
-    persistGateway.removeMany(["moneylith.personal.truelayer.accounts", "moneylith.personal.bank.lastSync"]);
-  }, [accounts, setAccounts, setTransactions]);
 
   useEffect(() => {
     const hydrateBankStatus = async () => {
@@ -2182,29 +2156,13 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
     if (normalizedStep === "bank") return (
       <div className="space-y-4">
-      <LunchflowCard accounts={accounts} onApply={(snapshots, mappings) => {
+      <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
         const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
         persistLunchflow(window.localStorage, result);
         setAccounts(result.accounts);
         setTransactions(result.transactions);
         return result.reports;
       }} />
-      <StepBank
-        onAutoFillDebts={setDebts}
-        onAutoFillIncomes={setIncomeItems}
-        onAutoFillFixedCosts={setFixedCostManualItems}
-        onAutoFillBuckets={setStoredBuckets}
-        onSyncAccounts={(synced) =>
-          setAccounts((prev) => {
-            const nonBank = prev.filter((a) => a.source !== "bank" || a.bankProvider === "lunchflow");
-            return [...nonBank, ...synced];
-          })
-        }
-        onSyncTransactions={(synced) => upsertTransactionsList(synced, false)}
-        onConnectionChange={(connected) => setBankConnectedPersonal(connected)}
-        onPurgeBankData={purgePersonalBankData}
-        onboardingMode={onboardingMode}
-      />
       </div>
     );
     if (normalizedStep === "inbox") return renderInbox("personal");
@@ -2329,7 +2287,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     vermogen: "Voeg vermogen/buffers toe om runway en financiële veerkracht te zien.",
     focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
-    bank: "Koppel je bank via TrueLayer (sandbox) en haal rekeningen op.",
+    bank: "Beheer je Lunch Flow-koppeling en opgehaalde bankgegevens.",
     afschriften: "Upload bankafschriften (CSV/XLSX/PDF). AI haalt patronen/potjes uit je uitgaven.",
     inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
