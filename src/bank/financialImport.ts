@@ -53,7 +53,7 @@ export function analyzeFinancialImport(transactions: MoneylithTransaction[], asO
   }
   const groups = new Map<string, MoneylithTransaction[]>();
   for (const t of recent) {
-    if (internal.has(t.id) || refund.test(`${t.description} ${t.category ?? ""}`)) continue;
+    if (t.bankPatternKind || internal.has(t.id) || refund.test(`${t.description} ${t.category ?? ""}`)) continue;
     // A stable named counterparty is required; do not group on generic SEPA prefixes.
     const party = normalized(t.counterparty ?? "");
     if (!party || ["sepa", "incasso", "betaling", "overboeking"].includes(party)) continue;
@@ -87,7 +87,7 @@ export function analyzeFinancialImport(transactions: MoneylithTransaction[], asO
     });
   }
   const recognized = new Set(candidates.flatMap(c => c.bankEvidence.transactionIds));
-  const other = recent.filter(t => t.amount < 0 && !internal.has(t.id) && !recognized.has(t.id) && day(t.date) > end - 30);
+  const other = recent.filter(t => t.amount < 0 && t.bankPatternKind !== "fixed" && t.bankPatternKind !== "transfer" && !internal.has(t.id) && !recognized.has(t.id) && day(t.date) > end - 30);
   return {
     candidates,
     excludedTransfers: internal.size,

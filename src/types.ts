@@ -63,6 +63,8 @@ export type MoneylithTransaction = {
   provider?: "lunchflow";
   providerAccountId?: string;
   providerTransactionId?: string;
+  bankPatternCategory?: string;
+  bankPatternKind?: import("./bank/patterns").PatternKind;
   notes?: string;
   providerData?: { description: string; counterparty?: string; amount: number; date: string };
   source?: "bank" | "csv" | "manual" | "inbox";

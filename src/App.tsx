@@ -1,3 +1,5 @@
+import { BankPatterns } from "./components/BankPatterns";
+import { applyPatternDecision, classifyBankTransactions, indexBankPatterns, type PatternDecisions } from "./bank/patterns";
 import { LunchflowAccess } from "./components/LunchflowAccess";
 import { prefillFinancialImport } from "./bank/financialImport";
 import { mergeLunchflow, persistLunchflow } from "./bank/lunchflowMerge";
@@ -148,7 +150,7 @@ const personalTabs: TabConfig[] = [
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
   { key: "bank", label: "Bank", desc: "Lunch Flow-bankkoppeling" },
-  { key: "afschriften", label: "Patronen", desc: "Maandelijkse afschriften" },
+  { key: "afschriften", label: "Patronen", desc: "Herhalingen en uitgaven" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
@@ -230,6 +232,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assets, setAssets] = useLocalStorage<AssetItem[]>("moneylith.personal.assets", []);
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
+  const [bankPatternDecisions, setBankPatternDecisions] = useLocalStorage<PatternDecisions>("moneylith.personal.bankPatterns.v1", {});
   const [bankImportSeen, setBankImportSeen] = useLocalStorage<string[]>("moneylith.personal.bankImportSeen", []);
   const [bankImportResult, setBankImportResult] = useState<ReturnType<typeof prefillFinancialImport> | null>(null);
   const [incomeItemsBusiness, setIncomeItemsBusiness] = useLocalStorage<IncomeItem[]>("moneylith.business.income", []);
@@ -1362,6 +1365,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [projectionOptions, setProjectionOptions] = useState(emptyOptions);
   const [projectionScenario, setProjectionScenario] = useState<ProjectionScenario | null>(null);
   const projectionDate = today();
+  const personalBankGroups = useMemo(() => indexBankPatterns(transactions, projectionDate), [transactions, projectionDate]);
+  const bankPendingQuestions = personalBankGroups.filter(g => g.active && g.transactions.length >= 2 && !bankPatternDecisions[g.key]).length;
   const personalProjection = useMemo(() => personalInput(moneylithSnapshot.personal, projectionOptions, projectionDate), [moneylithSnapshot.personal, projectionOptions, projectionDate]);
   useEffect(() => { setProjectionOptions(p => p.confirmOpening ? {...p, confirmOpening:false} : p); }, [accounts, projectionDate]);
   const personalSections = inputSections("personal");
@@ -1891,6 +1896,10 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
             </p>
           </div>
         )}
+        {!isBusinessVariant && bankPendingQuestions > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-900">
+          <p>{bankPendingQuestions} herhalende betalingen uit je bankgegevens wachten op jouw uitleg. Benoem ze bij Patronen en koppel vaste lasten of inkomsten aan dit overzicht.</p>
+          <button type="button" className="mt-2 rounded-lg bg-amber-500 px-3 py-2 font-semibold" onClick={() => setCurrentStep("afschriften")}>Betalingen benoemen</button>
+        </div>}
         <IncomeList
           confirmed={sections.income.ready}
           items={incomeItemsSource}
@@ -2085,6 +2094,17 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
+    if (!isBusinessVariant && (accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
+      return <BankPatterns asOf={projectionDate} accounts={accountsSource} transactions={transactionsSource} income={incomeItems} fixedCosts={fixedCostManualItems}
+        decisions={bankPatternDecisions} onBank={() => setCurrentStep("bank")}
+        onDecide={(pattern, decision, monthly, paymentDay) => {
+          const next = applyPatternDecision(pattern, decision, monthly, paymentDay, incomeItems, fixedCostManualItems, bankPatternDecisions);
+          const nextTransactions = classifyBankTransactions(transactions, next.decisions);
+          persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { ...next, seen: bankImportSeen });
+          setIncomeItems(next.income); setFixedCostManualItems(next.fixedCosts);
+          setBankPatternDecisions(next.decisions); setTransactions(nextTransactions);
+        }} />;
+    }
     return (
       <StepAfschriften
         variant={isBusinessVariant ? "business" : "personal"}
@@ -2161,6 +2181,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       <div className="space-y-4">
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
         const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
+        result.transactions = classifyBankTransactions(result.transactions, bankPatternDecisions);
         const financial = result.reports.some(r => r.ok)
           ? prefillFinancialImport(result.transactions, incomeItems, fixedCostManualItems, bankImportSeen, today(),
               mergedFixedCostItems.some(i => i.isFixed && !i.isIgnored))
@@ -2221,7 +2242,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const vermogenFilled = activeSections.assets.ready;
   const activePayAccountIds = activeAccounts.filter((a) => a.active && a.type === "betaalrekening").map((a) => a.id);
   const rekeningenFilled = activePayAccountIds.length > 0;
-  const afschriftenFilled = activeStatements.some((s) => activePayAccountIds.includes(s.accountId));
+  const afschriftenFilled = !isBusiness && personalBankGroups.length > 0 ? bankPendingQuestions === 0 : activeStatements.some((s) => activePayAccountIds.includes(s.accountId));
   const ritmeFilled = false;
   const doelenFilled = activeGoals.length > 0;
   const vooruitblikFilled = missingInputs(Object.values(activeSections)).length === 0;
@@ -2297,7 +2318,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         filled = false;
         break;
     }
-    const label = active ? "Actief" : normalized === "inbox" ? "Optioneel" : filled ? "Ingevuld" : "Nog te doen";
+    const label = active ? "Actief" : normalized === "inbox" ? "Optioneel" : normalized === "afschriften" && !isBusiness && bankPendingQuestions > 0 ? `${bankPendingQuestions} te benoemen` : filled ? "Ingevuld" : "Nog te doen";
     return { active, filled, label };
   };
   const helpCopy: Record<string, string> = {
@@ -2308,7 +2329,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
     bank: "Beheer je Lunch Flow-koppeling en opgehaalde bankgegevens.",
-    afschriften: "Upload bankafschriften (CSV/XLSX/PDF). AI haalt patronen/potjes uit je uitgaven.",
+    afschriften: accounts.some(a => a.bankProvider === "lunchflow") ? "Bekijk herhalingen rechtstreeks uit je banktransacties en benoem onduidelijke betalingen. Geen upload nodig." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
     inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
     backup: "Exporteer of importeer je data lokaal (geen cloud).",
