@@ -87,7 +87,7 @@ export function analyzeFinancialImport(transactions: MoneylithTransaction[], asO
     });
   }
   const recognized = new Set(candidates.flatMap(c => c.bankEvidence.transactionIds));
-  const other = recent.filter(t => t.amount < 0 && t.bankPatternKind !== "fixed" && t.bankPatternKind !== "transfer" && !internal.has(t.id) && !recognized.has(t.id) && day(t.date) > end - 30);
+  const other = recent.filter(t => t.amount < 0 && t.bankPatternKind !== "fixed" && t.bankPatternKind !== "transfer" && t.bankPatternKind !== "financing" && !internal.has(t.id) && !recognized.has(t.id) && day(t.date) > end - 30);
   return {
     candidates,
     excludedTransfers: internal.size,

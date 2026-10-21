@@ -1,5 +1,6 @@
+import { matchingBankRule, emptyBankRules, type BankRuleSettings } from "./classificationRules";
 import type { FixedCostManualItem, IncomeItem, MoneylithTransaction } from "../types";
-export type PatternKind = "income" | "fixed" | "variable" | "transfer" | "ignore";
+export type PatternKind = "income" | "fixed" | "variable" | "transfer" | "financing" | "ignore";
 export type PatternDecision = { kind: PatternKind; label: string; targetId?: string };
 export type PatternDecisions = Record<string, PatternDecision>;
 export type Cadence = "weekly" | "fortnightly" | "fourweekly" | "monthly" | "quarterly" | "yearly" | "irregular";
@@ -14,6 +15,7 @@ const normalize = (s: string) => s.normalize("NFKC").toLowerCase().trim().replac
 const cents = (n: number) => Math.round(n * 100);
 const generic = /^(sepa|incasso|betaling|overboeking)$|^(paypal|mollie|adyen|sumup|stripe|tikkie)\b/i;
 export function patternKey(tx: MoneylithTransaction) {
+  if (tx.bankRuleId) return JSON.stringify(["bank-rule-v1", tx.accountId, tx.amount > 0 ? "in" : "out", tx.bankRuleId]);
   const party = normalize(tx.providerData?.counterparty ?? tx.counterparty ?? "");
   // Processors are not merchants: retain the description to avoid combining unrelated purchases.
   const description = normalize(tx.providerData?.description ?? tx.description).replace(/\b\d{4}-\d{2}-\d{2}\b/g, "").replace(/\b\d{2}[/-]\d{2}[/-]\d{4}\b/g, "").replace(/\s+/g, " ").trim();
@@ -62,9 +64,9 @@ export function indexBankPatterns(transactions: MoneylithTransaction[], asOf: st
     const total = amounts.reduce((s, n) => s + n, 0), mean = Math.round(total / ts.length);
     const cadence = detectCadence(ts.map(t => t.date));
     return {
-      key, label: latest.counterparty?.trim() || latest.description || "Onbekende tegenpartij", accountId: latest.accountId,
+      key, label: latest.bankRuleLabel || latest.counterparty?.trim() || latest.description || "Onbekende tegenpartij", accountId: latest.accountId,
       incoming: latest.amount > 0, transactions: ts, frequency: cadence?.frequency ?? "irregular" as Cadence,
-      monthlyEstimate: cadence ? Math.round(mean * cadence.factor) / 100 : null,
+      monthlyEstimate: cadence && !latest.bankRuleId ? Math.round(mean * cadence.factor) / 100 : null,
       average: mean / 100, total: total / 100, firstDate: ts[0].date, lastDate: latest.date,
       varying: amounts.some(n => Math.abs(n - mean) > Math.max(1, mean * 0.1)),
       possibleTransfer: ts.some(t => transferIds.has(t.id)),
@@ -72,22 +74,31 @@ export function indexBankPatterns(transactions: MoneylithTransaction[], asOf: st
     };
   }).sort((a, b) => b.transactions.length - a.transactions.length || b.total - a.total || a.key.localeCompare(b.key));
 }
-export function classifyBankTransactions(transactions: MoneylithTransaction[], decisions: PatternDecisions) {
+export function classifyBankTransactions(transactions: MoneylithTransaction[], decisions: PatternDecisions, settings: BankRuleSettings = emptyBankRules) {
   return transactions.map(tx => {
     if (tx.provider !== "lunchflow") return tx;
-    const decision = decisions[patternKey(tx)];
-    if (!decision) return tx;
-    const category = decision.kind === "transfer" ? "Eigen overboeking" : decision.label;
+    const original = { ...tx, bankRuleId: undefined, bankRuleLabel: undefined };
+    const rule = matchingBankRule(original, settings);
+    const grouped = rule ? { ...original, bankRuleId: rule.id, bankRuleLabel: rule.label } : original;
+    // Previously saved merchant decisions and explicit group corrections outrank automatic rules.
+    const decision = decisions[patternKey(original)] ?? decisions[patternKey(grouped)];
+    const chosen = decision ?? rule;
+    if (!chosen) {
+      if (!tx.bankRuleId) return tx;
+      return { ...original, category: tx.category === tx.bankPatternCategory ? undefined : tx.category,
+        bankPatternCategory: undefined, bankPatternKind: undefined };
+    }
     const managed = !tx.category || tx.category === tx.bankPatternCategory;
-    return { ...tx, category: managed ? category : tx.category,
-      bankPatternCategory: managed ? category : tx.bankPatternCategory, bankPatternKind: decision.kind };
+    const category = decision?.kind === "transfer" ? "Eigen overboeking" : chosen.label;
+    return { ...(decision && decisions[patternKey(original)] ? original : grouped), category: managed ? category : tx.category,
+      bankPatternCategory: managed ? category : tx.bankPatternCategory, bankPatternKind: chosen.kind };
   });
 }
 export function applyPatternDecision(
   pattern: BankPattern, decision: PatternDecision, monthly: number | null, paymentDay: number,
   income: IncomeItem[], fixedCosts: FixedCostManualItem[], decisions: PatternDecisions,
 ) {
-  if (!decision.label.trim() || !["income", "fixed", "variable", "transfer", "ignore"].includes(decision.kind)) throw Error("Geef aan wat deze betaling betekent.");
+  if (!decision.label.trim() || !["income", "fixed", "variable", "transfer", "financing", "ignore"].includes(decision.kind)) throw Error("Geef aan wat deze betaling betekent.");
   const nextIncome = [...income], nextFixed = [...fixedCosts];
   const previous = decisions[pattern.key];
   if (previous?.targetId && (income.some(i => i.id === previous.targetId) || fixedCosts.some(i => i.id === previous.targetId)))

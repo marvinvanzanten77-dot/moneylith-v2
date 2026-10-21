@@ -164,7 +164,7 @@ export function mergeLunchflow(
 export function persistLunchflow(
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
   result: ReturnType<typeof mergeLunchflow>,
-  financial?: { income: import("../types").IncomeItem[]; fixedCosts: import("../types").FixedCostManualItem[]; seen: string[]; decisions?: import("./patterns").PatternDecisions },
+  financial?: { income: import("../types").IncomeItem[]; fixedCosts: import("../types").FixedCostManualItem[]; seen: string[]; rules?: import("./classificationRules").BankRuleSettings; decisions?: import("./patterns").PatternDecisions },
 ) {
   const keys = [
     "moneylith.personal.accounts",
@@ -174,6 +174,7 @@ export function persistLunchflow(
   if (financial) {
     keys.push("moneylith.personal.income", "moneylith.personal.fixedCosts", "moneylith.personal.bankImportSeen");
     values.push(financial.income, financial.fixedCosts, financial.seen);
+    if (financial.rules) { keys.push("moneylith.personal.bankRules.v1"); values.push(financial.rules); }
     if (financial.decisions) {
       keys.push("moneylith.personal.bankPatterns.v1"); values.push(financial.decisions);
     }

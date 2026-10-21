@@ -1,3 +1,4 @@
+import { isOperatingTransaction, emptyBankRules, type BankRuleSettings } from "./bank/classificationRules";
 import { BankPatterns } from "./components/BankPatterns";
 import { applyPatternDecision, classifyBankTransactions, indexBankPatterns, type PatternDecisions } from "./bank/patterns";
 import { LunchflowAccess } from "./components/LunchflowAccess";
@@ -232,6 +233,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assets, setAssets] = useLocalStorage<AssetItem[]>("moneylith.personal.assets", []);
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
+  const [bankRules, setBankRules] = useLocalStorage<BankRuleSettings>("moneylith.personal.bankRules.v1", emptyBankRules);
   const [bankPatternDecisions, setBankPatternDecisions] = useLocalStorage<PatternDecisions>("moneylith.personal.bankPatterns.v1", {});
   const [bankImportSeen, setBankImportSeen] = useLocalStorage<string[]>("moneylith.personal.bankImportSeen", []);
   const [bankImportResult, setBankImportResult] = useState<ReturnType<typeof prefillFinancialImport> | null>(null);
@@ -1145,7 +1147,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       ? Math.ceil(debtsSummary.totalDebt / (netIncome - bufferMonthlyReserve))
       : null;
 
-  const recurringCandidates = useMemo(() => detectRecurringCandidates(transactions), [transactions]);
+  const classifiedBankTransactions = useMemo(() => classifyBankTransactions(transactions, bankPatternDecisions, bankRules), [transactions, bankPatternDecisions, bankRules]);
+  const personalOperatingTransactions = useMemo(() => classifiedBankTransactions.filter(t => isOperatingTransaction(t, bankRules)), [classifiedBankTransactions, bankRules]);
+  const recurringCandidates = useMemo(() => detectRecurringCandidates(personalOperatingTransactions.filter(t => !t.bankPatternKind)), [personalOperatingTransactions]);
   const recurringCandidatesBusiness = useMemo(() => detectRecurringCandidates(transactionsBusiness), [transactionsBusiness]);
 
   const mergeFixedItems = (candidates: RecurringCandidate[], base: FixedCostItem[]) => {
@@ -1365,8 +1369,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [projectionOptions, setProjectionOptions] = useState(emptyOptions);
   const [projectionScenario, setProjectionScenario] = useState<ProjectionScenario | null>(null);
   const projectionDate = today();
-  const personalBankGroups = useMemo(() => indexBankPatterns(transactions, projectionDate), [transactions, projectionDate]);
-  const bankPendingQuestions = personalBankGroups.filter(g => g.active && g.transactions.length >= 2 && !bankPatternDecisions[g.key]).length;
+  const personalBankGroups = useMemo(() => indexBankPatterns(classifiedBankTransactions, projectionDate), [classifiedBankTransactions, projectionDate]);
+  const bankPendingQuestions = personalBankGroups.filter(g => g.active && g.transactions.length >= 2 && !bankPatternDecisions[g.key] && !g.transactions.every(t => t.bankRuleId)).length;
   const personalProjection = useMemo(() => personalInput(moneylithSnapshot.personal, projectionOptions, projectionDate), [moneylithSnapshot.personal, projectionOptions, projectionDate]);
   useEffect(() => { setProjectionOptions(p => p.confirmOpening ? {...p, confirmOpening:false} : p); }, [accounts, projectionDate]);
   const personalSections = inputSections("personal");
@@ -1389,9 +1393,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   };
 
   const derivedIncomeFromTransactions = useMemo(() => {
-    const pos = transactions?.filter((t) => t.amount > 0) ?? [];
+    const pos = personalOperatingTransactions.filter((t) => t.amount > 0) ?? [];
     return pos.reduce((sum, t) => sum + t.amount, 0);
-  }, [transactions]);
+  }, [personalOperatingTransactions]);
 
   const derivedIncomeFromTransactionsBusiness = useMemo(() => {
     const pos = transactionsBusiness?.filter((t) => t.amount > 0) ?? [];
@@ -1399,9 +1403,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   }, [transactionsBusiness]);
 
   const derivedFixedFromTransactions = useMemo(() => {
-    const neg = transactions?.filter((t) => t.amount < 0) ?? [];
+    const neg = personalOperatingTransactions.filter((t) => t.amount < 0) ?? [];
     return neg.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  }, [transactions]);
+  }, [personalOperatingTransactions]);
 
   const derivedFixedFromTransactionsBusiness = useMemo(() => {
     const neg = transactionsBusiness?.filter((t) => t.amount < 0) ?? [];
@@ -1552,7 +1556,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   }, [fixedCostItemsBusiness]);
 
   const bucketsPersonal = useMemo(() => {
-    const txBuckets = deriveBucketsFromTransactions(transactions, netFreePersonal);
+    const txBuckets = deriveBucketsFromTransactions(personalOperatingTransactions, netFreePersonal);
     let base = txBuckets.length
       ? txBuckets
       : aiBucketsPersonal.length
@@ -1592,6 +1596,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     aiAnalysisRaw,
     aiBucketsPersonal,
     deriveBucketsFromTransactions,
+    personalOperatingTransactions,
     autoBuckets,
     bucketOverrides,
     buildHeuristicBuckets,
@@ -2095,11 +2100,15 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
     if (!isBusinessVariant && (accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
-      return <BankPatterns asOf={projectionDate} accounts={accountsSource} transactions={transactionsSource} income={incomeItems} fixedCosts={fixedCostManualItems}
-        decisions={bankPatternDecisions} onBank={() => setCurrentStep("bank")}
+      return <BankPatterns asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems}
+        rules={bankRules} onRulesChange={rules => {
+          const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
+          persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { income: incomeItems, fixedCosts: fixedCostManualItems, seen: bankImportSeen, rules });
+          setBankRules(rules); setTransactions(nextTransactions);
+        }} decisions={bankPatternDecisions} onBank={() => setCurrentStep("bank")}
         onDecide={(pattern, decision, monthly, paymentDay) => {
           const next = applyPatternDecision(pattern, decision, monthly, paymentDay, incomeItems, fixedCostManualItems, bankPatternDecisions);
-          const nextTransactions = classifyBankTransactions(transactions, next.decisions);
+          const nextTransactions = classifyBankTransactions(transactions, next.decisions, bankRules);
           persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { ...next, seen: bankImportSeen });
           setIncomeItems(next.income); setFixedCostManualItems(next.fixedCosts);
           setBankPatternDecisions(next.decisions); setTransactions(nextTransactions);
@@ -2181,9 +2190,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       <div className="space-y-4">
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
         const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
-        result.transactions = classifyBankTransactions(result.transactions, bankPatternDecisions);
+        result.transactions = classifyBankTransactions(result.transactions, bankPatternDecisions, bankRules);
         const financial = result.reports.some(r => r.ok)
-          ? prefillFinancialImport(result.transactions, incomeItems, fixedCostManualItems, bankImportSeen, today(),
+          ? prefillFinancialImport(result.transactions.filter(t => bankRules.accountRoles[t.accountId] !== "business"), incomeItems, fixedCostManualItems, bankImportSeen, today(),
               mergedFixedCostItems.some(i => i.isFixed && !i.isIgnored))
           : undefined;
         persistLunchflow(window.localStorage, result, financial);

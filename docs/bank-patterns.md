@@ -19,3 +19,11 @@ Beslissingen worden tijdens volgende Lunch Flow-synchronisaties opnieuw op passe
 ## Grenzen
 
 Herkenning blijft een hulpmiddel: veranderende tegenpartijnamen of unieke omschrijvingen kunnen meerdere groepen veroorzaken; meerdere contracten bij dezelfde tegenpartij kunnen juist samen voorkomen. Vergeten of gestopte betalingen en ontbrekende bankhistorie worden niet aangevuld. Een omgerekend maandbedrag is een begrotingsindicatie, niet de daadwerkelijke betaaldatum van een kwartaal- of jaarfactuur. Schuldsaldi en andere onbekende financiële feiten worden niet afgeleid.
+
+## Automatische categorisering en persoonlijke regels
+
+`classificationRules.ts` groepeert bekende winkels over vestigingen heen (boodschappen, Action, sauna). Persoonlijke uitzonderingen staan uitsluitend in `moneylith.personal.bankRules.v1`, binnen de bestaande versleutelde accountopslag. Namen van familieleden, rekeningidentificaties en persoonlijke interpretaties worden niet in de publieke applicatiecode opgenomen. Via **Eigen regels beheren** kunnen regels worden toegevoegd, aangepast, uitgeschakeld of verwijderd. Regels worden direct op bestaande transacties en opnieuw bij synchroniseren toegepast; expliciete groepsantwoorden en handmatige categorieën behouden voorrang.
+
+Een regel kan woorden, richting, exclusieve bedraggrenzen in centen, een bronrekening en een volledige tegenrekening combineren. Alleen twee rekeningcijfers of een gelijk tegengesteld bedrag bewijzen geen interne overboeking. Terugboekingen vallen niet automatisch onder regels voor aankopen. Onbenoemde grensgevallen blijven vragen. Categorisering verandert geen echte bedragen, datums, notities of rekeningbestemmingen.
+
+Top-ups en geldleningen zijn aparte geldbewegingen. Ze worden niet als consumptie of verdiend inkomen in de transactie-afleidingen opgenomen en leveren geen abonnementskosten of openstaand schuldsaldo op. Rekeningrollen zijn expliciete metadata: zakelijke rekeningtransacties worden uitgesloten van persoonlijke automatische inkomsten-/lastensuggesties, maar blijven zichtbaar in hetzelfde bankoverzicht. Deze wijziging migreert geen boekingen, bestaande maandposten, saldi of prognoses naar een andere administratie. Daardoor blijven bestaande handmatige financiële keuzes behouden; een volledige herindeling van bestaande administraties is een afzonderlijke handeling.
