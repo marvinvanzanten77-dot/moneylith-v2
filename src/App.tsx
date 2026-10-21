@@ -1,4 +1,5 @@
 import { LunchflowAccess } from "./components/LunchflowAccess";
+import { prefillFinancialImport } from "./bank/financialImport";
 import { mergeLunchflow, persistLunchflow } from "./bank/lunchflowMerge";
 import { personalInput } from "./projection/adapters";
 import { emptyOptions, today, type Scenario as ProjectionScenario } from "./projection/engine";
@@ -229,6 +230,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assets, setAssets] = useLocalStorage<AssetItem[]>("moneylith.personal.assets", []);
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
+  const [bankImportSeen, setBankImportSeen] = useLocalStorage<string[]>("moneylith.personal.bankImportSeen", []);
+  const [bankImportResult, setBankImportResult] = useState<ReturnType<typeof prefillFinancialImport> | null>(null);
   const [incomeItemsBusiness, setIncomeItemsBusiness] = useLocalStorage<IncomeItem[]>("moneylith.business.income", []);
   const [futureIncomeItems, setFutureIncomeItems] = useLocalStorage<FutureIncomeItem[]>(
     "moneylith.personal.futureIncome",
@@ -2158,11 +2161,28 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       <div className="space-y-4">
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
         const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
-        persistLunchflow(window.localStorage, result);
+        const financial = result.reports.some(r => r.ok)
+          ? prefillFinancialImport(result.transactions, incomeItems, fixedCostManualItems, bankImportSeen, today(),
+              mergedFixedCostItems.some(i => i.isFixed && !i.isIgnored))
+          : undefined;
+        persistLunchflow(window.localStorage, result, financial);
         setAccounts(result.accounts);
         setTransactions(result.transactions);
+        if (financial) {
+          setIncomeItems(financial.income);
+          setFixedCostManualItems(financial.fixedCosts);
+          setBankImportSeen(financial.seen);
+          setBankImportResult(financial);
+        }
         return result.reports;
       }} />
+      {bankImportResult && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-slate-800" role="status">
+        <h3 className="font-semibold">Verwerkt in je eigen administratie</h3>
+        <p>{bankImportResult.addedIncome} inkomsten en {bankImportResult.addedFixed} vaste lasten toegevoegd aan Fundament. Controleer daar bedragen en betaaldagen en bevestig de invoer.</p>
+        <p className="mt-2 text-sm">Overige afschrijvingen in de opgehaalde gegevens van de laatste 30 dagen: {formatCurrency(bankImportResult.otherOutflows30Days)} ({bankImportResult.otherOutflowCount} transacties). Dit zijn geen vastgestelde maandlasten; ook eenmalige uitgaven kunnen hierin staan.</p>
+        <p className="mt-2 text-sm">{bankImportResult.excludedTransfers} mogelijke interne overboekingen uitgesloten van herkenning. Bestaande invoer blijft behouden. Schuldsaldi, doelen en toekomstige bedragen worden niet afgeleid.</p>
+        {bankImportResult.blocked.length > 0 && <p className="mt-2 text-sm">{bankImportResult.blocked.length} herkenningen niet automatisch toegevoegd omdat er al eigen invoer is. Vergelijk in Fundament: {bankImportResult.blocked.map(c => `${c.naam} (${formatCurrency(c.bedrag)})`).join(", ")}.</p>}
+      </div>}
       </div>
     );
     if (normalizedStep === "inbox") return renderInbox("personal");

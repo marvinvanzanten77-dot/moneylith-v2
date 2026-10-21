@@ -164,15 +164,20 @@ export function mergeLunchflow(
 export function persistLunchflow(
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
   result: ReturnType<typeof mergeLunchflow>,
+  financial?: { income: import("../types").IncomeItem[]; fixedCosts: import("../types").FixedCostManualItem[]; seen: string[] },
 ) {
   const keys = [
     "moneylith.personal.accounts",
     "moneylith.personal.transactions",
   ];
+  const values: unknown[] = [result.accounts, result.transactions];
+  if (financial) {
+    keys.push("moneylith.personal.income", "moneylith.personal.fixedCosts", "moneylith.personal.bankImportSeen");
+    values.push(financial.income, financial.fixedCosts, financial.seen);
+  }
   const previous = keys.map((key) => storage.getItem(key));
   try {
-    storage.setItem(keys[0], JSON.stringify(result.accounts));
-    storage.setItem(keys[1], JSON.stringify(result.transactions));
+    keys.forEach((key, i) => storage.setItem(key, JSON.stringify(values[i])));
   } catch {
     keys.forEach((key, i) => {
       try {

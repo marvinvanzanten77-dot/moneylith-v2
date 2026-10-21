@@ -25,6 +25,7 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  bankEvidence?: import("./bank/financialImport").BankEvidence;
   amountEntered?: boolean;
   id: string;
   naam: string;
@@ -105,6 +106,7 @@ export type FixedCostItem = {
 };
 
 export type IncomeItem = {
+  bankEvidence?: import("./bank/financialImport").BankEvidence;
   dagVanMaand?: number; // Optional expected receipt day; absent remains unknown.
   amountEntered?: boolean;
   id: string;

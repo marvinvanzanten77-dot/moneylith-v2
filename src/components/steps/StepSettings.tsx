@@ -41,7 +41,7 @@ export function StepSettings({
         <div className="grid gap-2 md:grid-cols-2">
           <button
             type="button"
-            onClick={() => onStorageModeChange("local")}
+            onClick={() => { onStorageModeChange("local"); window.location.reload(); }}
             className={`rounded-xl border px-3 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed ${
               storageMode === "local"
                 ? "border-emerald-400 bg-emerald-50"
@@ -56,7 +56,7 @@ export function StepSettings({
           <button
             type="button"
             disabled={business}
-            onClick={() => onStorageModeChange("cloud")}
+            onClick={() => { onStorageModeChange("cloud"); window.location.reload(); }}
             className={`rounded-xl border px-3 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed ${
               storageMode === "cloud"
                 ? "border-blue-400 bg-blue-50"

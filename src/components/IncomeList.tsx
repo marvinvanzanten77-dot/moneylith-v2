@@ -156,6 +156,7 @@ export function IncomeList({
                   (item.bedrag !== 0 || item.amountEntered === true)
                     ? formatCurrency(item.bedrag)
                     : "Nog niet ingevuld"}
+                  {item.bankEvidence && <span className="ml-2 text-xs text-slate-600">Uit bankgegevens · {confirmed ? "gecontroleerd" : "nog controleren"}</span>}
                 </span>
               }
             >

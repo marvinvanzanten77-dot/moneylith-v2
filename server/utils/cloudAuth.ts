@@ -5,11 +5,8 @@ import { clearCookie, parseCookies, setCookie } from "./cookies.js";
 const SESSION_COOKIE = "ml_cloud_session";
 
 const getSecret = () => {
-  const src =
-    process.env.CLOUD_AUTH_SECRET ||
-    process.env.BANK_TOKEN_ENCRYPTION_KEY ||
-    process.env.TRUELAYER_CLIENT_SECRET ||
-    "moneylith-cloud-dev-secret";
+  const src = process.env.CLOUD_AUTH_SECRET;
+  if (!src || src.length < 64) throw Error("Cloud authentication is not configured.");
   return crypto.createHash("sha256").update(src).digest("hex");
 };
 
@@ -22,6 +19,7 @@ export const hashPassword = (password: string, salt?: string) => {
 };
 
 export const verifyPassword = (password: string, salt: string, expectedHash: string) => {
+  if (!/^[a-f0-9]{128}$/.test(expectedHash) || !/^[a-f0-9]{32}$/.test(salt)) return false;
   const { hash } = hashPassword(password, salt);
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(expectedHash, "hex"));
 };
@@ -41,12 +39,13 @@ export const clearCloudSession = (res: VercelResponse) => {
 };
 
 export const getCloudSessionEmail = (req: VercelRequest): string | null => {
+  try {
   const cookie = parseCookies(req)[SESSION_COOKIE];
   if (!cookie) return null;
-  const [b64, mac] = cookie.split(".");
-  if (!b64 || !mac) return null;
-  if (sign(b64) !== mac) return null;
-  try {
+  const parts = cookie.split(".");
+  const [b64, mac] = parts;
+  if (parts.length !== 2 || !b64 || !/^[a-f0-9]{64}$/.test(mac)) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sign(b64)), Buffer.from(mac))) return null;
     const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf8")) as { email?: string; exp?: number };
     if (!payload.email || !payload.exp || payload.exp < Date.now()) return null;
     return payload.email.toLowerCase();
@@ -56,7 +55,8 @@ export const getCloudSessionEmail = (req: VercelRequest): string | null => {
 };
 
 const getEncKey = () => {
-  const src = process.env.CLOUD_ENCRYPTION_KEY || process.env.CLOUD_AUTH_SECRET || "moneylith-cloud-encryption";
+  const src = process.env.CLOUD_ENCRYPTION_KEY;
+  if (!src || src.length < 64) throw Error("Cloud encryption is not configured.");
   return crypto.createHash("sha256").update(src).digest();
 };
 

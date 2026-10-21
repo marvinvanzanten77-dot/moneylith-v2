@@ -9,6 +9,8 @@ import {
   writeOwnerCookie,
 } from "./ownerAuth.js";
 import { rateLimit } from "../utils/rateLimit.js";
+import { getCloudSessionEmail } from "../utils/cloudAuth.js";
+import { getCloudUser, hasCloudStore } from "../utils/cloudStore.js";
 export default async function privateLunchflow(
   req: VercelRequest,
   res: VercelResponse,
@@ -54,8 +56,15 @@ export default async function privateLunchflow(
     writeOwnerCookie(res, "");
     return res.status(200).json({ authenticated: false });
   }
-  const authenticated = validOwnerSession(req, config);
-  if (body.action === "status") return res.status(200).json({ authenticated });
+  let accountAccess = false;
+  try {
+    if (hasCloudStore() && getCloudSessionEmail(req) === config.email)
+      accountAccess = (await getCloudUser(config.email))?.bankOwnerVerified === true;
+  } catch {
+    return failure(503, "Accountcontrole is tijdelijk niet bereikbaar.");
+  }
+  const authenticated = accountAccess || validOwnerSession(req, config);
+  if (body.action === "status") return res.status(200).json({ authenticated, ...(accountAccess ? { accountAccess: true } : {}) });
   if (!authenticated)
     return failure(401, "Log opnieuw in met je persoonlijke testtoegang.");
   const client = new LunchClient(config.apiKey);

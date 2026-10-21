@@ -11,6 +11,7 @@ export function LunchflowAccess(props: ComponentProps<typeof LunchflowCard>) {
   const [authenticated, setAuthenticated] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [accountAccess, setAccountAccess] = useState(false);
   const [email, setEmail] = useState(""),
     [code, setCode] = useState("");
   useEffect(() => {
@@ -29,7 +30,10 @@ export function LunchflowAccess(props: ComponentProps<typeof LunchflowCard>) {
       .then(async (r) => {
         const data = await r.json();
         if (controller.signal.aborted) return;
-        if (r.ok) setAuthenticated(data.authenticated === true);
+        if (r.ok) {
+          setAuthenticated(data.authenticated === true);
+          setAccountAccess(data.accountAccess === true);
+        }
         else
           setError(
             data.error?.message || "Testtoegang is nog niet beschikbaar.",
@@ -77,7 +81,8 @@ export function LunchflowAccess(props: ComponentProps<typeof LunchflowCard>) {
             Lunch Flow — persoonlijke live-test
           </h3>
           <p className="text-sm">
-            Deze test is alleen beschikbaar voor de eigenaar. Log in met je
+            Log in op je Moneylith-account via Instellingen voor toegang tot je bankkoppeling en opslag op meerdere apparaten.
+            De oorspronkelijke testtoegang blijft beschikbaar voor de eenmalige activering: log in met je
             e-mailadres en je aparte persoonlijke testcode. Dit is niet je
             gewone Moneylith-wachtwoord of je Lunch Flow API-sleutel.
           </p>
@@ -118,10 +123,10 @@ export function LunchflowAccess(props: ComponentProps<typeof LunchflowCard>) {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-200">
-            <p>Persoonlijke testtoegang actief (maximaal één uur).</p>
-            <Button disabled={busy} onClick={() => void authenticate("logout")}>
+            <p>{accountAccess ? "Bankkoppeling verbonden met je Moneylith-account." : "Persoonlijke testtoegang actief (maximaal één uur). Activeer je Moneylith-account bij Instellingen voor opslag op meerdere apparaten."}</p>
+            {!accountAccess && <Button disabled={busy} onClick={() => void authenticate("logout")}>
               Testtoegang sluiten
-            </Button>
+            </Button>}
           </div>
           <LunchflowCard
             {...props}
