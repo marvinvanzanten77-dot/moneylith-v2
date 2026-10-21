@@ -55,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let scope: string | undefined;
   let businessReplyPolicy: BusinessReplyPolicy | undefined;
   let computedReply: string | undefined;
+  let qualitativeOnly = false;
   try {
     if (req.body?.scope !== undefined) {
       const selected = buildChatRequest(req.body);
@@ -62,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       scope = selected.scope;
       businessReplyPolicy = selected.businessReplyPolicy;
       computedReply = selected.computedReply;
+      qualitativeOnly = selected.qualitativeOnly;
     } else {
       // Existing per-tab analysis contract; the shared chat always uses the scoped protocol.
       const { system, user } = req.body ?? {};
@@ -108,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let content =
       completion.choices?.[0]?.message?.content?.toString().trim() ?? "";
-    const replyIssue = (text: string) => businessReplyIssue(text, businessReplyPolicy) ?? (computedReply && /[0-9€]|\b(?:nul|honderd|duizend|euro)\b/iu.test(text.replace(/\b(?:7|30|90|365)\s*dagen\b/giu, "")) ? "Geef uitsluitend een korte kwalitatieve toelichting zonder cijfers, bedragen of eurobedragen. De server voegt de berekende cijfers toe." : null);
+    const replyIssue = (text: string) => businessReplyIssue(text, businessReplyPolicy) ?? ((computedReply || qualitativeOnly) && /[0-9€]|\b(?:nul|honderd|duizend|euro)\b/iu.test(text.replace(/\b(?:7|30|90|365)\s*dagen\b/giu, "")) ? "Geef uitsluitend een korte kwalitatieve toelichting zonder cijfers, bedragen of eurobedragen. De interface toont de berekende cijfers afzonderlijk." : null);
     const issue = replyIssue(content);
     if (issue) {
       // Keep the user's stored conversation intact. Retry only the provider's

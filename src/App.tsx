@@ -1,5 +1,6 @@
+import { spendingRows } from "./bank/spending";
 import { isOperatingTransaction, emptyBankRules, type BankRuleSettings } from "./bank/classificationRules";
-import { BankPatterns } from "./components/BankPatterns";
+import { BankSpendingOverview } from "./components/BankSpendingOverview";
 import { applyPatternDecision, classifyBankTransactions, indexBankPatterns, type PatternDecisions } from "./bank/patterns";
 import { LunchflowAccess } from "./components/LunchflowAccess";
 import { prefillFinancialImport } from "./bank/financialImport";
@@ -151,7 +152,7 @@ const personalTabs: TabConfig[] = [
   { key: "focus", label: "Doelen", desc: "Kies je richting voor deze maand" },
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
   { key: "bank", label: "Bank", desc: "Lunch Flow-bankkoppeling" },
-  { key: "afschriften", label: "Patronen", desc: "Herhalingen en uitgaven" },
+  { key: "afschriften", label: "Patronen", desc: "Je uitgaven in potjes" },
   { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
@@ -1370,7 +1371,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [projectionScenario, setProjectionScenario] = useState<ProjectionScenario | null>(null);
   const projectionDate = today();
   const personalBankGroups = useMemo(() => indexBankPatterns(classifiedBankTransactions, projectionDate), [classifiedBankTransactions, projectionDate]);
-  const bankPendingQuestions = personalBankGroups.filter(g => g.active && g.transactions.length >= 2 && !bankPatternDecisions[g.key] && !g.transactions.every(t => t.bankRuleId)).length;
+  const unknownPurchaseIds = new Set(spendingRows(classifiedBankTransactions, bankRules, fixedCostManualItems).filter(r => r.date.startsWith(projectionDate.slice(0, 7)) && !r.label).map(r => r.id));
+  const bankPendingQuestions = personalBankGroups.filter(g => g.transactions.some(t => unknownPurchaseIds.has(t.id))).length;
   const personalProjection = useMemo(() => personalInput(moneylithSnapshot.personal, projectionOptions, projectionDate), [moneylithSnapshot.personal, projectionOptions, projectionDate]);
   useEffect(() => { setProjectionOptions(p => p.confirmOpening ? {...p, confirmOpening:false} : p); }, [accounts, projectionDate]);
   const personalSections = inputSections("personal");
@@ -1902,7 +1904,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           </div>
         )}
         {!isBusinessVariant && bankPendingQuestions > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-900">
-          <p>{bankPendingQuestions} herhalende betalingen uit je bankgegevens wachten op jouw uitleg. Benoem ze bij Patronen en koppel vaste lasten of inkomsten aan dit overzicht.</p>
+          <p>{bankPendingQuestions} aankoopgroepen uit deze maand wachten op jouw uitleg. Help ze bij Patronen in het juiste potje te plaatsen. Vaste lasten blijven in dit overzicht.</p>
           <button type="button" className="mt-2 rounded-lg bg-amber-500 px-3 py-2 font-semibold" onClick={() => setCurrentStep("afschriften")}>Betalingen benoemen</button>
         </div>}
         <IncomeList
@@ -2100,7 +2102,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
     if (!isBusinessVariant && (accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
-      return <BankPatterns asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems}
+      return <BankSpendingOverview asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
           persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { income: incomeItems, fixedCosts: fixedCostManualItems, seen: bankImportSeen, rules });
@@ -2338,7 +2340,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
     bank: "Beheer je Lunch Flow-koppeling en opgehaalde bankgegevens.",
-    afschriften: accounts.some(a => a.bankProvider === "lunchflow") ? "Bekijk herhalingen rechtstreeks uit je banktransacties en benoem onduidelijke betalingen. Geen upload nodig." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
+    afschriften: accounts.some(a => a.bankProvider === "lunchflow") ? "Bekijk je uitgavenpotjes en vraag bemoedigende bespaartips. Via Help met indelen benoem je onbekende aankopen, één tegelijk." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
     inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
     backup: "Exporteer of importeer je data lokaal (geen cloud).",

@@ -6,7 +6,7 @@ import { cadenceLabels, indexBankPatterns, type BankPattern, type PatternDecisio
 import { SurfaceCard, Button, Input, Select } from "./WorkspaceUI";
 import { formatCurrency } from "../utils/format";
 const kinds: Record<PatternKind, string> = { fixed: "Vaste last", income: "Inkomen", variable: "Variabele uitgave / overige ontvangst", transfer: "Overboeking / top-up", financing: "Geleend geld / terugbetaling", ignore: "Niet meenemen in herkenning" };
-type Props = {
+export type BankPatternsProps = {
   asOf?: string;
   rules?: RuleSettings; onRulesChange?: (rules: RuleSettings) => void;
   accounts: MoneylithAccount[]; transactions: MoneylithTransaction[];
@@ -14,7 +14,7 @@ type Props = {
   onDecide: (pattern: BankPattern, decision: PatternDecision, monthly: number | null, paymentDay: number) => void;
   onBank: () => void;
 };
-function PatternEditor({ pattern, decisions, income, fixedCosts, onDecide }: Pick<Props, "decisions" | "income" | "fixedCosts" | "onDecide"> & { pattern: BankPattern }) {
+function PatternEditor({ pattern, decisions, income, fixedCosts, onDecide }: Pick<BankPatternsProps, "decisions" | "income" | "fixedCosts" | "onDecide"> & { pattern: BankPattern }) {
   const saved = decisions[pattern.key];
   const automatic = pattern.transactions.find(t => t.bankRuleId);
   const possibleTargets = pattern.incoming ? income : fixedCosts;
@@ -76,7 +76,7 @@ function PatternEditor({ pattern, decisions, income, fixedCosts, onDecide }: Pic
     </div>
   </div>;
 }
-export function BankPatterns(props: Props) {
+export function BankPatterns(props: BankPatternsProps) {
   const [notice, setNotice] = useState("");
   const [days, setDays] = useState(365), [account, setAccount] = useState(""), [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all"), [limit, setLimit] = useState(20), [selected, setSelected] = useState<string | null>(null);
