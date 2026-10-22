@@ -96,6 +96,27 @@ export function analyzeFinancialImport(transactions: MoneylithTransaction[], asO
   };
 }
 
+/** Opt-in: the latest received income from the same evidence-linked account and counterparty.
+ * Payroll deductions are informational and deliberately never used here. */
+export function refreshLatestIncome(transactions: MoneylithTransaction[], income: IncomeItem[], asOf: string): IncomeItem[] {
+  return income.map(item => {
+    if (!item.followLatestBank || !item.bankEvidence) return item;
+    const evidence = item.bankEvidence;
+    const anchors = transactions.filter(t => evidence.transactionIds.includes(t.id) && t.amount > 0);
+    const sources = new Set(anchors.filter(t => t.counterparty?.trim()).map(t => `${t.accountId}:${normalized(t.counterparty!)}`));
+    if (sources.size !== 1) return item;
+    const candidates = transactions.filter(t => t.provider === "lunchflow" && t.currency === "EUR" && Number.isFinite(t.amount) && t.amount > 0 && t.date <= asOf && t.date >= evidence.through &&
+      /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(Date.parse(t.date)) && new Date(t.date).toISOString().slice(0,10) === t.date &&
+      !["transfer","financing","ignore"].includes(t.bankPatternKind ?? "") && !refund.test(t.description) &&
+      sources.has(`${t.accountId}:${normalized(t.counterparty ?? "")}`) && (salary.test(t.description) || t.bankPatternKind === "income"));
+    const latest = candidates.sort((a,b) => b.date.localeCompare(a.date))[0];
+    // Multiple receipts on the latest day need a user's decision, never an arbitrary pick.
+    if (!latest || candidates.filter(t => t.date === latest.date).length !== 1) return item;
+    return {...item, bedrag:cents(latest.amount)/100, amountEntered:true,
+      bankEvidence:{...evidence, through:latest.date, transactionIds:[...new Set([...evidence.transactionIds,latest.id])]}};
+  });
+}
+
 /** Add only previously unseen observations. Existing records, including edits,
  * explicit zeroes and deleted suggestions, are never overwritten/recreated.
  * When a section already has manual entries, matching needs user judgement.
@@ -109,7 +130,8 @@ export function prefillFinancialImport(
   hasReviewedDetectedCosts = false,
 ) {
   const analysis = analyzeFinancialImport(transactions, asOf);
-  const nextIncome = [...income], nextFixed = [...fixedCosts], nextSeen = new Set(seen);
+  const nextIncome = refreshLatestIncome(transactions, income, asOf), nextFixed = [...fixedCosts], nextSeen = new Set(seen);
+  const updatedIncome = income.filter((item,index) => JSON.stringify(item) !== JSON.stringify(nextIncome[index])).length;
   const blocked: Candidate[] = [];
   let addedIncome = 0, addedFixed = 0;
   for (const candidate of analysis.candidates) {
@@ -124,5 +146,5 @@ export function prefillFinancialImport(
     else { nextFixed.push(item); addedFixed++; }
     nextSeen.add(candidate.id);
   }
-  return { ...analysis, income: nextIncome, fixedCosts: nextFixed, seen: [...nextSeen], blocked, addedIncome, addedFixed };
+  return { ...analysis, income: nextIncome, fixedCosts: nextFixed, seen: [...nextSeen], blocked, addedIncome, addedFixed, updatedIncome };
 }

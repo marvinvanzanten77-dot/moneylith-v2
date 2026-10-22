@@ -98,13 +98,13 @@ export function personalInput(
       "fixed",
       "Vaste lasten",
       detected.length
-        ? detected.map((r) => ({
+        ? [...detected.map((r) => ({
             id: String(r.id),
             name: String(r.customLabel || r.descriptionPattern),
             amount: (r.customMonthlyAmount ??
               r.estimatedMonthlyAmount) as number,
             details: r,
-          }))
+          })), ...manual(fixed.filter(r => r.paymentRoute || r.budgetCategory))]
         : manual(fixed),
       receipts,
     ),
@@ -169,13 +169,13 @@ export function personalInput(
         options.monthlyDay,
         "pattern",
       );
-  } else
-    for (const r of fixed)
+  }
+    for (const r of fixed.filter(r => !detected.length || r.paymentRoute || r.budgetCategory))
       recurring(
         input,
         "fixed:" + r.id,
         name(r),
-        r.amountEntered === false || amount(r.bedrag) === null
+        r.paymentRoute === "withheld" ? 0 : r.amountEntered === false || amount(r.bedrag) === null
           ? null
           : -amount(r.bedrag)!,
         Number.isInteger(r.dagVanMaand) &&
@@ -205,7 +205,21 @@ export function personalInput(
       Number(r.afschrijfDag) <= 31
         ? Number(r.afschrijfDag)
         : options.monthlyDay;
-    if (principal !== 0)
+    if (r.firstPaymentDate !== undefined || r.remainingPayments !== undefined) {
+      if (!validDate(r.firstPaymentDate) || !Number.isInteger(r.remainingPayments) || Number(r.remainingPayments) < 1 || Number(r.remainingPayments) > 600) {
+        input.missing.push(name(r) + ": resterend aflosschema nog invullen");
+        continue;
+      }
+      const first = r.firstPaymentDate;
+      const firstDay = Number(first.slice(8));
+      // Anchor to the actual remaining schedule, not to the date the app is opened.
+      for (let n=0; n<Number(r.remainingPayments); n++) {
+        const y=Number(first.slice(0,4)), m=Number(first.slice(5,7))-1+n;
+        const date=new Date(Date.UTC(y,m,Math.min(firstDay,new Date(Date.UTC(y,m+1,0)).getUTCDate()))).toISOString().slice(0,10);
+        if(date > asOf && date <= addDays(asOf,365) && principal !== 0) input.events.push({id:`debt:${r.id}:${date}`,label:name(r),date,amount:payment === null ? null : -payment,source:"debt",basis:"assumption",kind:"repayment",debtId:String(r.id)});
+      }
+      input.assumptions.push(name(r) + ": resterende betaaldata zijn vastgelegd; een verstreken datum bewijst geen betaling. Werk het schuldsaldo bij na betaling.");
+    } else if (principal !== 0)
       recurring(
         input,
         "debt:" + r.id,
@@ -239,6 +253,7 @@ export function personalInput(
       monthly: amount(r.monthlyContribution),
     });
   input.assumptions.push(
+    "Inhoudingen op loonstroken zijn uitsluitend administratief en veranderen het ontvangen inkomen of de prognose niet. Lasten met betaalwijze ingehouden zijn al verwerkt in het ontvangen inkomen; geen tweede afschrijving.",
     "Maandinkomsten en lasten herhalen volgens de ingevoerde bedragen. Rente en tariefwijzigingen zonder invoer zijn niet berekend. Doelen zijn voornemens, geen extra automatische betalingen.",
   );
   if (options.monthlyDay !== null)

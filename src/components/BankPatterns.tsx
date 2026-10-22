@@ -8,6 +8,7 @@ import { formatCurrency } from "../utils/format";
 const kinds: Record<PatternKind, string> = { fixed: "Vaste last", income: "Inkomen", variable: "Variabele uitgave / overige ontvangst", transfer: "Overboeking / top-up", financing: "Geleend geld / terugbetaling", ignore: "Niet meenemen in herkenning" };
 export type BankPatternsProps = {
   asOf?: string;
+  onFixedCostsChange?: (items: FixedCostManualItem[]) => void;
   rules?: RuleSettings; onRulesChange?: (rules: RuleSettings) => void;
   accounts: MoneylithAccount[]; transactions: MoneylithTransaction[];
   income: IncomeItem[]; fixedCosts: FixedCostManualItem[]; decisions: PatternDecisions;

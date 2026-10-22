@@ -22,7 +22,8 @@ export function validateBankRules(value: unknown): value is BankRuleSettings {
   return Array.isArray(s.rules) && s.rules.length <= 100 && !!s.accountRoles && typeof s.accountRoles === "object" && !Array.isArray(s.accountRoles) &&
     Object.values(s.accountRoles).every(v => v === "personal" || v === "business") &&
     new Set(s.rules.map(r => r?.id)).size === s.rules.length && s.rules.every(r => r && typeof r.id === "string" && r.id.length > 0 && r.id.length < 100 &&
-      typeof r.label === "string" && !!r.label.trim() && r.label.length <= 150 && ["variable", "transfer", "financing", "ignore"].includes(r.kind) &&
+      typeof r.label === "string" && !!r.label.trim() && r.label.length <= 150 && ["fixed", "variable", "transfer", "financing", "ignore"].includes(r.kind) &&
+      (r.kind !== "fixed" || (r.direction === "out" && r.aboveCents !== undefined && r.belowCents === r.aboveCents + 2)) &&
       Array.isArray(r.terms) && r.terms.length <= 30 && r.terms.every(t => typeof t === "string" && !!normalize(t) && t.length <= 150) &&
       (r.terms.length > 0 || (typeof r.accountId === "string" && typeof r.counterpartyIban === "string")) &&
       (r.direction === undefined || r.direction === "in" || r.direction === "out") &&

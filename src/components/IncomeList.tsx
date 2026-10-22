@@ -49,6 +49,7 @@ export function IncomeList({
   const setItems = onItemsChange ?? setLocalItems;
   const isReadOnly = readOnly === true;
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deductionMonth, setDeductionMonth] = useState(new Date().toISOString().slice(0,7));
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -108,10 +109,10 @@ export function IncomeList({
       }
     };
 
-    document.addEventListener("mousedown", handleClickAway);
+    document.addEventListener("click", handleClickAway);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickAway);
+      document.removeEventListener("click", handleClickAway);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [expandedId]);
@@ -204,6 +205,8 @@ export function IncomeList({
                         readOnly={isReadOnly}
                       />
                     </label>
+                    {item.bankEvidence && <label className="flex flex-col gap-1"><span><input type="checkbox" checked={item.followLatestBank === true} disabled={isReadOnly} onChange={e => updateItem(item.id,{followLatestBank:e.target.checked})} /> Volg het laatst opgehaalde inkomen</span><span className="text-xs">Bij synchroniseren wordt de laatste ontvangst van dezelfde gekoppelde inkomstenbron overgenomen. Laatst geregistreerd: {item.bankEvidence.through}.</span></label>}
+                    <div className="space-y-2"><p className="font-semibold">Beslaglegging / inhouding werkgever</p><label className="block">Maand<input type="month" className={recordControlClass} value={deductionMonth} onChange={e => setDeductionMonth(e.target.value)} /></label><label className="block">Ingehouden bedrag (alleen administratie)<input type="number" min="0" step="0.01" className={recordControlClass} value={item.payrollDeductions?.[deductionMonth] ?? ""} placeholder="Nog niet ingevuld" readOnly={isReadOnly} onChange={e => updateItem(item.id,{payrollDeductions:{...item.payrollDeductions,[deductionMonth]:e.target.value === "" ? null : Math.max(0,Number(e.target.value))}})} /></label><p className="text-xs">Vul dit in vanaf je loonstrook, bijvoorbeeld op je salarisdag. Het ontvangen inkomen is al na inhouding. Dit veld verandert geen saldo, inkomen, schuld of prognose. Banksync kan dit bedrag niet vaststellen.</p></div>
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-slate-600">Verwachte ontvangstdag (optioneel, 1–31)</span>
                       <input type="number" min={1} max={31} className={recordControlClass} value={item.dagVanMaand ?? ""} readOnly={isReadOnly} onChange={e => {

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
 import { numberInputValue, parseNumberInput } from "../utils/numberInput";
 import { parseDateNlToIso } from "../utils/date";
@@ -15,6 +15,8 @@ export type SchuldItem = {
   saldo: number;
   minimaleMaandlast?: number;
   afschrijfDag?: number;
+  firstPaymentDate?: string;
+  remainingPayments?: number;
   gebruikerOpmerking?: string;
   aiOpmerking?: string;
 };
@@ -297,7 +299,8 @@ export const SchuldenkaartCard = ({
                         />
                       </div>
                     ) : (
-                      <label className="flex flex-col gap-1">
+                      <><div className="space-y-2"><label className="block">Eerste resterende aflossing<input readOnly={isReadOnly} aria-label="Eerste resterende aflossing" type="date" className="w-full rounded-lg border p-2" value={item.firstPaymentDate ?? ""} onChange={e => updateItem(item.id,{firstPaymentDate:e.target.value || undefined})} /></label><label className="block">Resterende maandtermijnen<input readOnly={isReadOnly} aria-label="Resterende maandtermijnen" type="number" min="1" max="600" className="w-full rounded-lg border p-2" value={item.remainingPayments ?? ""} onChange={e => updateItem(item.id,{remainingPayments:e.target.value ? Math.max(1,Math.floor(Number(e.target.value))):undefined})} /></label><p className="text-xs">Vul beide velden in voor een eindig maandschema. Een geplande betaling verlaagt je geregistreerde schuld niet automatisch.</p></div>
+                    <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
                         <input
                           type="text"
@@ -319,7 +322,7 @@ export const SchuldenkaartCard = ({
                           placeholder="Dag 1-31"
                           readOnly={isReadOnly}
                         />
-                      </label>
+                      </label></>
                     )}
                     {proposalEditEnabled && proposal ? (
                       <label className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">

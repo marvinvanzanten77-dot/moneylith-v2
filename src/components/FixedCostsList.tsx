@@ -50,13 +50,13 @@ export function FixedCostsList({
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    onSumChange?.(items.reduce((sum, item) => sum + (item.bedrag || 0), 0));
+    onSumChange?.(items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag || 0), 0));
   }, [items, onSumChange]);
 
   const updateItems = (next: FixedCostManualItem[]) => {
     if (isReadOnly) return;
     setItems(next);
-    onSumChange?.(next.reduce((sum, item) => sum + (item.bedrag || 0), 0));
+    onSumChange?.(next.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag || 0), 0));
   };
 
   const updateItem = (id: string, patch: Partial<FixedCostManualItem>) => {
@@ -76,7 +76,7 @@ export function FixedCostsList({
         naam: "",
         bedrag: 0,
         amountEntered: false,
-        dagVanMaand: 1,
+        dagVanMaand: 0,
         opmerking: "",
       },
     ];
@@ -113,10 +113,10 @@ export function FixedCostsList({
       }
     };
 
-    document.addEventListener("mousedown", handleClickAway);
+    document.addEventListener("click", handleClickAway);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickAway);
+      document.removeEventListener("click", handleClickAway);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [expandedId]);
@@ -166,6 +166,9 @@ export function FixedCostsList({
                   (item.bedrag !== 0 || item.amountEntered === true)
                     ? formatCurrency(item.bedrag)
                     : "Nog niet ingevuld"}
+                  {item.paymentRoute === "withheld" && <span className="ml-2 text-xs">Al ingehouden op inkomen/toeslagen · geen extra afschrijving</span>}
+                  {item.budgetCategory && <span className="ml-2 text-xs">Maandbudget · {item.budgetCategory}</span>}
+                  {item.amountRange && <span className="ml-2 text-xs">Wisselend: {formatCurrency(item.amountRange.min, true)}–{formatCurrency(item.amountRange.max, true)}</span>}
                   {item.bankEvidence && <span className="ml-2 text-xs text-slate-600">Uit bankgegevens · {confirmed ? "gecontroleerd" : "nog controleren"}</span>}
                 </span>
               }
@@ -195,7 +198,7 @@ export function FixedCostsList({
                       <input
                         type="number"
                         min={0}
-                        step={1}
+                        step={0.01}
                         className={recordControlClass}
                         value={
                           item.amountEntered === false
@@ -224,13 +227,13 @@ export function FixedCostsList({
                         max={31}
                         className={recordControlClass}
                         value={
-                          Number.isFinite(item.dagVanMaand)
+                          Number.isFinite(item.dagVanMaand) && item.dagVanMaand > 0
                             ? item.dagVanMaand
                             : ""
                         }
                         onChange={(e) =>
                           updateItem(item.id, {
-                            dagVanMaand: parseInt(e.target.value) || 1,
+                            dagVanMaand: parseInt(e.target.value) || 0,
                           })
                         }
                         placeholder="1-31 (kies incassodag)"
@@ -256,6 +259,15 @@ export function FixedCostsList({
                       />
                     </label>
                   </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label>Betaalwijze<select aria-label="Betaalwijze" className={recordControlClass} value={item.paymentRoute ?? "bank"} disabled={isReadOnly} onChange={e => updateItem(item.id, {paymentRoute:e.target.value as FixedCostManualItem["paymentRoute"]})}>
+                      <option value="bank">Vanaf een bankrekening</option><option value="card">Via creditcard / bunq</option><option value="third-party">Via iemand anders</option><option value="withheld">Al ingehouden op ontvangen inkomen / toeslagen</option>
+                    </select></label>
+                    <label><input type="checkbox" checked={!!item.amountRange} disabled={isReadOnly} onChange={e => updateItem(item.id,{amountRange:e.target.checked ? {min:0,max:0}:undefined})} /> Bedrag wisselt per maand</label>
+                    {item.amountRange && <>{(["min","max"] as const).map(key => <label key={key}>{key === "min" ? "Minimum" : "Maximum"}<input className={recordControlClass} type="number" min="0" step="0.01" value={item.amountRange![key]} onChange={e => updateItem(item.id,{amountRange:{...item.amountRange!,[key]:Math.max(0,Number(e.target.value))}})} /></label>)}<p className="text-xs sm:col-span-2">Vul bij Bedrag zelf het verwachte maandbedrag in. De bandbreedte is informatie en wordt niet automatisch gemiddeld.</p></>}
+                    {item.budgetCategory && <p className="text-xs sm:col-span-2">Dit budget telt eenmaal mee in je vaste maandruimte. Patronen toont alleen het bedrag boven dit budget, vanaf {item.budgetSince || "de ingestelde maand"}. Pas hier het budget aan; verwijder deze last om weer alle aankopen te tonen.</p>}
+                    {item.paymentRoute === "withheld" && <p className="text-xs sm:col-span-2">Registreer het bedrag voor je overzicht. Het ontvangen inkomen moet al na deze inhouding zijn; deze last wordt daarom niet opnieuw van je beschikbare geld afgetrokken.</p>}
+                  </div>
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
@@ -275,7 +287,7 @@ export function FixedCostsList({
 
       <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
         <div className="flex items-center justify-between">
-          <span>{totalLabel ?? "Som van vaste lasten"}</span>
+          <span>{totalLabel ?? "Nog te betalen vaste lasten en budgetten"}</span>
           <span className="font-semibold">
             {confirmed ||
             (items.length > 0 &&
@@ -286,7 +298,7 @@ export function FixedCostsList({
                   (item.bedrag !== 0 || item.amountEntered === true),
               ))
               ? formatCurrency(
-                  items.reduce((sum, item) => sum + item.bedrag, 0),
+                  items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag), 0),
                 )
               : "Nog niet ingevuld"}
           </span>

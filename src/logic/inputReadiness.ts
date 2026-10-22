@@ -11,10 +11,11 @@ export type InputSection = {
   hasRows: boolean;
 };
 
-export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean }[]): ReviewRow[] {
+export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number} }[]): ReviewRow[] {
   return items.map((item) => ({
-    id: item.id, name: item.naam, amount: item.bedrag,
+    id: item.id, name: item.naam, amount: item.paymentRoute === "withheld" ? 0 : item.bedrag,
     complete: item.amountEntered !== false && (item.bedrag !== 0 || item.amountEntered === true),
+    ...((item.paymentRoute || item.budgetCategory || item.amountRange) ? {details: item} : {}),
   }));
 }
 

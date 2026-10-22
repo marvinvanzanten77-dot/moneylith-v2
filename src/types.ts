@@ -25,6 +25,12 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  paymentRoute?: "bank" | "card" | "third-party" | "withheld";
+  amountRange?: { min: number; max: number };
+  budgetCategory?: string;
+  budgetSince?: string; // YYYY-MM; budgets never rewrite earlier months.
+  budgetEvidence?: { months: string[]; average: number };
+
   bankEvidence?: import("./bank/financialImport").BankEvidence;
   amountEntered?: boolean;
   id: string;
@@ -46,6 +52,8 @@ export type SchuldItem = {
   notitie?: string;
   gebruikerOpmerking?: string;
   aiOpmerking?: string;
+  firstPaymentDate?: string; // First remaining payment, YYYY-MM-DD
+  remainingPayments?: number;
   afschrijfDag?: number; // 0-31 (0 = geen vaste dag)
 };
 
@@ -110,6 +118,9 @@ export type FixedCostItem = {
 };
 
 export type IncomeItem = {
+  followLatestBank?: boolean;
+  payrollDeductions?: Record<string, number | null>; // Informational only: already deducted from received income.
+
   bankEvidence?: import("./bank/financialImport").BankEvidence;
   dagVanMaand?: number; // Optional expected receipt day; absent remains unknown.
   amountEntered?: boolean;

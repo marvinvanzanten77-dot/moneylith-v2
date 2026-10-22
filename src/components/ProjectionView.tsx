@@ -159,7 +159,7 @@ export function ProjectionView({
         {input.scope === "personal" && (
           <>
             <label className="block text-sm">
-              Variabele uitgaven per maand (€; leeg is onbekend)
+              Extra variabele uitgaven per maand (€; leeg is onbekend)
               <Input
                 inputMode="decimal"
                 value={
@@ -179,6 +179,7 @@ export function ProjectionView({
                 }}
               />
             </label>
+            <p className="text-xs text-slate-500">Budgetten voor tanken en boodschappen uit Fundament zijn al meegenomen. Vul hier alleen aanvullende uitgaven in om dubbel tellen te voorkomen.</p>
             <label className="block text-sm">
               Reeds gereserveerd binnen je saldi (€; leeg is onbekend)
               <Input

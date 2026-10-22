@@ -1251,7 +1251,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       return sum + monthly;
     }, 0);
 
-  const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts : manualFixedCosts;
+  const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts + fixedCostManualItems.filter(i => i.paymentRoute || i.budgetCategory).reduce((sum,i)=>sum+(i.paymentRoute === "withheld" ? 0 : i.bedrag || 0),0) : manualFixedCosts;
   const fixedCostsBusiness = autoFixedCostsBusiness > 0 ? autoFixedCostsBusiness : manualFixedCostsBusiness;
 
   const inputSections = (variant: "personal" | "business") => {
@@ -1265,11 +1265,11 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const assetItems = business ? assetsBusiness : assets;
     return {
       income: reviewSection("income", "Inkomen", manualReviewRows(incomes), receipts),
-      fixed: reviewSection("fixed", "Vaste lasten", useDetected ? detected.map((item) => ({
+      fixed: reviewSection("fixed", "Vaste lasten", useDetected ? [...detected.map((item) => ({
         id: item.id, name: item.customLabel || item.descriptionPattern,
         amount: item.customMonthlyAmount ?? item.estimatedMonthlyAmount,
         details: item,
-      })) : manualReviewRows(manual), receipts),
+      })), ...manualReviewRows(manual.filter(i => i.paymentRoute || i.budgetCategory))] : manualReviewRows(manual), receipts),
       debts: reviewSection("debts", "Schulden", debtItems.map((item) => ({
         id: item.id, name: item.naam, amount: item.saldo ?? item.openBedrag ?? NaN,
         complete: Number.isFinite(item.minimaleMaandlast ?? item.minBetaling) && (item.minimaleMaandlast ?? item.minBetaling ?? -1) >= 0,
@@ -1737,7 +1737,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   }, [incomeItemsBusiness, setNetIncomeBusiness]);
 
   useEffect(() => {
-    const total = fixedCostManualItems.reduce((sum, item) => sum + (Number.isFinite(item.bedrag) ? item.bedrag : 0), 0);
+    const total = fixedCostManualItems.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : Number.isFinite(item.bedrag) ? item.bedrag : 0), 0);
     setManualFixedCosts(total);
   }, [fixedCostManualItems, setManualFixedCosts]);
 
@@ -1950,7 +1950,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           <p className="text-xs text-slate-200" role="status">{marginStatus}</p>
           {!ready && <p className="text-sm text-slate-200">Vul je inkomen en vaste lasten in en bevestig dat beide overzichten compleet zijn. Heb je geen inkomen of vaste lasten? Bevestig dan expliciet € 0.</p>}
           <p className="text-xs text-slate-300">
-            Inkomsten en vaste lasten komen uit de tabellen hierboven. De som van vaste lasten gebruikt de wizard zodra je daar items bevestigt, anders de handmatige lijst.
+            Inkomsten en vaste lasten komen uit de tabellen hierboven. Ingehouden lasten worden niet opnieuw afgetrokken. Bevestigde budgetten tellen eenmaal mee. De wizardlijst wordt aangevuld met lasten met een opgegeven betaalwijze en budgetten.
           </p>
         </div>
       </div>
@@ -2102,7 +2102,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
     if (!isBusinessVariant && (accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
-      return <BankSpendingOverview asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems}
+      return <BankSpendingOverview asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
           persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { income: incomeItems, fixedCosts: fixedCostManualItems, seen: bankImportSeen, rules });
@@ -2210,9 +2210,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       }} />
       {bankImportResult && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-slate-800" role="status">
         <h3 className="font-semibold">Verwerkt in je eigen administratie</h3>
-        <p>{bankImportResult.addedIncome} inkomsten en {bankImportResult.addedFixed} vaste lasten toegevoegd aan Fundament. Controleer daar bedragen en betaaldagen en bevestig de invoer.</p>
+        <p>{bankImportResult.addedIncome} inkomsten en {bankImportResult.addedFixed} vaste lasten toegevoegd aan Fundament. {bankImportResult.updatedIncome} inkomsten bijgewerkt naar de laatste bankontvangst. Controleer daar bedragen en betaaldagen en bevestig de invoer.</p>
         <p className="mt-2 text-sm">Overige afschrijvingen in de opgehaalde gegevens van de laatste 30 dagen: {formatCurrency(bankImportResult.otherOutflows30Days)} ({bankImportResult.otherOutflowCount} transacties). Dit zijn geen vastgestelde maandlasten; ook eenmalige uitgaven kunnen hierin staan.</p>
-        <p className="mt-2 text-sm">{bankImportResult.excludedTransfers} mogelijke interne overboekingen uitgesloten van herkenning. Bestaande invoer blijft behouden. Schuldsaldi, doelen en toekomstige bedragen worden niet afgeleid.</p>
+        <p className="mt-2 text-sm">{bankImportResult.excludedTransfers} mogelijke interne overboekingen uitgesloten van herkenning. Handmatige invoer blijft behouden; inkomen met “Volg het laatst opgehaalde inkomen” wordt bijgewerkt. Schuldsaldi, doelen en toekomstige bedragen worden niet afgeleid.</p>
         {bankImportResult.blocked.length > 0 && <p className="mt-2 text-sm">{bankImportResult.blocked.length} herkenningen niet automatisch toegevoegd omdat er al eigen invoer is. Vergelijk in Fundament: {bankImportResult.blocked.map(c => `${c.naam} (${formatCurrency(c.bedrag)})`).join(", ")}.</p>}
       </div>}
       </div>

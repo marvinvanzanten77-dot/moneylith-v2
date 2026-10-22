@@ -39,3 +39,31 @@ export function spendingSummary(rows: SpendingRow[], month: string, asOf: string
   })).sort((a,b) => b.cents - a.cents || a.label.localeCompare(b.label));
   return { month, previousMonth, elapsedDay, totalCents, categorizedCents, unknownCents: current.filter(r => r.label === null).reduce((n,r) => n + r.cents,0), unknownCount: current.filter(r => r.label === null).length, count: current.length, pots };
 }
+
+/** Budget allocation is a view of transactions, never a mutation or an extra expense. */
+export function spendingAboveBudgets(rows: SpendingRow[], fixed: FixedCostManualItem[]) {
+  const budgets = fixed.filter(i => i.budgetCategory && i.paymentRoute !== "withheld" && i.amountEntered !== false && Number.isFinite(i.bedrag) && i.bedrag >= 0);
+  const spent = new Map<string, number>();
+  return rows.slice().sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)).flatMap(row => {
+    const month = row.date.slice(0,7);
+    const matches = budgets.filter(i => i.budgetCategory === row.label && !!i.budgetSince && i.budgetSince <= month);
+    // Ambiguous duplicate budgets must not silently absorb spending twice.
+    if (matches.length !== 1) return [{...row}];
+    const budget = Math.round(matches[0].bedrag * 100), key = month + ":" + row.label;
+    const prior = spent.get(key) ?? 0; spent.set(key, prior + row.cents);
+    const excess = Math.max(0,prior+row.cents-budget)-Math.max(0,prior-budget);
+    return excess ? [{...row,cents:excess,label:row.label + " — boven maandbudget"}] : [];
+  });
+}
+
+/** Last three completed calendar months with observations; absent months are unknown. */
+export function observedBudgetAverage(rows: SpendingRow[], label: string, asOf: string) {
+  const end = asOf.slice(0,7), start = new Date(end + "-01T00:00:00Z"); start.setUTCMonth(start.getUTCMonth()-3);
+  const from = start.toISOString().slice(0,7), totals = new Map<string, number>();
+  for(const row of rows) {
+    const month=row.date.slice(0,7);
+    if(row.label===label && month>=from && month<end) totals.set(month,(totals.get(month)??0)+row.cents);
+  }
+  const months=[...totals.keys()].sort();
+  return {months, cents:months.length ? Math.round([...totals.values()].reduce((s,n)=>s+n,0)/months.length) : null};
+}
