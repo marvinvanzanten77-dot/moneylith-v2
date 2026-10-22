@@ -11,8 +11,8 @@ export type InputSection = {
   hasRows: boolean;
 };
 
-export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number} }[]): ReviewRow[] {
-  return items.map((item) => ({
+export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number} }[]): ReviewRow[] {
+  return items.map(({reviewedInput: _receipt, ...item}) => ({
     id: item.id, name: item.naam, amount: item.paymentRoute === "withheld" ? 0 : item.bedrag,
     complete: item.amountEntered !== false && (item.bedrag !== 0 || item.amountEntered === true),
     ...((item.paymentRoute || item.budgetCategory || item.amountRange) ? {details: item} : {}),
@@ -42,4 +42,12 @@ export function foundationStatus(income: InputSection, fixed: InputSection, goal
   if (margin < 0) return "Onhoudbaar tempo";
   if (free === 0 || margin < 0.2 * free) return "Krap tempo";
   return "Stabiel tempo";
+}
+
+/** A row receipt does not assert that the entire list is complete. */
+export function recordReview(item: {id:string; naam:string; bedrag:number; amountEntered?:boolean; reviewedInput?:string}) {
+  const {reviewedInput, ...fields} = item;
+  const section = reviewSection("income", "Regel", manualReviewRows([fields]), {});
+  const signature = JSON.stringify(fields);
+  return {valid:section.valid, signature, ready:section.valid && reviewedInput === signature};
 }

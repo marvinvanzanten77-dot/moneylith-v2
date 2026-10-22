@@ -87,7 +87,7 @@ test("unknown versus confirmed zero is visible in review UI", () => {
   const confirmed = { ...checked("income", []), label: "Inkomen" };
   const html = renderToStaticMarkup(<InputReview section={confirmed} onReview={() => {}} />);
   assert.doesNotMatch(html, /Nog niet ingevuld/);
-  assert.match(html, /checked/);
+  assert.match(html, /aria-pressed="true"/);
 });
 
 test("empty source lists do not present default zero as a known total", () => {
@@ -104,4 +104,19 @@ test("manual drafts, cleared values and legacy default zeros remain unknown", ()
   assert.equal(checked("income", manualReviewRows([{ ...legacy, amountEntered: false }])).ready, false);
   assert.equal(checked("income", manualReviewRows([{ ...legacy, amountEntered: true }])).ready, true);
   assert.equal(checked("income", manualReviewRows([{ ...legacy, bedrag: 1200 }])).ready, true);
+});
+
+test("individual row review persists, invalidates after edits and never confirms the whole list", async () => {
+  const {recordReview}=await import('../src/logic/inputReadiness');
+  const item={id:'row',naam:'Verzekering',bedrag:53,amountEntered:true};
+  const receipt=recordReview(item).signature;
+  assert.equal(recordReview({...item,reviewedInput:receipt}).ready,true);
+  assert.equal(recordReview({...item,bedrag:54,reviewedInput:receipt}).ready,false);
+  assert.equal(recordReview({...item,amountEntered:false}).valid,false);
+  assert.equal(recordReview({...item,bedrag:0,amountEntered:true}).valid,true);
+  assert.equal(reviewSection('fixed','Vaste lasten',manualReviewRows([{...item,reviewedInput:receipt}]),{}).ready,false);
+  assert.deepEqual(manualReviewRows([item]),manualReviewRows([{...item,reviewedInput:receipt}]));
+  const {RecordReview}=await import('../src/components/RecordReview');
+  assert.match(renderToStaticMarkup(<RecordReview item={item} onReview={()=>{}} />),/Deze regel gecontroleerd/);
+  assert.match(renderToStaticMarkup(<RecordReview item={{...item,amountEntered:false}} onReview={()=>{}} />),/disabled/);
 });

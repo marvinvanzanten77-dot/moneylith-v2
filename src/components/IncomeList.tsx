@@ -1,3 +1,5 @@
+import { RecordReview } from "./RecordReview";
+import { recordReview } from "../logic/inputReadiness";
 import { ExpandableRecord, recordControlClass } from "./ExpandableRecord";
 import { Button } from "./WorkspaceUI";
 import { useEffect, useId, useRef, useState } from "react";
@@ -157,6 +159,7 @@ export function IncomeList({
                   (item.bedrag !== 0 || item.amountEntered === true)
                     ? formatCurrency(item.bedrag)
                     : "Nog niet ingevuld"}
+                  {recordReview(item).ready && <span className="ml-2 text-xs text-emerald-700">Regel gecontroleerd</span>}
                   {item.bankEvidence && <span className="ml-2 text-xs text-slate-600">Uit bankgegevens · {confirmed ? "gecontroleerd" : "nog controleren"}</span>}
                 </span>
               }
@@ -230,6 +233,7 @@ export function IncomeList({
                       />
                     </label>
                   </div>
+                  <RecordReview item={item} disabled={isReadOnly} onReview={reviewedInput => updateItem(item.id, {reviewedInput})} />
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"

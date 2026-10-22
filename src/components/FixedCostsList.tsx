@@ -1,3 +1,5 @@
+import { RecordReview } from "./RecordReview";
+import { recordReview } from "../logic/inputReadiness";
 import { ExpandableRecord, recordControlClass } from "./ExpandableRecord";
 import { useEffect, useRef, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -169,6 +171,7 @@ export function FixedCostsList({
                   {item.paymentRoute === "withheld" && <span className="ml-2 text-xs">Al ingehouden op inkomen/toeslagen · geen extra afschrijving</span>}
                   {item.budgetCategory && <span className="ml-2 text-xs">Maandbudget · {item.budgetCategory}</span>}
                   {item.amountRange && <span className="ml-2 text-xs">Wisselend: {formatCurrency(item.amountRange.min, true)}–{formatCurrency(item.amountRange.max, true)}</span>}
+                  {recordReview(item).ready && <span className="ml-2 text-xs text-emerald-700">Regel gecontroleerd</span>}
                   {item.bankEvidence && <span className="ml-2 text-xs text-slate-600">Uit bankgegevens · {confirmed ? "gecontroleerd" : "nog controleren"}</span>}
                 </span>
               }
@@ -260,7 +263,7 @@ export function FixedCostsList({
                     </label>
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label>Betaalwijze<select aria-label="Betaalwijze" className={recordControlClass} value={item.paymentRoute ?? "bank"} disabled={isReadOnly} onChange={e => updateItem(item.id, {paymentRoute:e.target.value as FixedCostManualItem["paymentRoute"]})}>
+                    <label className="min-w-0">Betaalwijze<select aria-label="Betaalwijze" className={recordControlClass + " block w-full min-w-0"} value={item.paymentRoute ?? "bank"} disabled={isReadOnly} onChange={e => updateItem(item.id, {paymentRoute:e.target.value as FixedCostManualItem["paymentRoute"]})}>
                       <option value="bank">Vanaf een bankrekening</option><option value="card">Via creditcard / bunq</option><option value="third-party">Via iemand anders</option><option value="withheld">Al ingehouden op ontvangen inkomen / toeslagen</option>
                     </select></label>
                     <label><input type="checkbox" checked={!!item.amountRange} disabled={isReadOnly} onChange={e => updateItem(item.id,{amountRange:e.target.checked ? {min:0,max:0}:undefined})} /> Bedrag wisselt per maand</label>
@@ -268,6 +271,7 @@ export function FixedCostsList({
                     {item.budgetCategory && <p className="text-xs sm:col-span-2">Dit budget telt eenmaal mee in je vaste maandruimte. Patronen toont alleen het bedrag boven dit budget, vanaf {item.budgetSince || "de ingestelde maand"}. Pas hier het budget aan; verwijder deze last om weer alle aankopen te tonen.</p>}
                     {item.paymentRoute === "withheld" && <p className="text-xs sm:col-span-2">Registreer het bedrag voor je overzicht. Het ontvangen inkomen moet al na deze inhouding zijn; deze last wordt daarom niet opnieuw van je beschikbare geld afgetrokken.</p>}
                   </div>
+                  <RecordReview item={item} disabled={isReadOnly} onReview={reviewedInput => updateItem(item.id, {reviewedInput})} />
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"

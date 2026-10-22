@@ -25,6 +25,7 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  reviewedInput?: string;
   paymentRoute?: "bank" | "card" | "third-party" | "withheld";
   amountRange?: { min: number; max: number };
   budgetCategory?: string;
@@ -118,6 +119,7 @@ export type FixedCostItem = {
 };
 
 export type IncomeItem = {
+  reviewedInput?: string;
   followLatestBank?: boolean;
   payrollDeductions?: Record<string, number | null>; // Informational only: already deducted from received income.
 

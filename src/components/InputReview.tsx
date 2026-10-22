@@ -1,4 +1,4 @@
-import { ReviewPanel } from "./WorkspaceUI";
+import { Button, ReviewPanel } from "./WorkspaceUI";
 import type { InputSection } from "../logic/inputReadiness";
 import { formatCurrency } from "../utils/format";
 
@@ -31,22 +31,15 @@ export function InputReview({
           Vul 0 in als het bedrag echt nul is.
         </p>
       )}
-      <label className="mt-2 flex items-start gap-2">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={section.ready}
-          disabled={!section.valid}
-          onChange={(event) =>
-            onReview(event.target.checked ? section.signature : null)
-          }
-        />
-        <span>
-          {section.hasRows
-            ? `Ik heb ${section.label.toLowerCase()} gecontroleerd: het overzicht is compleet${showTotal ? ` en het totaal van ${section.valid ? formatCurrency(section.total) : "—"} klopt` : ""}.`
-            : `Ik bevestig dat ik geen ${section.label.toLowerCase()} heb (€ 0).`}
-        </span>
-      </label>
+      <p className="mt-2">
+        {section.hasRows
+          ? `Bevestig dat je alle ${section.label.toLowerCase()} hebt ingevuld en gecontroleerd${showTotal && section.valid ? ` en dat het totaal van ${formatCurrency(section.total)} klopt` : ""}.`
+          : `Bevestig alleen € 0 als je geen ${section.label.toLowerCase()} hebt.`}
+      </p>
+      <Button type="button" aria-pressed={section.ready} className="mt-3 rounded-lg bg-amber-400 px-4 py-2 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50" disabled={!section.valid} onClick={() => onReview(section.ready ? null : section.signature)}>
+        {section.ready ? "Controle ongedaan maken" : section.hasRows ? "Hele overzicht gecontroleerd" : "Bevestigen: geen posten (€ 0)"}
+      </Button>
+      {!section.valid && <p className="mt-2 text-sm">Je kunt complete regels afzonderlijk controleren. Het hele overzicht kun je bevestigen zodra alle verplichte bedragen zijn ingevuld.</p>}
       <p className="mt-2 text-xs text-slate-400">
         Na een wijziging vragen we je dit opnieuw te controleren.
       </p>
