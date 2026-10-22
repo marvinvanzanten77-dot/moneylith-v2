@@ -1,3 +1,4 @@
+import { registerAppWorker } from "./pwa/register";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./WorkspaceApp";
@@ -9,3 +10,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <CloudSyncBoundary><App /></CloudSyncBoundary>
   </React.StrictMode>
 );
+
+registerAppWorker();

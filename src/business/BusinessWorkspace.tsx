@@ -1113,6 +1113,7 @@ export default function BusinessWorkspace({
   return (
     <ApplicationLayout
       mode="business"
+      mobile={{input:businessInput(data, projectionOptions, today()),onNavigate:(page)=>go(({spending:"patterns",forecast:"forecast",bank:"bank",foundation:"foundation"} as const)[page])}}
       onPersonal={onPersonal}
       onBusiness={() => {}}
       onSettings={() => go("settings")}

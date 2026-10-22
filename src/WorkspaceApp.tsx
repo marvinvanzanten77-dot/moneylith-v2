@@ -1,3 +1,4 @@
+import { useCompactMode } from "./mobile/useCompactMode";
 import { useEffect, useState } from "react";
 import PersonalApp from "./App";
 
@@ -12,6 +13,7 @@ function initialMode(): Mode {
 }
 
 export default function WorkspaceApp() {
+  const [compact]=useCompactMode();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [enteredWorkspace, setEnteredWorkspace] = useState(() => {
     try {
@@ -23,6 +25,7 @@ export default function WorkspaceApp() {
       return initialMode() !== "personal";
     }
   });
+  useEffect(() => { if(compact)setEnteredWorkspace(true); }, [compact]);
   useEffect(() => {
     try {
       if (enteredWorkspace)
@@ -68,7 +71,7 @@ export default function WorkspaceApp() {
     return (
       <PersonalApp
         onOpenBusiness={openBusiness}
-        skipOnboarding={enteredWorkspace}
+        skipOnboarding={enteredWorkspace||compact}
       />
     );
   return (

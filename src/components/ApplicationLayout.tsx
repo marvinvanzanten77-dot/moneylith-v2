@@ -1,23 +1,13 @@
+import { MobileLayout } from "../mobile/MobileLayout";
+import { useCompactMode } from "../mobile/useCompactMode";
+import type { MobileData } from "../mobile/MobileOverview";
 import { NotificationCenter } from "./NotificationCenter";
 import { useLayoutEffect, type ReactNode } from "react";
 import { CookieBanner } from "./CookieBanner";
 import { AnalyticsGate } from "./AnalyticsGate";
 
 /** The personal application's frame, shared without mode-specific geometry or themes. */
-export function ApplicationLayout({
-  mode,
-  onPersonal,
-  onBusiness,
-  onSettings,
-  onLogin,
-  navigation,
-  step,
-  banner,
-  guide,
-  children,
-  overlays,
-  guideTitle = "AI gids",
-}: {
+export type ApplicationLayoutProps = {
   mode: "personal" | "business";
   onPersonal: () => void;
   onBusiness: () => void;
@@ -30,16 +20,22 @@ export function ApplicationLayout({
   children: ReactNode;
   overlays?: ReactNode;
   guideTitle?: string;
-}) {
+  mobile?: MobileData;
+};
+export function ApplicationLayout(props: ApplicationLayoutProps) {
+  const {mode,onPersonal,onBusiness,onSettings,onLogin,navigation,step,banner,guide,children,overlays,guideTitle = "AI gids"}=props;
+  const [compact,setCompact]=useCompactMode();
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [mode, step]);
+  if(compact)return <MobileLayout key={mode} {...props} onFull={()=>setCompact(false)}/>;
   return (
     <main
       style={{ overflowAnchor: "none" }}
       data-app-layout
       className="min-h-screen text-slate-50 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950"
     >
+      <button className="m-3 rounded-lg border border-white/30 px-3 py-2 text-sm" onClick={()=>setCompact(true)}>Compacte appweergave</button>
       <div className="grid min-h-screen grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)_320px]">
         <aside
           data-app-sidebar

@@ -5,9 +5,12 @@ import {Button,SurfaceCard} from './WorkspaceUI';
 import {TurnstileWidget} from './TurnstileWidget';
 
 const date=(value:string|null)=>value?new Date(value).toLocaleString('nl-NL',{timeZone:'Europe/Amsterdam',dateStyle:'short',timeStyle:'short'}):'Nog niet bekend';
-export function NotificationCenter({mode,onLogin}:{mode:'personal'|'business';onLogin?:()=>void}){
+export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOpen,onClose,onUnread}:{mode:'personal'|'business';onLogin?:()=>void;hideTrigger?:boolean;expanded?:boolean;onOpen?:()=>void;onClose?:()=>void;onUnread?:(count:number)=>void}){
   const [history,setHistory]=useState(false),[limit,setLimit]=useState(10);
   const [open,setOpen]=useState(false),[data,setData]=useState<MonitoringState|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[toast,setToast]=useState('');
+  const isOpen=expanded??open;
+  const show=()=>onOpen?onOpen():setOpen(true);
+  const close=()=>onClose?onClose():setOpen(false);
   const alive=useRef(true),running=useRef(false),known=useRef<Set<string>|null>(null);
   const local=()=>localStorage.getItem('moneylith.storage.mode')==='"local"'||location.hostname!=='www.moneylith.nl';
   const refresh=async(update?:MonitoringAction)=>{
@@ -38,11 +41,12 @@ export function NotificationCenter({mode,onLogin}:{mode:'personal'|'business';on
   const visible=data?.notices.filter(n=>!n.dismissedAt&&!data.preferences.mutedLabels.includes(n.label))??[];
   const listed=visible.filter(n=>history||n.active);
   const unread=visible.filter(n=>n.active&&!n.readAt).length;
+  useEffect(()=>{onUnread?.(unread);},[unread,onUnread]);
   return <div className="mb-4 space-y-2" data-notification-center>
-    <button type="button" className="rounded-lg border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10" aria-expanded={open} aria-controls="moneylith-notifications" onClick={()=>setOpen(v=>!v)}>Meldingen{unread?` (${unread})`:''}</button>
-    {toast&&!open&&mode==='personal'&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-purple-100 p-3 text-sm text-purple-950"><p role="status">{toast}</p><button className="underline" onClick={()=>setOpen(true)}>Bekijken</button><button className="underline" onClick={()=>setToast('')}>Sluiten</button></div>}
-    {open&&<SurfaceCard id="moneylith-notifications" className="space-y-4" role="region" aria-label="Meldingencentrum">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Een beetje hulp onderweg</h2><Button onClick={()=>setOpen(false)}>Sluiten</Button></div>
+    {!hideTrigger&&<button type="button" className="rounded-lg border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10" aria-expanded={isOpen} aria-controls="moneylith-notifications" onClick={()=>isOpen?close():show()}>Meldingen{unread?` (${unread})`:''}</button>}
+    {toast&&!isOpen&&mode==='personal'&&<div className="flex flex-wrap items-center gap-2 rounded-xl bg-purple-100 p-3 text-sm text-purple-950"><p role="status">{toast}</p><button className="underline" onClick={show}>Bekijken</button><button className="underline" onClick={()=>setToast('')}>Sluiten</button></div>}
+    {isOpen&&<SurfaceCard id="moneylith-notifications" className="space-y-4" role="region" aria-label="Meldingencentrum">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Een beetje hulp onderweg</h2><Button onClick={close}>Sluiten</Button></div>
       {mode==='business'?<p className="text-sm">Uitgavenmonitoring is nu beschikbaar in Persoonlijk. Je persoonlijke meldingen worden hier niet getoond.</p>:local()?<p className="text-sm">Meldingen horen bij je Moneylith-account. Kies accountopslag bij Instellingen en log in op moneylith.nl om je meldingen op al je apparaten te gebruiken.</p>:<>
         <p className="text-sm text-slate-600">We kijken naar je opgeslagen aankopen en budgetten zolang de website zichtbaar is. Jij kiest waarop je wilt letten. Smartphone-push is nog niet beschikbaar.</p>
         {error&&<div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm"><p>{error}</p><div className="mt-2 flex gap-2"><Button onClick={()=>void refresh()} disabled={busy}>Opnieuw proberen</Button>{!data&&onLogin&&<Button onClick={onLogin}>Inloggen</Button>}</div></div>}

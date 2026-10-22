@@ -94,3 +94,16 @@
     @apply bg-slate-200 text-slate-700 border border-slate-300;
   }
 }
+
+/* Compact app presentation; the original desktop component styles remain intact. */
+.mobile-header { padding-top: max(1rem, env(safe-area-inset-top)); }
+.mobile-bottom { padding-bottom: max(.35rem, env(safe-area-inset-bottom)); }
+.mobile-app button, .mobile-app summary { min-height: 44px; }
+.mobile-app input:not([type="checkbox"]):not([type="radio"]), .mobile-app select, .mobile-app textarea { font-size: 16px; min-width: 0; max-width: 100%; }
+.mobile-app .card-shell { padding: 1rem; }
+.mobile-app .card-shell:hover { transform: none; }
+.mobile-app [data-app-content] { overflow-wrap: anywhere; }
+.mobile-app table { display: block; max-width: 100%; overflow-x: auto; }
+@media (prefers-reduced-motion: reduce) { .mobile-app * { scroll-behavior: auto !important; transition: none !important; } }
+
+body:has([data-mobile-layout]) [data-cloud-status][role="status"] { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

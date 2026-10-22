@@ -41,7 +41,7 @@ export function CloudSyncBoundary({ children }: { children: ReactNode }) {
   }, []);
   if (!ready) return <div className="p-6 text-slate-100" role="status">Je administratie laden…</div>;
   return <>
-    {status && <div role={error ? "alert" : "status"} className={`px-4 py-2 text-sm ${error ? "bg-amber-100 text-amber-950" : "bg-slate-800 text-slate-100"}`}>{status}</div>}
+    {status && <div data-cloud-status role={error ? "alert" : "status"} className={`px-4 py-2 text-sm ${error ? "bg-amber-100 text-amber-950" : "bg-slate-800 text-slate-100"}`}>{status}</div>}
     {children}
   </>;
 }

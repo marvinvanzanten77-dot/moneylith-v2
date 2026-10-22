@@ -1,3 +1,5 @@
+import {useCompactMode} from "./mobile/useCompactMode";
+import {mobileBankBalance} from "./mobile/bankBalance";
 import { spendingRows } from "./bank/spending";
 import { isOperatingTransaction, emptyBankRules, type BankRuleSettings } from "./bank/classificationRules";
 import { BankSpendingOverview } from "./components/BankSpendingOverview";
@@ -175,6 +177,7 @@ const businessTabs: TabConfig[] = [
 const useActiveTabs = (mode: Mode) => useMemo(() => (mode === "zakelijk" ? businessTabs : personalTabs), [mode]);
 
 const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () => void; skipOnboarding?: boolean }) => {
+  const [compactMode]=useCompactMode();
   const legalPaths = ["/privacy", "/disclaimer", "/terms", "/cookies"];
   const statusPaths = ["/status", "/about"];
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
@@ -2101,7 +2104,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
-    if (!isBusinessVariant && (accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
+    if (!isBusinessVariant && (compactMode || accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
       return <BankSpendingOverview asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
@@ -2359,6 +2362,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   return (
     <ApplicationLayout
       mode="personal"
+      mobile={{input:personalProjection,bank:mobileBankBalance(accounts,bankRules),onNavigate:(page)=>handleStepClick(({spending:"afschriften",forecast:"action",bank:"bank",foundation:"fundament"} as const)[page])}}
       onPersonal={() => setMode("persoonlijk")}
       onBusiness={() => onOpenBusiness?.()}
       onSettings={() => { setSettingsAuthMode(null); setCurrentStep("settings"); }}
