@@ -193,6 +193,7 @@ test("backend returns honest errors and actual scoped provider response, preserv
         socket: {},
       } as VercelRequest,
       {
+        setHeader(name: string, value: string) { assert.equal(value, name === "Cache-Control" ? "private, no-store" : "Cookie, Origin"); return this; },
         status(n: number) {
           status = n;
           return this;
@@ -327,6 +328,7 @@ test("backend retries an unsupported business diagnosis once and never returns i
         socket: {},
       } as VercelRequest,
       {
+        setHeader(name: string, value: string) { assert.equal(value, name === "Cache-Control" ? "private, no-store" : "Cookie, Origin"); return this; },
         status(n: number) {
           status = n;
           return this;
@@ -394,7 +396,7 @@ test('projection answers append server figures and retry invented provider amoun
   try {
     process.env.OPENAI_API_KEY='test-key-not-real';process.env.TURNSTILE_OPTIONAL='true';delete process.env.TURNSTILE_SECRET_KEY;
     globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{message:{content:++calls===1?'Over 30 dagen heb je €999999.':'Controleer eerst de ontbrekende gegevens. De rekenuitkomst staat hieronder.'}}]}),{status:200,headers:{'content-type':'application/json'}});
-    await handler({method:'POST',body:{...input(),question:'Waar sta ik over 30 dagen?'},headers:{'x-real-ip':'projection-answer-test'},socket:{}} as VercelRequest,{status(n:number){status=n;return this;},json(v:Record<string,unknown>){result=v;return this;}} as VercelResponse);
+    await handler({method:'POST',body:{...input(),question:'Waar sta ik over 30 dagen?'},headers:{'x-real-ip':'projection-answer-test'},socket:{}} as VercelRequest,{setHeader(name:string,value:string){assert.equal(value,name==="Cache-Control"?"private, no-store":"Cookie, Origin");return this;},status(n:number){status=n;return this;},json(v:Record<string,unknown>){result=v;return this;}} as VercelResponse);
     assert.equal(status,200);assert.equal(calls,2);assert.match(String(result.content),/Berekend door Moneylith/);assert.match(String(result.content),/30 dagen: beschikbaar onbekend/);assert.ok(!String(result.content).includes('999999'));
   } finally {
     globalThis.fetch=oldFetch;

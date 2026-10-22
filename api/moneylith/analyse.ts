@@ -1,3 +1,4 @@
+import { monitoringAdviceRequest } from '../../server/monitoring/advice.js';
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
 import { rateLimit } from "../../server/utils/rateLimit.js";
@@ -13,6 +14,8 @@ import { buildChatRequest } from "../../src/ai/context.js";
 const MODEL = "gpt-4.1-mini";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Vary", "Cookie, Origin");
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
     return;
@@ -58,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let qualitativeOnly = false;
   try {
     if (req.body?.scope !== undefined) {
-      const selected = buildChatRequest(req.body);
+      const selected = req.body.purpose === "monitoring-coach" ? await monitoringAdviceRequest(req) : buildChatRequest(req.body);
       messages = selected.messages;
       scope = selected.scope;
       businessReplyPolicy = selected.businessReplyPolicy;

@@ -1,3 +1,5 @@
+import { InvalidMonitoringAction } from '../src/monitoring/engine.js';
+import { monitorAccount } from '../server/monitoring/store.js';
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { clearCloudSession, decryptCloudPayload, encryptCloudPayload, getCloudSessionEmail, hashPassword, setCloudSession, verifyPassword } from "../server/utils/cloudAuth.js";
 import { allowCloudLogin, getCloudSnapshot, getCloudUser, hasCloudStore, setCloudSnapshot, setCloudUser } from "../server/utils/cloudStore.js";
@@ -53,6 +55,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, email });
     }
     if (!authenticated) return fail(401, "Log in met je Moneylith-account.");
+    if (req.method === "POST" && action === "monitoring") {
+      if (body.update !== undefined) {
+        const update = body.update as Record<string, unknown>;
+        if (!update || !["read", "dismiss", "preferences"].includes(String(update.action))) return fail(400, "Ongeldige meldingsactie.");
+      }
+      const monitoring = await monitorAccount(config.email, body.update);
+      return res.status(200).json({ ok: true, monitoring });
+    }
     if (req.method === "GET" && action === "snapshot") {
       const snapshot = await getCloudSnapshot(config.email);
       if (!snapshot) return res.status(200).json({ ok: true, state: null, revision: null });
@@ -68,7 +78,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, revision });
     }
     return fail(405, "Actie niet beschikbaar.");
-  } catch {
+  } catch (error) {
+    if (error instanceof InvalidMonitoringAction) return fail(400, error.message);
     return fail(503, "Accountopslag is tijdelijk niet bereikbaar. Lokale gegevens zijn behouden.");
   }
 }

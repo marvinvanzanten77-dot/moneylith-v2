@@ -1,3 +1,4 @@
+import { NotificationCenter } from "./NotificationCenter";
 import { useLayoutEffect, type ReactNode } from "react";
 import { CookieBanner } from "./CookieBanner";
 import { AnalyticsGate } from "./AnalyticsGate";
@@ -112,6 +113,7 @@ export function ApplicationLayout({
               Stap: {step}
             </div>
           </div>
+          <NotificationCenter key={mode} mode={mode} onLogin={onLogin}/>
           {banner}
           <div className="space-y-4">{children}</div>
         </section>

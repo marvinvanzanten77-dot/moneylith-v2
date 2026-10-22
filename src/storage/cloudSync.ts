@@ -67,6 +67,7 @@ export async function saveCloudChanges() {
     const result = await cloudRequest("snapshot", "PUT", { state, revision: current.revision });
     if (session !== current) return false;
     remember({ ...current, revision: result.revision, hash });
+    window.dispatchEvent(new Event("moneylith:cloud-saved"));
     return true;
   } finally { saving = false; }
 }
