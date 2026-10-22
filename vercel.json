@@ -13,6 +13,7 @@
     }
   ],
   "headers": [
+    { "source": "/app-version.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
     {
       "source": "/sw.js",
       "headers": [
@@ -46,7 +47,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!manifest\\.webmanifest|sw\\.js|offline\\.html|icons|api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml|@vite|@react-refresh|@id|@fs|src|node_modules).*)",
+      "source": "/((?!app-version\\.json|manifest\\.webmanifest|sw\\.js|offline\\.html|icons|api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml|@vite|@react-refresh|@id|@fs|src|node_modules).*)",
       "destination": "/index.html"
     }
   ],

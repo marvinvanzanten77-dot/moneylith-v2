@@ -1,3 +1,4 @@
+import {UpdateApp} from '../pwa/UpdateApp';
 import { MobileLayout } from "../mobile/MobileLayout";
 import { useCompactMode } from "../mobile/useCompactMode";
 import type { MobileData } from "../mobile/MobileOverview";
@@ -88,6 +89,7 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
               </button>
             ))}
           </div>
+          <div className="mb-4"><UpdateApp/></div>
           <nav aria-label="Onderdelen" className="space-y-2">
             {navigation}
           </nav>

@@ -81,3 +81,13 @@ export async function loadCloudVersion() {
   window.location.reload();
 }
 export function stopCloudSync() { session = null; }
+
+/** Flush an active account before a user-requested app reload; local-only data stays local. */
+export async function prepareCloudReload() {
+  const deadline = Date.now() + 25000;
+  while (saving) {
+    if (Date.now() > deadline) throw Error("Opslaan is nog bezig. Wacht even en probeer opnieuw.");
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  if (session) await saveCloudChanges();
+}
