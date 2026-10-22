@@ -1,3 +1,4 @@
+import {disableDevicePush} from '../pwa/PushSettings';
 import { useEffect, useState } from "react";
 import { cloudRequest, loadCloudVersion, saveCloudChanges, stopCloudSync } from "../storage/cloudSync";
 import { Button, Input } from "./WorkspaceUI";
@@ -34,6 +35,7 @@ export function CloudAccountCard({ preferredAuthMode = null }: { preferredAuthMo
         <Button disabled={busy} onClick={() => void run(loadCloudVersion)}>Cloudversie laden</Button>
         <Button disabled={busy} onClick={() => void run(async () => {
           try { await saveCloudChanges(); } catch { /* Local data and sync metadata remain available after logout. */ }
+          await disableDevicePush();
           await cloudRequest("logout", "POST"); stopCloudSync();
           window.location.reload();
         })}>Uitloggen</Button>

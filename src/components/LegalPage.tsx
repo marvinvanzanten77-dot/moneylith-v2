@@ -5,17 +5,26 @@ import { CookieSettings } from "./CookieSettings";
 
 type LegalKind = "privacy" | "disclaimer" | "terms" | "cookies";
 
-const lastUpdated = "2026-03-06";
+const lastUpdated = "2026-10-22";
 
 const sections: Record<LegalKind, { title: string; blocks: { heading: string; bullets: string[] }[] }> = {
   privacy: {
     title: "Privacyverklaring",
     blocks: [
       {
+        heading: "Pushmeldingen (optioneel)",
+        bullets: [
+          "Na jouw toestemming bewaren we de pushregistratie van dit apparaat versleuteld bij je account. We gebruiken deze om meldingen te versturen via de pushdienst van je browser of telefoon.",
+          "De pushmelding bevat geen bedragen, transactieomschrijvingen of rekeninggegevens. De details bekijk je in Moneylith. De pushdienst ontvangt wel technische bezorggegevens.",
+          "De achtergrondcontrole gebruikt je laatst opgeslagen persoonlijke administratie en haalt geen nieuwe bankgegevens op. Je kunt monitoring pauzeren, potjes dempen en push per apparaat uitschakelen bij Meldingen.",
+          "Uitschakelen of uitloggen verwijdert de pushregistratie van dit apparaat. Technische verzendmarkeringen verlopen na 120 dagen. Een al verstuurde melding kan nog door de pushdienst worden bezorgd.",
+        ],
+      },
+      {
         heading: "Lokale opslag (browser)",
         bullets: [
-          "Je gegevens blijven lokaal in je browser (localStorage).",
-          "Moneylith bewaart geen gebruikersdata op een server en er zijn geen accounts.",
+          "Je administratie wordt lokaal in je browser bewaard. Met accountopslag wordt deze ook versleuteld op de server opgeslagen.",
+          "Je persoonlijke Moneylith-account geeft toegang tot je eigen cloudadministratie.",
           "Als je je browserdata wist, verdwijnen ook je planner-gegevens.",
         ],
       },

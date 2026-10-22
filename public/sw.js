@@ -13,3 +13,19 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request).catch(async () => (await caches.match('/offline.html')) || Response.error()));
   }
 });
+
+self.addEventListener('push', event => {
+  let test = false;
+  try { test = event.data?.json()?.type === 'test'; } catch { /* Always display a safe generic notification. */ }
+  event.waitUntil(self.registration.showNotification('Moneylith', {
+    body: test ? 'Je testmelding is aangekomen. Fijn, je bent bereikbaar!' : 'Er staat een nieuwe tip voor je klaar. Bekijk rustig wat bij je past.',
+    icon: '/icons/moneylith-192.png', badge: '/icons/moneylith-192.png',
+    tag: test ? 'moneylith-test' : 'moneylith-monitoring',
+    data: {url: '/?app=1&view=notifications#persoonlijk'}
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  // Fixed same-origin destination; never navigate to a URL supplied in a payload.
+  event.waitUntil(self.clients.openWindow('/?app=1&view=notifications#persoonlijk'));
+});

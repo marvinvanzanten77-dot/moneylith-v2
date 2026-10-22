@@ -49,5 +49,6 @@
       "source": "/((?!manifest\\.webmanifest|sw\\.js|offline\\.html|icons|api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml|@vite|@react-refresh|@id|@fs|src|node_modules).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "crons": [{ "path": "/api/monitoring-cron", "schedule": "*/15 * * * *" }]
 }

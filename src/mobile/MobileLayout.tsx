@@ -8,7 +8,7 @@ import {MobileOverview,type MobileDestination} from './MobileOverview';
 import {InstallApp} from '../pwa/InstallApp';
 type View='home'|'content'|'notifications'|'more'|'guide';
 const viewKey='moneylith.mobile.view';
-function initialView():View {try{const value=sessionStorage.getItem(viewKey);return ['home','content','notifications','more','guide'].includes(value??'')?value as View:'home';}catch{return 'home';}}
+function initialView():View {if(new URLSearchParams(location.search).get('view')==='notifications')return 'notifications';try{const value=sessionStorage.getItem(viewKey);return ['home','content','notifications','more','guide'].includes(value??'')?value as View:'home';}catch{return 'home';}}
 export function MobileLayout(props:ApplicationLayoutProps&{onFull:()=>void}){
   const {mode,onPersonal,onBusiness,onLogin,onSettings,step,navigation,guide,children,overlays,mobile,onFull}=props;
   const [view,setView]=useState<View>(initialView),[unread,setUnread]=useState(0),[online,setOnline]=useState(navigator.onLine),[reconnected,setReconnected]=useState(false);

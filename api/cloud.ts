@@ -1,3 +1,4 @@
+import {pushConfig,registerDevice,removeDevice,deviceExists,testDevice,dispatchPush,PushInputError} from '../server/push/service.js';
 import { InvalidMonitoringAction } from '../src/monitoring/engine.js';
 import { monitorAccount } from '../server/monitoring/store.js';
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -55,12 +56,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, email });
     }
     if (!authenticated) return fail(401, "Log in met je Moneylith-account.");
+    if (req.method === "POST" && action === "push") {
+      const configPush=pushConfig();
+      if(body.operation==='status')return res.status(200).json({ok:true,publicKey:configPush?.publicKey??null,subscribed:body.endpoint?await deviceExists(config.email,body.endpoint):false});
+      if(body.operation==='unsubscribe'){await removeDevice(config.email,body.endpoint);return res.status(200).json({ok:true});}
+      if(!configPush)return fail(503,"Pushmeldingen zijn nog niet geconfigureerd.");
+      if(body.operation==='subscribe'){await registerDevice(config.email,body.subscription);return res.status(200).json({ok:true});}
+      if(body.operation==='test'){await testDevice(config.email,body.endpoint);return res.status(200).json({ok:true,accepted:true});}
+      return fail(400,"Ongeldige pushactie.");
+    }
     if (req.method === "POST" && action === "monitoring") {
       if (body.update !== undefined) {
         const update = body.update as Record<string, unknown>;
         if (!update || !["read", "dismiss", "preferences"].includes(String(update.action))) return fail(400, "Ongeldige meldingsactie.");
       }
       const monitoring = await monitorAccount(config.email, body.update);
+      // Delivery problems never hide the monitoring result or alter financial data.
+      try { await dispatchPush(config.email,monitoring); } catch { /* Scheduled retry. */ }
       return res.status(200).json({ ok: true, monitoring });
     }
     if (req.method === "GET" && action === "snapshot") {
@@ -79,7 +91,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return fail(405, "Actie niet beschikbaar.");
   } catch (error) {
+    if (error instanceof PushInputError) return fail(400,error.message);
     if (error instanceof InvalidMonitoringAction) return fail(400, error.message);
+    if(action === "push") return fail(503,"Pushdienst is tijdelijk niet bereikbaar. Probeer het opnieuw; je financiële gegevens zijn behouden.");
     return fail(503, "Accountopslag is tijdelijk niet bereikbaar. Lokale gegevens zijn behouden.");
   }
 }

@@ -1,3 +1,4 @@
+import {PushSettings} from '../pwa/PushSettings';
 import {useEffect,useRef,useState} from 'react';
 import {cloudRequest} from '../storage/cloudSync';
 import type {MonitoringState,MonitoringAction,Notice} from '../monitoring/engine';
@@ -7,7 +8,7 @@ import {TurnstileWidget} from './TurnstileWidget';
 const date=(value:string|null)=>value?new Date(value).toLocaleString('nl-NL',{timeZone:'Europe/Amsterdam',dateStyle:'short',timeStyle:'short'}):'Nog niet bekend';
 export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOpen,onClose,onUnread}:{mode:'personal'|'business';onLogin?:()=>void;hideTrigger?:boolean;expanded?:boolean;onOpen?:()=>void;onClose?:()=>void;onUnread?:(count:number)=>void}){
   const [history,setHistory]=useState(false),[limit,setLimit]=useState(10);
-  const [open,setOpen]=useState(false),[data,setData]=useState<MonitoringState|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[toast,setToast]=useState('');
+  const [open,setOpen]=useState(()=>new URLSearchParams(location.search).get('view')==='notifications'),[data,setData]=useState<MonitoringState|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[toast,setToast]=useState('');
   const isOpen=expanded??open;
   const show=()=>onOpen?onOpen():setOpen(true);
   const close=()=>onClose?onClose():setOpen(false);
@@ -48,10 +49,11 @@ export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOp
     {isOpen&&<SurfaceCard id="moneylith-notifications" className="space-y-4" role="region" aria-label="Meldingencentrum">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Een beetje hulp onderweg</h2><Button onClick={close}>Sluiten</Button></div>
       {mode==='business'?<p className="text-sm">Uitgavenmonitoring is nu beschikbaar in Persoonlijk. Je persoonlijke meldingen worden hier niet getoond.</p>:local()?<p className="text-sm">Meldingen horen bij je Moneylith-account. Kies accountopslag bij Instellingen en log in op moneylith.nl om je meldingen op al je apparaten te gebruiken.</p>:<>
-        <p className="text-sm text-slate-600">We kijken naar je opgeslagen aankopen en budgetten zolang de website zichtbaar is. Jij kiest waarop je wilt letten. Smartphone-push is nog niet beschikbaar.</p>
+        <p className="text-sm text-slate-600">We kijken naar je opgeslagen aankopen en budgetten. Jij kiest waarop je wilt letten en of je meldingen op dit apparaat wilt ontvangen.</p>
         {error&&<div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm"><p>{error}</p><div className="mt-2 flex gap-2"><Button onClick={()=>void refresh()} disabled={busy}>Opnieuw proberen</Button>{!data&&onLogin&&<Button onClick={onLogin}>Inloggen</Button>}</div></div>}
         {!data&&!error&&<p role="status">Meldingen laden…</p>}
         {data&&<>
+          <PushSettings/>
           <div className="rounded-xl bg-slate-50 p-3 text-sm"><p>{data.status}</p><p className="mt-1 text-xs text-slate-600">Gegevens opgehaald: {date(data.sourceFetchedAt)} · controle: {date(data.checkedAt)}. Ophalen bij Lunch Flow garandeert geen nieuwe verversing bij de bank.</p></div>
           <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:!data.preferences.enabled,mutedLabels:data.preferences.mutedLabels})}>{data.preferences.enabled?'Monitoring pauzeren':'Monitoring hervatten'}</Button><Button disabled={busy} onClick={()=>void refresh()}>Controleren</Button></div>
           {!visible.some(n=>n.active)&&<p className="text-sm">Er zijn nu geen nieuwe signalen. Dat betekent niet dat alle uitgaven bekend of gecontroleerd zijn.</p>}
