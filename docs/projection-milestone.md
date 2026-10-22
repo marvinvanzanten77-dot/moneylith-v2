@@ -69,3 +69,11 @@ Deze controles betreffen de lokale implementatie. Deze mijlpaal is niet gepublic
 | AI-context en servercontrole | `src/ai/context.ts`, `src/components/AiAssistantCard.tsx`, `api/moneylith/analyse.ts` |
 | Regressies | `tests/projection.test.tsx` (nieuw), `tests/chat.test.tsx`, `tests/input-readiness.test.tsx` |
 | Audit en opleververslag | `docs/projection-milestone.md` (nieuw) |
+
+## Visuele vooruitblik
+
+De gedeelde `ProjectionView` opent nu een grafiek met huidige verwachting, best case en worst case voor 7/30/90 dagen. `ProjectionDetails` bewaart de bestaande formulieren, betalingenlijst en eigen scenario’s achter een uitklapbare bediening. Dezelfde projectie-engine berekent alle lijnen; de dagelijkse reeks is uitsluitend voor visualisatie en wordt niet als extra tekst naar de AI gestuurd.
+
+De tegenvaller start op verzoek met een fictieve €150 per maand, vanaf de getoonde datum. Dit is een scenario-uitgave, geen boeking of reservering in de administratie. Meevallers blijven leeg totdat de gebruiker een netto bedrag kiest. Beide aannames zijn aanpasbaar, eenmalig of maandelijks, en tijdelijk. Wissen verwijdert ze; herladen begint opnieuw met de standaardtegenvaller. Onbekende basisgegevens blijven onbekend. Een bestaand eigen scenario geldt als gedeelde basis voor alle lijnen.
+
+De bestaande AI-ideeënkaart ondersteunt ook `income-ideas` op dezelfde beveiligde analyse-route, voor persoonlijke of zakelijke context. Zij geeft bemoedigende ideeën voor website- en app-opdrachten zonder prijzen of gegarandeerde inkomsten. Alleen modus en maand gaan naar dit doel; financiële brongegevens en chatgeschiedenis worden niet meegestuurd. Bij fouten blijft een echte foutmelding zichtbaar. Een idee wordt nooit automatisch als inkomsten geboekt.

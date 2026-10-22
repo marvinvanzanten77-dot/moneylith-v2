@@ -306,6 +306,7 @@ export function project(input: Input, scenario: Scenario | null = null) {
           : null,
     })),
     horizons,
+    timeline: days,
     lowest,
     tightestWeek,
     pressureWeeks: weeks.filter((w) => w.minimum !== null && w.minimum < 0),
