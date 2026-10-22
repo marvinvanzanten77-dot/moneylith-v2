@@ -42,3 +42,19 @@ test("the initial screen presents pots and a single classification entry, not ba
   assert.ok(html.includes('data-spending-overview'));assert.ok(html.includes('Je uitgavenpotjes'));assert.ok(html.includes('Help met indelen'));
   assert.ok(!html.includes('PRIVATE BANK DESCRIPTION'));assert.ok(!html.includes('data-bank-patterns'));assert.ok(!html.includes('Eigen regels beheren'));
 });
+test("the spending coach module graph loads as production Node ESM without the tsx resolver", async () => {
+  const fs = await import("node:fs/promises"), path = await import("node:path"), os = await import("node:os"), url = await import("node:url"), ts = await import("typescript");
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), "moneylith-coach-esm-"));
+  try {
+    await fs.writeFile(path.join(folder,"package.json"),'{"type":"module"}');
+    for (const file of ["ai/spendingCoach", "bank/spending", "bank/classificationRules"]) {
+      const source = await fs.readFile(new URL(`../src/${file}.ts`, import.meta.url), "utf8");
+      const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+      const destination = path.join(folder,file+'.js'); await fs.mkdir(path.dirname(destination),{recursive:true}); await fs.writeFile(destination,compiled);
+    }
+    // A child Node process deliberately omits --import tsx, matching Vercel's ESM resolution.
+    const { execFileSync } = await import("node:child_process");
+    const output = execFileSync(process.execPath,["--input-type=module","-e",`const module = await import(${JSON.stringify(url.pathToFileURL(path.join(folder,'ai/spendingCoach.js')).href)}); console.log(typeof module.buildSpendingCoach);`],{encoding:"utf8"});
+    assert.equal(output.trim(),"function");
+  } finally { await fs.rm(folder,{recursive:true,force:true}); }
+});

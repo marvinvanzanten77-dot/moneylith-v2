@@ -1,5 +1,5 @@
 import type { MoneylithTransaction, FixedCostManualItem } from "../types";
-import { isOperatingTransaction, type BankRuleSettings } from "./classificationRules";
+import { isOperatingTransaction, type BankRuleSettings } from "./classificationRules.js";
 export type SpendingRow = { id: string; date: string; cents: number; label: string | null };
 export type SpendingPot = { label: string; cents: number; count: number; share: number; previousCents: number | null };
 const unknown = /^(onbekend|uncategorized|uncategorised|overig|other|geen categorie)$/i;
