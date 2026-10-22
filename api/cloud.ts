@@ -1,4 +1,4 @@
-import {pushConfig,registerDevice,removeDevice,deviceExists,testDevice,dispatchPush,PushInputError} from '../server/push/service.js';
+import {pushConfig,registerDevice,removeDevice,deviceExists,testDevice,PushInputError} from '../server/push/service.js';
 import { InvalidMonitoringAction } from '../src/monitoring/engine.js';
 import { monitorAccount } from '../server/monitoring/store.js';
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -71,8 +71,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!update || !["read", "dismiss", "preferences"].includes(String(update.action))) return fail(400, "Ongeldige meldingsactie.");
       }
       const monitoring = await monitorAccount(config.email, body.update);
-      // Delivery problems never hide the monitoring result or alter financial data.
-      try { await dispatchPush(config.email,monitoring); } catch { /* Scheduled retry. */ }
       return res.status(200).json({ ok: true, monitoring });
     }
     if (req.method === "GET" && action === "snapshot") {
