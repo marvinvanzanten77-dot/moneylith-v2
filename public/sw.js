@@ -18,7 +18,7 @@ self.addEventListener('push', event => {
   let test = false;
   try { test = event.data?.json()?.type === 'test'; } catch { /* Always display a safe generic notification. */ }
   event.waitUntil(self.registration.showNotification('Moneylith', {
-    body: test ? 'Je testmelding is aangekomen. Fijn, je bent bereikbaar!' : 'Er staat een nieuwe tip voor je klaar. Bekijk rustig wat bij je past.',
+    body: test ? 'Je testmelding is aangekomen. Fijn, je bent bereikbaar!' : 'Er staat een nieuwe melding voor je klaar. Bekijk rustig wat bij je past.',
     icon: '/icons/moneylith-192.png', badge: '/icons/moneylith-192.png',
     tag: test ? 'moneylith-test' : 'moneylith-monitoring',
     data: {url: '/?app=1&view=notifications#persoonlijk'}

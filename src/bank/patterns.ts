@@ -1,4 +1,4 @@
-import { matchingBankRule, emptyBankRules, type BankRuleSettings } from "./classificationRules";
+import { matchingBankRule, emptyBankRules, type BankRuleSettings } from "./classificationRules.js";
 import type { FixedCostManualItem, IncomeItem, MoneylithTransaction } from "../types";
 export type PatternKind = "income" | "fixed" | "variable" | "transfer" | "financing" | "ignore";
 export type PatternDecision = { kind: PatternKind; label: string; targetId?: string };

@@ -1,3 +1,4 @@
+import {syncBankAccount} from '../server/lunchflow/accountSync.js';
 import {pushConfig,registerDevice,removeDevice,deviceExists,testDevice,PushInputError} from '../server/push/service.js';
 import { InvalidMonitoringAction } from '../src/monitoring/engine.js';
 import { monitorAccount } from '../server/monitoring/store.js';
@@ -56,6 +57,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, email });
     }
     if (!authenticated) return fail(401, "Log in met je Moneylith-account.");
+    if(req.method === "POST" && action === "bank-scan") {
+      const scan=await syncBankAccount(config.email,config.apiKey);
+      await monitorAccount(config.email);
+      return res.status(200).json({ok:true,scan});
+    }
     if (req.method === "POST" && action === "push") {
       const configPush=pushConfig();
       if(body.operation==='status')return res.status(200).json({ok:true,publicKey:configPush?.publicKey??null,subscribed:body.endpoint?await deviceExists(config.email,body.endpoint):false});

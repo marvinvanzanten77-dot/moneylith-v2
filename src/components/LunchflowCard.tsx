@@ -1,3 +1,4 @@
+import {prepareCloudReload} from '../storage/cloudSync';
 import { useEffect, useRef, useState } from "react";
 import { SurfaceCard, Button, Select } from "./WorkspaceUI";
 import type { MoneylithAccount } from "../types";
@@ -14,7 +15,7 @@ export function LunchflowCard({
   remoteAccess,
 }: {
   accounts: MoneylithAccount[];
-  remoteAccess?: { endpoint: string; onExpired: () => void };
+  remoteAccess?: { endpoint: string; onExpired: () => void; accountAccess?: boolean };
   onApply: (snapshots: LunchSnapshot[], mappings: LunchMapping[]) => Report;
 }) {
   const [remote, setRemote] = useState<LunchAccount[]>([]),
@@ -90,6 +91,7 @@ export function LunchflowCard({
             targetId: selection[providerId],
           })),
         );
+        if(remoteAccess?.accountAccess) await prepareCloudReload();
         setReports(result);
         setSelection((prev) =>
           Object.fromEntries(

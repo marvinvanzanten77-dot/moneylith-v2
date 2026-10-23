@@ -16,7 +16,7 @@ The service worker caches **only `/offline.html`**. HTML navigation is network-f
 
 ## Scope and validation
 
-This is an installable web app, not an App Store/Google Play release. Web Push can be enabled per device in Meldingen. A production cron checks the last saved financial snapshot three times daily; this does not fetch new bank transactions. See push-notifications.md. Physical-device installation must still be checked by the owner on their own phone; browser emulation cannot demonstrate an actual iOS/Android home-screen installation.
+This is an installable web app, not an App Store/Google Play release. Web Push can be enabled per device in Meldingen. A production cron fetches and processes linked Lunch Flow accounts three times daily. Bankgegevens bijwerken runs the same account scan on demand. Open account-connected devices check cloud revisions every thirty seconds and on returning to the app. Disjoint changes merge; same-field conflicts retain local edits and require resolution. See push-notifications.md. Physical-device installation must still be checked by the owner on their own phone; browser emulation cannot demonstrate an actual iOS/Android home-screen installation.
 
 Regression checks cover compact/full selection, unknown versus zero, seven-day engine reuse, business separation, retrieved bank balances, manifest/icon hosting, and a worker harness proving only public offline content is cached. Browser checks cover new-user entry, essential tabs, mode switching, existing forms/account/bank access, reload, multiple narrow widths, desktop layout, manifest validity and offline/reconnect behavior.
 

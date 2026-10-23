@@ -1,3 +1,4 @@
+import {BankScanButton} from '../pwa/BankScanButton';
 import { useEffect, useState, useRef, type ComponentProps } from "react";
 import { LunchflowCard } from "./LunchflowCard";
 import { SurfaceCard, Input, Button } from "./WorkspaceUI";
@@ -128,10 +129,12 @@ export function LunchflowAccess(props: ComponentProps<typeof LunchflowCard>) {
               Testtoegang sluiten
             </Button>}
           </div>
+          {accountAccess&&<BankScanButton/>}
           <LunchflowCard
             {...props}
             remoteAccess={{
               endpoint,
+              accountAccess,
               onExpired: () => {
                 setAuthenticated(false);
                 setError("Je testtoegang is verlopen. Log opnieuw in.");

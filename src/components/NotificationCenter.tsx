@@ -1,3 +1,4 @@
+import {BankScanButton} from '../pwa/BankScanButton';
 import {PushSettings} from '../pwa/PushSettings';
 import {useEffect,useRef,useState} from 'react';
 import {cloudRequest} from '../storage/cloudSync';
@@ -36,7 +37,8 @@ export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOp
     check();const timer=setInterval(check,60000);
     document.addEventListener('visibilitychange',check);
     window.addEventListener('moneylith:cloud-saved',check);
-    return()=>{alive.current=false;clearInterval(timer);document.removeEventListener('visibilitychange',check);window.removeEventListener('moneylith:cloud-saved',check);};
+    window.addEventListener('moneylith:cloud-restored',check);
+    return()=>{alive.current=false;clearInterval(timer);document.removeEventListener('visibilitychange',check);window.removeEventListener('moneylith:cloud-saved',check);window.removeEventListener('moneylith:cloud-restored',check);};
     // ApplicationLayout mounts this component with a separate mode key.
   },[]);
   const visible=data?.notices.filter(n=>!n.dismissedAt&&!data.preferences.mutedLabels.includes(n.label))??[];
@@ -53,14 +55,14 @@ export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOp
         {error&&<div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm"><p>{error}</p><div className="mt-2 flex gap-2"><Button onClick={()=>void refresh()} disabled={busy}>Opnieuw proberen</Button>{!data&&onLogin&&<Button onClick={onLogin}>Inloggen</Button>}</div></div>}
         {!data&&!error&&<p role="status">Meldingen laden…</p>}
         {data&&<>
-          <PushSettings/>
+          <PushSettings/><BankScanButton/>
           <div className="rounded-xl bg-slate-50 p-3 text-sm"><p>{data.status}</p><p className="mt-1 text-xs text-slate-600">Gegevens opgehaald: {date(data.sourceFetchedAt)} · controle: {date(data.checkedAt)}. Ophalen bij Lunch Flow garandeert geen nieuwe verversing bij de bank.</p></div>
-          <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:!data.preferences.enabled,mutedLabels:data.preferences.mutedLabels})}>{data.preferences.enabled?'Monitoring pauzeren':'Monitoring hervatten'}</Button><Button disabled={busy} onClick={()=>void refresh()}>Controleren</Button></div>
+          <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:!data.preferences.enabled,mutedLabels:data.preferences.mutedLabels})}>{data.preferences.enabled?'Monitoring pauzeren':'Monitoring hervatten'}</Button><Button disabled={busy} onClick={()=>void refresh()}>Meldingen verversen</Button></div>
           {!visible.some(n=>n.active)&&<p className="text-sm">Er zijn nu geen nieuwe signalen. Dat betekent niet dat alle uitgaven bekend of gecontroleerd zijn.</p>}
           {listed.slice(0,limit).map(n=><article key={n.id} className="space-y-2 rounded-xl border border-slate-200 p-3">
             <p className="text-xs text-slate-500">{n.month} · {!n.active?'Niet meer actueel':n.readAt?'Gelezen':'Nieuw'}</p><h3 className="font-semibold">{n.title}</h3><p className="text-sm">{n.message}</p>
-            <div className="flex flex-wrap gap-2">{!n.readAt&&<Button disabled={busy} onClick={()=>void refresh({action:'read',id:n.id})}>Gelezen</Button>}<Button disabled={busy} onClick={()=>void refresh({action:'dismiss',id:n.id})}>Afhandelen</Button><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:data.preferences.enabled,mutedLabels:[...data.preferences.mutedLabels,n.label]})}>Minder over dit potje</Button></div>
-            {n.active&&data.preferences.enabled&&<NoticeAdvice key={n.id+n.updatedAt} notice={n}/>}
+            <div className="flex flex-wrap gap-2">{!n.readAt&&<Button disabled={busy} onClick={()=>void refresh({action:'read',id:n.id})}>Gelezen</Button>}<Button disabled={busy} onClick={()=>void refresh({action:'dismiss',id:n.id})}>Afhandelen</Button>{n.kind!=='sync'&&<Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:data.preferences.enabled,mutedLabels:[...data.preferences.mutedLabels,n.label]})}>Minder over dit potje</Button>}</div>
+            {n.active&&n.kind!=='sync'&&data.preferences.enabled&&<NoticeAdvice key={n.id+n.updatedAt} notice={n}/>}
           </article>)}
           <div className="flex flex-wrap gap-2">{listed.length>limit&&<Button onClick={()=>setLimit(v=>v+10)}>Meer meldingen</Button>}{visible.some(n=>!n.active)&&<Button onClick={()=>setHistory(v=>!v)}>{history?'Alleen actuele signalen':'Eerdere signalen bekijken'}</Button>}</div>
           {!!data.preferences.mutedLabels.length&&<details><summary className="cursor-pointer text-sm">Gedempte potjes ({data.preferences.mutedLabels.length})</summary><div className="mt-2 space-y-2">{data.preferences.mutedLabels.map(label=><div key={label} className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{label}</span><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:data.preferences.enabled,mutedLabels:data.preferences.mutedLabels.filter(l=>l!==label)})}>Weer melden</Button></div>)}</div></details>}

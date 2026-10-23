@@ -1,3 +1,5 @@
+import {processBankSync} from "./bank/processSync";
+import {collectCloudState} from "./storage/cloudState";
 import {useCompactMode} from "./mobile/useCompactMode";
 import {mobileBankBalance} from "./mobile/bankBalance";
 import { spendingRows } from "./bank/spending";
@@ -5,8 +7,8 @@ import { isOperatingTransaction, emptyBankRules, type BankRuleSettings } from ".
 import { BankSpendingOverview } from "./components/BankSpendingOverview";
 import { applyPatternDecision, classifyBankTransactions, indexBankPatterns, type PatternDecisions } from "./bank/patterns";
 import { LunchflowAccess } from "./components/LunchflowAccess";
-import { prefillFinancialImport } from "./bank/financialImport";
-import { mergeLunchflow, persistLunchflow } from "./bank/lunchflowMerge";
+import type { prefillFinancialImport } from "./bank/financialImport";
+import { persistLunchflow } from "./bank/lunchflowMerge";
 import { personalInput } from "./projection/adapters";
 import { emptyOptions, today, type Scenario as ProjectionScenario } from "./projection/engine";
 import { NavigationHint } from "./components/NavigationHint";
@@ -2194,12 +2196,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     if (normalizedStep === "bank") return (
       <div className="space-y-4">
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
-        const result = mergeLunchflow(accounts, transactions, snapshots, mappings);
-        result.transactions = classifyBankTransactions(result.transactions, bankPatternDecisions, bankRules);
-        const financial = result.reports.some(r => r.ok)
-          ? prefillFinancialImport(result.transactions.filter(t => bankRules.accountRoles[t.accountId] !== "business"), incomeItems, fixedCostManualItems, bankImportSeen, today(),
-              mergedFixedCostItems.some(i => i.isFixed && !i.isIgnored))
-          : undefined;
+        const {result,financial} = processBankSync(collectCloudState(window.localStorage), snapshots, mappings, today());
         persistLunchflow(window.localStorage, result, financial);
         setAccounts(result.accounts);
         setTransactions(result.transactions);

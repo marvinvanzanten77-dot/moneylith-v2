@@ -62,6 +62,6 @@ export function PushSettings(){
       </div>
     </>}
     {message&&<p className="text-sm" role="status">{message}</p>}{error&&<p className="text-sm text-amber-800" role="alert">{error}</p>}
-    <p className="text-xs text-slate-600">Drie keer per dag controleren we je laatst opgeslagen gegevens voor pushmeldingen. Synchroniseer je bank zelf voor nieuwe transacties. Bestaande meldingen van vóór het aanzetten worden niet alsnog verstuurd. Uitloggen zet push op dit apparaat uit.</p>
+    <p className="text-xs text-slate-600">Drie keer per dag halen we gegevens van je gekoppelde rekeningen op en verwerken die in je administratie. Je kunt ook zelf bankgegevens bijwerken. Lunch Flow kan achterlopen op de bank. Bestaande meldingen van vóór het aanzetten worden niet alsnog verstuurd. Uitloggen zet push op dit apparaat uit.</p>
   </section>;
 }

@@ -4,7 +4,7 @@ import { emptyBankRules, validateBankRules } from '../bank/classificationRules.j
 import { spendingRows, spendingSummary } from '../bank/spending.js';
 
 export type Signal = {
-  id: string; scope: 'personal'; kind: 'budget' | 'pace' | 'progress' | 'classification';
+  id: string; scope: 'personal'; kind: 'budget' | 'pace' | 'progress' | 'classification' | 'sync';
   month: string; label: string; title: string; message: string;
   observedCents: number; referenceCents: number | null;
 };
@@ -32,6 +32,10 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   const fetchedAt=timestamps.length===selected.length && timestamps.length ? timestamps.sort()[0]:null;
   const signals:Signal[]=[];
   if(!preferences.enabled)return {signals,fetchedAt,status:'Monitoring gepauzeerd.'};
+  const scan=read<import('../bank/processSync.js').BankScan|null>(state,'moneylith.personal.bankScan.v1',null);
+  if(scan&&typeof scan.id==='string'&&typeof scan.message==='string'&&Number.isFinite(Date.parse(scan.at))&&now.getTime()-Date.parse(scan.at)<2*86400000){
+    signals.push({id:`personal:sync:${scan.id}`,scope:'personal',kind:'sync',month,label:'Bankcontrole',title:scan.failed?'Bankcontrole: aandacht nodig':'Bankcontrole uitgevoerd',message:scan.message,observedCents:0,referenceCents:null});
+  }
   if(!fetchedAt || Date.parse(fetchedAt)>now.getTime()+300000 || now.getTime()-Date.parse(fetchedAt)>72*3600000)
     return {signals,fetchedAt,status:'Haal eerst recente bankgegevens op. Er worden nu geen nieuwe uitgavensignalen gemaakt.'};
   const ids=new Set(selected.map(a=>a.id));

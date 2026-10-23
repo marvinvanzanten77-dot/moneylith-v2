@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -21,6 +21,11 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: Up
   };
 
   const [value, setValue] = useState<T>(readValue);
+  useEffect(()=>{
+    const refresh=()=>setValue(readValue());
+    window.addEventListener('moneylith:cloud-restored',refresh);
+    return()=>window.removeEventListener('moneylith:cloud-restored',refresh);
+  },[key]);
 
   const setStoredValue = (nextValue: Updater<T>) => {
     const valueToStore = typeof nextValue === "function" ? (nextValue as (prev: T) => T)(value) : nextValue;

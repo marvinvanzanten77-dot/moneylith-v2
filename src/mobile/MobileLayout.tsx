@@ -1,3 +1,4 @@
+import {BankScanButton} from '../pwa/BankScanButton';
 import {useEffect,useLayoutEffect,useState} from 'react';
 import type {ApplicationLayoutProps} from '../components/ApplicationLayout';
 import {NotificationCenter} from '../components/NotificationCenter';
@@ -25,6 +26,7 @@ export function MobileLayout(props:ApplicationLayoutProps&{onFull:()=>void}){
       {online&&reconnected&&<div role="status" className="mb-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-900">Weer verbonden. Herlaad om je accountgegevens te synchroniseren. <Button onClick={()=>location.reload()}>Herlaad</Button></div>}
       <NotificationCenter key={mode} mode={mode} onLogin={()=>{onLogin?.();setView('content');}} hideTrigger expanded={view==='notifications'} onOpen={()=>setView('notifications')} onClose={()=>setView('home')} onUnread={setUnread}/>
       <section data-app-content className="min-w-0 space-y-4">
+        {view==='home'&&mode==='personal'&&<BankScanButton/>}
         {view==='home'&&(mobile?<MobileOverview input={mobile.input} bank={mobile.bank} onNavigate={navigate}/>:<SurfaceCard><p>Open een onderdeel om je administratie te bekijken.</p></SurfaceCard>)}
         {view==='content'&&<><h1 className="text-xl font-semibold">{step}</h1>{children}</>}
         {view==='guide'&&<><h1 className="text-xl font-semibold">Je AI-assistent</h1><div data-app-guide>{guide}</div></>}
