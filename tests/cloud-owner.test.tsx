@@ -90,7 +90,7 @@ test("owner account activation, durable storage, conflict protection and bank au
     Object.assign(process.env, previous);
   }
 });
-test("cloud snapshot allowlist preserves personal, business and chat separation; excludes credentials and demo", () => {
+test("cloud snapshot allowlist preserves personal, business and chat separation; excludes credentials and demo", async () => {
   for (const key of ["moneylith.business.demo.v1", "moneylith.cloud.sync.v1", "moneylith.personal.access_token", "unrelated"])
     assert.equal(cloudKey(key), false);
   const map = new Map([
@@ -106,10 +106,11 @@ test("cloud snapshot allowlist preserves personal, business and chat separation;
   const previous = collectCloudState(storage);
   assert.equal(Object.keys(previous).length, 4);
   assert.equal(validateCloudState({ "moneylith.personal.income": "invalid json" }), false);
-  restoreCloudState(storage, { "moneylith.personal.income": "[1]" });
+  let recovery: unknown;
+  await restoreCloudState(storage, { "moneylith.personal.income": "[1]" }, async state => { recovery = state; });
   assert.equal(map.get("unrelated"), "keep");
   assert.equal(map.has("moneylith.business.real.v1"), false);
-  assert.deepEqual(JSON.parse(map.get("moneylith.cloud.localRecovery")!), previous);
+  assert.deepEqual(recovery, previous);
 });
 test("snapshot encryption requires configuration and authenticates ciphertext", () => {
   const prior = process.env.CLOUD_ENCRYPTION_KEY;

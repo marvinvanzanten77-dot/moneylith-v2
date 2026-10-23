@@ -1,3 +1,4 @@
+import { saveCloudRecovery } from "./cloudRecovery.js";
 export type CloudState = Record<string, string>;
 const legacy = new Set([
   "selected-month", "month-focus", "income-netto", "income-netto-business",
@@ -30,17 +31,26 @@ export function collectCloudState(storage: Storage): CloudState {
   }
   return Object.fromEntries(Object.entries(state).sort(([a], [b]) => a.localeCompare(b)));
 }
-export function restoreCloudState(storage: Storage, state: CloudState) {
+export async function restoreCloudState(storage: Storage, state: CloudState, saveRecovery = saveCloudRecovery) {
   if (!validateCloudState(state)) throw Error("Ongeldige cloudgegevens.");
   const previous = collectCloudState(storage);
-  // Keep one local recovery copy outside the uploaded financial keys.
-  storage.setItem("moneylith.cloud.localRecovery", JSON.stringify(previous));
+  // Persist the recovery outside localStorage before changing any financial keys.
+  const legacyKey = "moneylith.cloud.localRecovery";
+  const legacy = storage.getItem(legacyKey);
+  try { await saveRecovery(previous, legacy); } catch {
+    throw Error("De lokale herstelkopie kon niet worden bewaard. Er is niets overschreven. Maak ruimte vrij op je apparaat en probeer opnieuw.");
+  }
+  // An edit may have happened while IndexedDB was committing. Never overwrite it.
+  if (JSON.stringify(collectCloudState(storage)) !== JSON.stringify(previous))
+    throw Error("Je lokale gegevens zijn ondertussen gewijzigd. Probeer de cloudversie opnieuw te laden; er is niets overschreven.");
+  // The old copy is now durable in IndexedDB too, so reclaim its limited storage.
+  storage.removeItem(legacyKey);
   const replace = (value: CloudState) => {
     for (const key of Object.keys(collectCloudState(storage))) storage.removeItem(key);
     for (const [key, raw] of Object.entries(value)) storage.setItem(key, raw);
   };
   try { replace(state); } catch {
-    try { replace(previous); } catch { /* recovery copy remains available */ }
-    throw Error("Herstellen mislukt. Je vorige lokale administratie is als herstelkopie bewaard.");
+    try { replace(previous); } catch { /* durable IndexedDB recovery remains available */ }
+    throw Error("Herstellen mislukt. Je vorige lokale administratie is als herstelkopie op dit apparaat bewaard.");
   }
 }

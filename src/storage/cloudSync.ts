@@ -49,7 +49,7 @@ export async function startCloudSync() {
       if (localChanged && (!previous || previous.revision !== remote.revision))
         throw Error("Dit apparaat en de cloud bevatten verschillende wijzigingen. Kies bij Instellingen ‘Cloudversie laden’; je lokale versie wordt eerst bewaard. Er is niets overschreven.");
       if (!localChanged) {
-        restoreCloudState(localStorage, remote.state);
+        await restoreCloudState(localStorage, remote.state);
         remember({ email: auth.email, revision: remote.revision, hash: remoteHash });
         return true;
       }
@@ -91,7 +91,7 @@ export async function loadCloudVersion() {
   if (!auth.authenticated) throw Error("Log eerst in.");
   const remote = await cloudRequest("snapshot");
   if (!validateCloudState(remote.state)) throw Error("Er is nog geen cloudadministratie.");
-  restoreCloudState(localStorage, remote.state);
+  await restoreCloudState(localStorage, remote.state);
   remember({ email: auth.email, revision: remote.revision, hash: await fingerprint(remote.state) });
   window.location.reload();
 }
@@ -124,7 +124,7 @@ export async function refreshCloudChanges(){
     // Read after the network request, so edits made while fetching are included.
     const local=collectCloudState(localStorage);
     const merged=mergeCloudVersions(baseState,local,remote.state);
-    restoreCloudState(localStorage,merged);
+    await restoreCloudState(localStorage,merged);
     baseState=remote.state;
     remember({...current,revision:remote.revision,hash:remoteHash});
     window.dispatchEvent(new Event('moneylith:cloud-restored'));
