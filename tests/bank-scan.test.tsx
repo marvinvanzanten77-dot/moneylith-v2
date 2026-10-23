@@ -30,11 +30,14 @@ test('shared processing routes latest salary, bank balance and categorized purch
  assert.equal(JSON.stringify(state),before);
  const repeat=processBankSync(r.state,[snapshot],mappings,'2026-10-23');assert.deepEqual(repeat.state,r.state);assert.equal(repeat.result.reports[0].added,0);
 });
-test('failed snapshots preserve old balances and income; business-role income is excluded',()=>{
+test('failed snapshots preserve old balances; business income needs an explicit personal evidence link',()=>{
  const broken={...snapshot,balance:{ok:false as const,error:{code:'network' as const,message:'Niet bereikbaar'}}};
  const result=processBankSync(state,[broken],mappings,'2026-10-23');assert.equal(result.state['moneylith.personal.accounts'],state['moneylith.personal.accounts']);assert.equal(result.state['moneylith.personal.income'],state['moneylith.personal.income']);
  const business={...state,'moneylith.personal.bankRules.v1':JSON.stringify({rules:[],accountRoles:{a:'business'}})};
- const excluded=processBankSync(business,[snapshot],mappings,'2026-10-23');assert.equal(excluded.state['moneylith.personal.income'],state['moneylith.personal.income']);
+ const linked=processBankSync(business,[snapshot],mappings,'2026-10-23');assert.equal(JSON.parse(linked.state['moneylith.personal.income'])[0].bedrag,2100);
+ const manual={...business,'moneylith.personal.income':JSON.stringify([{id:'manual',naam:'Handmatig',bedrag:2000}])};
+ const excluded=processBankSync(manual,[snapshot],mappings,'2026-10-23');assert.equal(excluded.state['moneylith.personal.income'],manual['moneylith.personal.income']);
+ assert.equal(linked.state['moneylith.personal.bankRules.v1'],business['moneylith.personal.bankRules.v1']);
 });
 test('cross-device reconciliation merges separate fields, deletions and identical edits; conflicts preserve originals',()=>{
  const base={a:'1',b:'2'},local={a:'3',b:'2'},remote={a:'1',b:'4'};

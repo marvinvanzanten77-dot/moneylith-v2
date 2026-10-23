@@ -1,6 +1,6 @@
 import {mergeLunchflow,type LunchMapping} from './lunchflowMerge.js';
 import {classifyBankTransactions,type PatternDecisions} from './patterns.js';
-import {prefillFinancialImport} from './financialImport.js';
+import {prefillFinancialImport,refreshLatestIncome} from './financialImport.js';
 import {emptyBankRules,validateBankRules} from './classificationRules.js';
 import type {LunchSnapshot} from './lunchflowTypes.js';
 import type {CloudState} from '../storage/cloudState.js';
@@ -21,6 +21,12 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
  const result=mergeLunchflow(accounts,txs,snapshots,mappings);
  result.transactions=classifyBankTransactions(result.transactions,decisions,rules);
  const financial=result.reports.some(r=>r.ok)?prefillFinancialImport(result.transactions.filter(t=>rules.accountRoles[t.accountId]!=='business'),income,fixed,seen,asOf,detected.some(i=>i.isFixed&&!i.isIgnored)):undefined;
+ // An explicitly linked personal salary may arrive on a business-designated bank account.
+ // Respect that opt-in link without auto-importing other business income into Personal.
+ if(financial){
+  financial.income=refreshLatestIncome(result.transactions,financial.income,asOf);
+  financial.updatedIncome=income.filter((item,index)=>JSON.stringify(item)!==JSON.stringify(financial.income[index])).length;
+ }
  const next={...state};
  next['moneylith.personal.accounts']=JSON.stringify(result.accounts);
  next['moneylith.personal.transactions']=JSON.stringify(result.transactions);
