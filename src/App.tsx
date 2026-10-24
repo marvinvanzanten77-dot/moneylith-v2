@@ -2107,7 +2107,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
     if (!isBusinessVariant && (compactMode || accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
-      return <BankSpendingOverview asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
+      return <BankSpendingOverview projection={personalProjection} asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
           persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { income: incomeItems, fixedCosts: fixedCostManualItems, seen: bankImportSeen, rules });

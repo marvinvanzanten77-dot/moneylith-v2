@@ -47,7 +47,7 @@ test("the spending coach module graph loads as production Node ESM without the t
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), "moneylith-coach-esm-"));
   try {
     await fs.writeFile(path.join(folder,"package.json"),'{"type":"module"}');
-    for (const file of ["ai/spendingCoach", "bank/spending", "bank/classificationRules"]) {
+    for (const file of ["ai/spendingCoach", "bank/spending", "bank/classificationRules", "bank/choiceGuidance"]) {
       const source = await fs.readFile(new URL(`../src/${file}.ts`, import.meta.url), "utf8");
       const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
       const destination = path.join(folder,file+'.js'); await fs.mkdir(path.dirname(destination),{recursive:true}); await fs.writeFile(destination,compiled);

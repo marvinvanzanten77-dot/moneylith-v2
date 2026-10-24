@@ -1,3 +1,4 @@
+import {choiceLimitsKey, validateChoiceLimits, choiceProfile} from '../bank/choiceGuidance.js';
 import type { FixedCostManualItem, MoneylithAccount, MoneylithTransaction } from '../types';
 import type { CloudState } from '../storage/cloudState.js';
 import { emptyBankRules, validateBankRules } from '../bank/classificationRules.js';
@@ -39,13 +40,21 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   if(!fetchedAt || Date.parse(fetchedAt)>now.getTime()+300000 || now.getTime()-Date.parse(fetchedAt)>72*3600000)
     return {signals,fetchedAt,status:'Haal eerst recente bankgegevens op. Er worden nu geen nieuwe uitgavensignalen gemaakt.'};
   const ids=new Set(selected.map(a=>a.id));
+  const storedLimits=read<unknown>(state,choiceLimitsKey,{});
+  const limits=validateChoiceLimits(storedLimits)?storedLimits:{};
   const rows=spendingRows(transactions.filter(t=>ids.has(t.accountId)),rules,fixed);
   const summary=spendingSummary(rows,month,asOf);
-  const add=(kind:Signal['kind'],label:string,title:string,message:string,observedCents:number,referenceCents:number|null)=>{
+  const add=(kind:Signal['kind'],label:string,title:string,message:string,observedCents:number,referenceCents:number|null,phase='')=>{
     if(!label.trim()||label.length>150||!Number.isSafeInteger(observedCents)||preferences.mutedLabels.includes(label))return;
-    signals.push({id:`personal:${month}:${kind}:${encodeURIComponent(label)}`,scope:'personal',kind,month,label,title,message,observedCents,referenceCents});
+    signals.push({id:`personal:${month}:${kind}:${encodeURIComponent(label)}${phase?":"+phase:""}`,scope:'personal',kind,month,label,title,message,observedCents,referenceCents});
   };
   for(const pot of summary.pots){
+    if(Object.hasOwn(limits,pot.label)){
+      const limit=limits[pot.label];
+      if(pot.cents>limit)add('budget',pot.label,`${pot.label}: boven je keuzegrens`,`${euros(pot.cents)} uitgegeven bij een maandgrens van ${euros(limit)}. Ook een waardevolle aankoop moet financieel passen. ${choiceProfile(pot.label).tip}`,pot.cents,limit,'over');
+      else if(limit>0&&pot.cents>=Math.ceil(limit*.8))add('budget',pot.label,`${pot.label}: je keuzegrens komt in zicht`,`${euros(pot.cents)} van ${euros(limit)} gebruikt. Binnen deze grens blijft ${euros(limit-pot.cents)} over; dit is geen bevestiging dat het betaalbaar is.`,pot.cents,limit,'near');
+      continue;
+    }
     const budgets=fixed.filter(f=>f.budgetCategory===pot.label&&f.paymentRoute!=='withheld'&&f.amountEntered!==false&&Number.isFinite(f.bedrag)&&f.bedrag>=0&&f.budgetSince&&f.budgetSince<=month);
     if(budgets.length>1)continue; // An ambiguous budget is not a reliable comparison.
     if(budgets.length===1){

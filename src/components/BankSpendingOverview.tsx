@@ -1,3 +1,7 @@
+import { ChoiceGuidance } from "./ChoiceGuidance";
+import { choiceLimitsKey, validateChoiceLimits, type ChoiceLimits } from "../bank/choiceGuidance";
+import { project, type Input as ProjectionInput } from "../projection/engine";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 import { potColors } from "../data/potColors";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BankPatterns, type BankPatternsProps } from "./BankPatterns";
@@ -38,9 +42,23 @@ function ClassificationModule({ props, groups, labels, onClose }: { props: BankP
     {advanced && <div className="mt-4"><BankPatterns {...props} /></div>}
   </dialog>;
 }
-export function BankSpendingOverview(props: BankPatternsProps) {
+export function BankSpendingOverview(props: BankPatternsProps & {projection?: ProjectionInput}) {
   const asOf = props.asOf ?? new Date().toISOString().slice(0,10);
   const [month, setMonth] = useState(asOf.slice(0,7)), [classifying, setClassifying] = useState(false);
+  const [storedLimits,setLimits] = useLocalStorage<ChoiceLimits>(choiceLimitsKey,{});
+  const limits = validateChoiceLimits(storedLimits) ? storedLimits : {};
+  const saveLimit = (label:string,cents:number|null) => {
+    const next={...limits}; if(cents===null)delete next[label];else next[label]=cents;
+    if(!validateChoiceLimits(next))throw Error("Ongeldige maandgrens.");
+    // Surface a storage failure before updating the visible control.
+    localStorage.setItem(choiceLimitsKey,JSON.stringify(next));setLimits(next);
+  };
+  const room=useMemo(()=>{
+    if(!props.projection||props.projection.scope!=='personal'||props.projection.asOf!==asOf)return null;
+    const projection=project(props.projection),days=projection.timeline.slice(0,30);
+    if(projection.missing.length||days.some(d=>d.available===null)||projection.opening===null||projection.reserve===null)return null;
+    return Math.min(projection.opening-projection.reserve,...days.map(d=>d.available!));
+  },[props.projection,asOf]);
   const rows = useMemo(() => spendingRows(props.transactions, props.rules ?? emptyBankRules, props.fixedCosts), [props.transactions, props.rules, props.fixedCosts]);
   const visibleRows = useMemo(() => spendingAboveBudgets(rows, props.fixedCosts), [rows, props.fixedCosts]);
   const summary = useMemo(() => spendingSummary(visibleRows, month, asOf), [visibleRows, month, asOf]);
@@ -50,7 +68,7 @@ export function BankSpendingOverview(props: BankPatternsProps) {
   const unknownGroups = indexBankPatterns(props.transactions.filter(t => unknownIds.has(t.id)), asOf, 730);
   const months = [...new Set([asOf.slice(0,7), ...rows.filter(r => r.date <= asOf).map(r => r.date.slice(0,7))])].filter(m => /^\d{4}-\d{2}$/.test(m)).sort().reverse();
   const coachRows = visibleRows.filter(r => r.date.startsWith(month) || r.date.startsWith(summary.previousMonth));
-  const coachKey = JSON.stringify([month, coachRows]);
+  const coachKey = JSON.stringify([month, coachRows, limits]);
   const chart = [...summary.pots.map((p,i) => ({naam:p.label,bedrag:p.cents/100,color:potColors[i % potColors.length]})), ...(summary.unknownCents ? [{naam:"Nog in te delen",bedrag:summary.unknownCents/100,color:"#94a3b8"}] : [])];
   return <div className="space-y-5" data-spending-overview>
     <SurfaceCard className="space-y-4">
@@ -64,9 +82,9 @@ export function BankSpendingOverview(props: BankPatternsProps) {
     </SurfaceCard>
     <PurchaseBudgets props={props} rows={rows} month={month} asOf={asOf} />
     <section aria-label="Je uitgavenpotjes" className="grid gap-4 sm:grid-cols-2">
-      {summary.pots.map((p,i) => <SurfaceCard key={p.label} className="space-y-3"><div className="flex items-start justify-between gap-3"><h3 className="flex items-center gap-2 break-words font-semibold"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor:potColors[i % potColors.length]}} />{p.label}</h3><span className="shrink-0 text-xs text-slate-500">{p.count}×</span></div><p className="text-2xl font-semibold">{euro(p.cents)}</p><div className="h-2 overflow-hidden rounded-full bg-purple-100"><div className="h-full rounded-full bg-purple-500" style={{width:`${p.share*100}%`, backgroundColor:potColors[i % potColors.length]}} /></div><p className="text-xs text-slate-600">{Math.round(p.share*100)}% van de aankopen in dit overzicht</p><p className="text-xs text-slate-500">{p.previousCents === null ? "Nog geen vergelijkbare waarneming uit de vorige maand." : `Vorige maand${summary.elapsedDay < 31 ? ` t/m dag ${summary.elapsedDay}` : ""}: ${euro(p.previousCents)} aan aankopen.`}</p></SurfaceCard>)}
+      {summary.pots.map((p,i) => <SurfaceCard key={p.label} className="space-y-3"><div className="flex items-start justify-between gap-3"><h3 className="flex items-center gap-2 break-words font-semibold"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor:potColors[i % potColors.length]}} />{p.label}</h3><span className="shrink-0 text-xs text-slate-500">{p.count}×</span></div><p className="text-2xl font-semibold">{euro(p.cents)}</p><div className="h-2 overflow-hidden rounded-full bg-purple-100"><div className="h-full rounded-full bg-purple-500" style={{width:`${p.share*100}%`, backgroundColor:potColors[i % potColors.length]}} /></div><p className="text-xs text-slate-600">{Math.round(p.share*100)}% van de aankopen in dit overzicht</p><p className="text-xs text-slate-500">{p.previousCents === null ? "Nog geen vergelijkbare waarneming uit de vorige maand." : `Vorige maand${summary.elapsedDay < 31 ? ` t/m dag ${summary.elapsedDay}` : ""}: ${euro(p.previousCents)} aan aankopen.`}</p><ChoiceGuidance pot={p} limits={limits} onSave={saveLimit} room={room} current={month===asOf.slice(0,7)}/></SurfaceCard>)}
     </section>
-    <SpendingCoach key={coachKey} month={month} rows={coachRows} available={summary.pots.length > 0} />
+    <SpendingCoach key={coachKey} month={month} limits={limits} rows={coachRows} available={summary.pots.length > 0} />
     {classifying && <ClassificationModule props={props} groups={unknownGroups} labels={summary.pots.map(p=>p.label)} onClose={() => setClassifying(false)} />}
   </div>;
 }

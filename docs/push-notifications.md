@@ -28,3 +28,26 @@ Official references: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-
 `src/bank/processSync.ts` is shared with the existing browser import. It preserves transaction enrichment, manual bills, budgets, loans, business books and chat. Known income with `followLatestBank` uses its latest matching receipt through the existing explicit evidence link, including a salary received on a business-designated bank account. Account roles still exclude other business transactions from automatic personal income recognition and personal spending. Unlinked/manual income remains unchanged. Bank-paid bills are not inferred as paid debts or settled invoices without explicit links. Forecast and pots derive from the refreshed existing stores. Same-date ambiguous income receipts still require review.
 
 `refreshCloudChanges` performs three-way reconciliation per storage key and emits `moneylith:cloud-restored`; existing personal storage hooks respond without reloading the page. Same-key competing edits are surfaced, never overwritten. Account mode is required for cross-device updates; browser-only storage stays local. Explicitly unsaved form drafts are not auto-submitted.
+
+### Keuzebegeleiding bij uitgaven
+
+Patronen maakt onderscheid tussen de bedoeling van een aankoop en financiële ruimte.
+De potjes geven concrete, niet-veroordelende keuzetips. Gezondheid en welzijn is een
+brede categorie, geen bewijs van een gezondheidsvoordeel; noodzakelijke zorg wordt
+niet afgeraden. De gemengde categorie koffie/snacks/rookwaar bewijst niet welk product
+is gekocht.
+
+Een optionele maandgrens per pot wordt in `moneylith.personal.spendingLimits.v1`
+bewaard en via bestaande accountopslag gesynchroniseerd. Bedragen zijn gehele
+EUR-centen. Ontbrekend betekent onbekend, nul is een expliciete grens. Deze grenzen
+zijn vergelijkingsgrenzen, geen vaste lasten of extra afschrijvingen. Tanken en
+boodschappen houden hun bestaande budgetten in Fundament. De huidige grens wordt
+ook bij historische maandvergelijkingen gebruikt; dit is geen historisch budgetboek.
+
+De bestaande drie dagelijkse scans signaleren vanaf 80% en bij overschrijding van
+een ingestelde keuzegrens, ook voor welzijn. Pauzeren, dempen, deduplicatie en
+beveiliging blijven gelijk. Zonder grens gelden de bestaande trendcontroles; er
+wordt geen bedrag verzonnen dat als te hoog of betaalbaar zou gelden. De browser
+gebruikt de bestaande projectie om ontbrekende gegevens of geen financiële ruimte
+te melden. Een resterende keuzegrens is nooit automatisch vrij besteedbaar saldo.
+De AI berekent niets zelf: de server valideert de grenzen en berekent de vergelijking.
