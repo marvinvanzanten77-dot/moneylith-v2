@@ -1,3 +1,4 @@
+import {costForMonth,currentCostMonth,setCostMonth} from "../logic/monthlyCosts";
 import { RecordReview } from "./RecordReview";
 import { recordReview } from "../logic/inputReadiness";
 import { ExpandableRecord, recordControlClass } from "./ExpandableRecord";
@@ -46,19 +47,21 @@ export function FixedCostsList({
     [],
   );
   const items = controlledItems ?? localItems;
+  const [editMonth,setEditMonth] = useState(currentCostMonth);
+  const currentMonth=currentCostMonth();
   const setItems = onItemsChange ?? setLocalItems;
   const isReadOnly = readOnly === true;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    onSumChange?.(items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag || 0), 0));
-  }, [items, onSumChange]);
+    onSumChange?.(items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : costForMonth(item).bedrag || 0), 0));
+  }, [items, onSumChange, currentMonth]);
 
   const updateItems = (next: FixedCostManualItem[]) => {
     if (isReadOnly) return;
     setItems(next);
-    onSumChange?.(next.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag || 0), 0));
+    onSumChange?.(next.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : costForMonth(item).bedrag || 0), 0));
   };
 
   const updateItem = (id: string, patch: Partial<FixedCostManualItem>) => {
@@ -68,7 +71,7 @@ export function FixedCostsList({
     );
   };
 
-  const addItem = () => {
+  const addItem = (card=false) => {
     if (isReadOnly) return;
     const id = newId();
     const next = [
@@ -80,6 +83,7 @@ export function FixedCostsList({
         amountEntered: false,
         dagVanMaand: 0,
         opmerking: "",
+        ...(card?{paymentRoute:"card" as const,monthlyAmounts:{[currentMonth]:null}}:{}),
       },
     ];
     updateItems(next);
@@ -138,7 +142,7 @@ export function FixedCostsList({
         </div>
         <button
           type="button"
-          onClick={addItem}
+          onClick={()=>addItem()}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-amber-400 hover:shadow"
           disabled={isReadOnly}
         >
@@ -146,6 +150,7 @@ export function FixedCostsList({
         </button>
       </div>
 
+      {!isReadOnly&&<div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm"><button type="button" className="font-semibold underline" onClick={()=>addItem(true)}>+ Bunq-abonnement toevoegen</button><p>Registreer ieder abonnement apart. Bij wisselende bedragen vul je per maand het werkelijke of verwachte bedrag in. Een bunq-opwaardering is een overboeking en telt niet nogmaals als last.</p></div>}
       <div className="space-y-3">
         {items.length === 0 && (
           <p className="text-sm text-slate-600">
@@ -153,6 +158,9 @@ export function FixedCostsList({
           </p>
         )}
         {items.map((item) => {
+          const variable=item.monthlyAmounts!==undefined&&item.monthlyVariable!==false;
+          const display=costForMonth(item,currentMonth);
+          const edited=costForMonth(item,editMonth);
           const isExpanded = expandedId === item.id;
           return (
             <ExpandableRecord
@@ -163,11 +171,12 @@ export function FixedCostsList({
               title={item.naam?.trim() || "Naam"}
               summary={
                 <span>
-                  {item.amountEntered !== false &&
-                  Number.isFinite(item.bedrag) &&
-                  (item.bedrag !== 0 || item.amountEntered === true)
-                    ? formatCurrency(item.bedrag)
+                  {display.amountEntered !== false &&
+                  Number.isFinite(display.bedrag) &&
+                  (display.bedrag !== 0 || display.amountEntered === true)
+                    ? formatCurrency(display.bedrag)
                     : "Nog niet ingevuld"}
+                  {variable&&<span className="ml-2 text-xs">Wisselend maandbedrag · {currentMonth}</span>}
                   {item.paymentRoute === "withheld" && <span className="ml-2 text-xs">Al ingehouden op inkomen/toeslagen · geen extra afschrijving</span>}
                   {item.budgetCategory && <span className="ml-2 text-xs">Maandbudget · {item.budgetCategory}</span>}
                   {item.amountRange && <span className="ml-2 text-xs">Wisselend: {formatCurrency(item.amountRange.min, true)}–{formatCurrency(item.amountRange.max, true)}</span>}
@@ -196,7 +205,7 @@ export function FixedCostsList({
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-slate-600">
-                        Bedrag
+                        {variable?`Bedrag voor ${editMonth}`:"Bedrag"}
                       </span>
                       <input
                         type="number"
@@ -204,17 +213,19 @@ export function FixedCostsList({
                         step={0.01}
                         className={recordControlClass}
                         value={
-                          item.amountEntered === false
+                          edited.amountEntered === false
                             ? ""
-                            : item.amountEntered === true
-                              ? item.bedrag
-                              : (numberInputValue(item.bedrag) ?? "")
+                            : edited.amountEntered === true
+                              ? edited.bedrag
+                              : (numberInputValue(edited.bedrag) ?? "")
                         }
-                        onChange={(e) =>
-                          updateItem(item.id, {
+                        onChange={(e) => {
+                          const value=parseNumberInput(e.target.value);
+                          if(variable&&(!Number.isFinite(value)||value<0||value>1e9))return;
+                          updateItem(item.id, variable ? setCostMonth(item,editMonth,e.target.value.trim()===""?null:parseNumberInput(e.target.value)) : {
                             bedrag: parseNumberInput(e.target.value),
                             amountEntered: e.target.value.trim() !== "",
-                          })
+                          });}
                         }
                         placeholder="Bedrag invullen"
                         readOnly={isReadOnly}
@@ -262,11 +273,15 @@ export function FixedCostsList({
                       />
                     </label>
                   </div>
+                  <div className="mt-3 space-y-2"><label className="flex items-center gap-2"><input type="checkbox" checked={variable} disabled={isReadOnly} onChange={e=>{
+                    if(e.target.checked){updateItem(item.id,{monthlyVariable:true,monthlyAmounts:item.monthlyAmounts??{[currentMonth]:item.amountEntered===false?null:item.bedrag}});setEditMonth(currentMonth);}
+                    else {const current=costForMonth(item,currentMonth);updateItem(item.id,{monthlyVariable:false,bedrag:current.bedrag,amountEntered:current.amountEntered});}
+                  }}/>Bedrag wisselt per maand</label>{variable&&<><label>Maand bewerken<input className={recordControlClass+" block"} aria-label="Maand bewerken" type="month" value={editMonth} onChange={e=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))setEditMonth(e.target.value);}} disabled={isReadOnly}/></label><p className="text-xs">Fundament toont {currentMonth}. Niet-ingevulde maanden blijven onbekend, ook in Vooruitblik. Eerdere maandbedragen blijven bewaard wanneer je een andere maand invult.</p></>}</div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <label className="min-w-0">Betaalwijze<select aria-label="Betaalwijze" className={recordControlClass + " block w-full min-w-0"} value={item.paymentRoute ?? "bank"} disabled={isReadOnly} onChange={e => updateItem(item.id, {paymentRoute:e.target.value as FixedCostManualItem["paymentRoute"]})}>
                       <option value="bank">Vanaf een bankrekening</option><option value="card">Via creditcard / bunq</option><option value="third-party">Via iemand anders</option><option value="withheld">Al ingehouden op ontvangen inkomen / toeslagen</option>
                     </select></label>
-                    <label><input type="checkbox" checked={!!item.amountRange} disabled={isReadOnly} onChange={e => updateItem(item.id,{amountRange:e.target.checked ? {min:0,max:0}:undefined})} /> Bedrag wisselt per maand</label>
+                    <label><input type="checkbox" checked={!!item.amountRange} disabled={isReadOnly} onChange={e => updateItem(item.id,{amountRange:e.target.checked ? {min:0,max:0}:undefined})} /> Minimum en maximum noteren (optioneel)</label>
                     {item.amountRange && <>{(["min","max"] as const).map(key => <label key={key}>{key === "min" ? "Minimum" : "Maximum"}<input className={recordControlClass} type="number" min="0" step="0.01" value={item.amountRange![key]} onChange={e => updateItem(item.id,{amountRange:{...item.amountRange!,[key]:Math.max(0,Number(e.target.value))}})} /></label>)}<p className="text-xs sm:col-span-2">Vul bij Bedrag zelf het verwachte maandbedrag in. De bandbreedte is informatie en wordt niet automatisch gemiddeld.</p></>}
                     {item.budgetCategory && <p className="text-xs sm:col-span-2">Dit budget telt eenmaal mee in je vaste maandruimte. Patronen toont alleen het bedrag boven dit budget, vanaf {item.budgetSince || "de ingestelde maand"}. Pas hier het budget aan; verwijder deze last om weer alle aankopen te tonen.</p>}
                     {item.paymentRoute === "withheld" && <p className="text-xs sm:col-span-2">Registreer het bedrag voor je overzicht. Het ontvangen inkomen moet al na deze inhouding zijn; deze last wordt daarom niet opnieuw van je beschikbare geld afgetrokken.</p>}
@@ -295,14 +310,14 @@ export function FixedCostsList({
           <span className="font-semibold">
             {confirmed ||
             (items.length > 0 &&
-              items.every(
+              items.map(item=>costForMonth(item)).every(
                 (item) =>
                   item.amountEntered !== false &&
                   Number.isFinite(item.bedrag) &&
                   (item.bedrag !== 0 || item.amountEntered === true),
               ))
               ? formatCurrency(
-                  items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : item.bedrag), 0),
+                  items.reduce((sum, item) => sum + (item.paymentRoute === "withheld" ? 0 : costForMonth(item).bedrag), 0),
                 )
               : "Nog niet ingevuld"}
           </span>

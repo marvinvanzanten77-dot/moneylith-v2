@@ -111,7 +111,7 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
               Stap: {step}
             </div>
           </div>
-          <NotificationCenter key={mode} mode={mode} onLogin={onLogin}/>
+          <NotificationCenter key={mode} mode={mode} onLogin={onLogin} expanded={mode==='personal'&&step==='Inbox'?true:undefined} hideTrigger={mode==='personal'&&step==='Inbox'}/>
           {banner}
           <div className="space-y-4">{children}</div>
         </section>

@@ -51,3 +51,15 @@ wordt geen bedrag verzonnen dat als te hoog of betaalbaar zou gelden. De browser
 gebruikt de bestaande projectie om ontbrekende gegevens of geen financiële ruimte
 te melden. Een resterende keuzegrens is nooit automatisch vrij besteedbaar saldo.
 De AI berekent niets zelf: de server valideert de grenzen en berekent de vergelijking.
+
+### Inbox, maandabonnementen en Euro95/E10
+
+De persoonlijke Inbox is het bestaande meldingencentrum. Bestaande documentopslag wordt niet verwijderd; zakelijke factuurverwerking blijft behouden. Mobiel gebruikt dezelfde meldingen en lees-/afhandelstatus.
+
+Fundament ondersteunt `monthlyAmounts` binnen bestaande vaste-lastenrecords (EUR, per `YYYY-MM`, null = onbekend). Nieuwe bunq-abonnementen gebruiken deze invoer; `monthlyVariable:false` schakelt naar het gewone vaste bedrag zonder historie te wissen. De actuele maand bepaalt Fundament en controlebevestiging; de projectie gebruikt het bedrag van elke bijbehorende kalendermaand. Onbekende toekomstige maanden worden niet geëxtrapoleerd. Top-ups blijven overboekingen. Cloudopslag neemt de bestaande fixedCosts-sleutel mee, zonder migratie of reset.
+
+De bestaande drie cronruns en de afgeschermde handmatige bankcontrole halen Euro95 E10-pompprijzen op van vier openbare TinQ-pagina’s: Arnhem/Eduard van Beinumlaan, Apeldoorn/Arnhemseweg, Bemmel/Herckenrathweg en Bennekom/Dr. W. Dreeslaan. Dit is een vaste selectie, geen provinciebrede goedkoopste-stationzoeker. Geen locatie, bankdata of sleutels worden aan TinQ gestuurd. De public-price-cache `ml:fuel:tinq-e10:v1` bevat uitsluitend openbare prijswaarnemingen, maximaal 31 kalenderdagen. Een uurcache en korte lock begrenzen handmatig herhalen. De bestaande accountautorisatie blijft vereist; geen nieuwe publieke route.
+
+Per station wordt de laatste dagwaarneming bewaard, in gehele milli-euro per liter. Zeven verschillende eerdere meetdagen in de laatste veertien dagen zijn nodig voor een vergelijking met hun mediaan. Vanaf twee cent verschil volgt maximaal één hoger- en één lager-signaal per dag (bestaande pushdeduplicatie). Vandaag moet een waarneming beschikbaar zijn die maximaal twaalf uur geleden is opgehaald. Gemiste/opmaakgewijzigde bronnen blijven onbekend; eerdere waarnemingen worden behouden. Er is geen historie geïmporteerd of verzonnen. De eerste week levert daarom nog geen trendmelding op.
+
+De TinQ-pagina noemt prijzen van vandaag maar geeft geen wijzigingstijdstip. Moneylith vermeldt daarom de ophaaltijd en bronbeperking, niet een gegarandeerd actuele pompprijs. Lage prijs is geen koopopdracht: tankbehoefte, saldo en tankbudget moeten passen. Geen uitspraak over morgen, omrijafstand of gegarandeerde besparing. Brandstofsignalen gebruiken vaste berekende uitleg, geen taalmodel. Prijscontrolefouten blokkeren bankopslag niet. Een echte prijsbroncontrole verifieert ophalen/parser; pas dagelijkse productiehistorie kan latere trendmeldingen aantonen.

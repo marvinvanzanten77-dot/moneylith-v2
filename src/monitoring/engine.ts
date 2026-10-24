@@ -5,13 +5,13 @@ import { emptyBankRules, validateBankRules } from '../bank/classificationRules.j
 import { spendingRows, spendingSummary } from '../bank/spending.js';
 
 export type Signal = {
-  id: string; scope: 'personal'; kind: 'budget' | 'pace' | 'progress' | 'classification' | 'sync';
+  id: string; scope: 'personal'; kind: 'budget' | 'pace' | 'progress' | 'classification' | 'sync' | 'fuel';
   month: string; label: string; title: string; message: string;
   observedCents: number; referenceCents: number | null;
 };
 export type Notice = Signal & { createdAt: string; updatedAt: string; readAt: string | null; dismissedAt: string | null; active: boolean };
 export type Preferences = { enabled: boolean; mutedLabels: string[] };
-export type MonitoringState = { version: 1; preferences: Preferences; notices: Notice[]; checkedAt: string | null; sourceRevision: string | null; sourceFetchedAt: string | null; status: string };
+export type MonitoringState = { version: 1; fuel?: ReturnType<typeof import('../../server/fuel/prices').fuelOverview>; preferences: Preferences; notices: Notice[]; checkedAt: string | null; sourceRevision: string | null; sourceFetchedAt: string | null; status: string };
 export const emptyMonitoring = (): MonitoringState => ({version:1,preferences:{enabled:true,mutedLabels:[]},notices:[],checkedAt:null,sourceRevision:null,sourceFetchedAt:null,status:'Nog niet gecontroleerd.'});
 export function amsterdamDate(now: Date) {
   const parts = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);

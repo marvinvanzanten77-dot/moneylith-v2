@@ -25,6 +25,8 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  monthlyVariable?: boolean;
+  monthlyAmounts?: Record<string, number | null>; // Explicit amounts per YYYY-MM; absent is unknown.
   reviewedInput?: string;
   paymentRoute?: "bank" | "card" | "third-party" | "withheld";
   amountRange?: { min: number; max: number };

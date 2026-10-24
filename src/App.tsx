@@ -1,3 +1,4 @@
+import {costForMonth} from "./logic/monthlyCosts";
 import {processBankSync} from "./bank/processSync";
 import {collectCloudState} from "./storage/cloudState";
 import {useCompactMode} from "./mobile/useCompactMode";
@@ -157,7 +158,7 @@ const personalTabs: TabConfig[] = [
   { key: "rekeningen", label: "Rekeningen", desc: "Betaal- en spaarrekeningen" },
   { key: "bank", label: "Bank", desc: "Lunch Flow-bankkoppeling" },
   { key: "afschriften", label: "Patronen", desc: "Je uitgaven in potjes" },
-  { key: "inbox", label: "Inbox", desc: "Brieven & documenten" },
+  { key: "inbox", label: "Inbox", desc: "Meldingen en controles" },
   { key: "action", label: "Vooruitblik", desc: "Wat gebeurt er als alles zo blijft?" },
   { key: "backup", label: "Backup", desc: "Export & import van je data" },
   { key: "settings", label: "Instellingen", desc: "Opslag, hulp en app-opties" },
@@ -1256,7 +1257,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       return sum + monthly;
     }, 0);
 
-  const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts + fixedCostManualItems.filter(i => i.paymentRoute || i.budgetCategory).reduce((sum,i)=>sum+(i.paymentRoute === "withheld" ? 0 : i.bedrag || 0),0) : manualFixedCosts;
+  const fixedCosts = autoFixedCosts > 0 ? autoFixedCosts + fixedCostManualItems.filter(i => i.paymentRoute || i.budgetCategory).reduce((sum,i)=>sum+(i.paymentRoute === "withheld" ? 0 : costForMonth(i).bedrag || 0),0) : fixedCostManualItems.length ? fixedCostManualItems.reduce((sum,i)=>sum+(i.paymentRoute === "withheld" ? 0 : costForMonth(i).bedrag),0) : manualFixedCosts;
   const fixedCostsBusiness = autoFixedCostsBusiness > 0 ? autoFixedCostsBusiness : manualFixedCostsBusiness;
 
   const inputSections = (variant: "personal" | "business") => {
@@ -2217,7 +2218,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       </div>}
       </div>
     );
-    if (normalizedStep === "inbox") return renderInbox("personal");
+    if (normalizedStep === "inbox") return null; // Shared layout renders the single notification inbox.
     if (normalizedStep === "biz-inbox") return renderInbox("business");
     if (normalizedStep === "afschriften") return renderAfschriften("personal");
     if (normalizedStep === "biz-afschriften") return renderAfschriften("business");
@@ -2329,7 +2330,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         filled = false;
         break;
     }
-    const label = active ? "Actief" : normalized === "inbox" ? "Optioneel" : normalized === "afschriften" && !isBusiness && bankPendingQuestions > 0 ? `${bankPendingQuestions} te benoemen` : filled ? "Ingevuld" : "Nog te doen";
+    const label = active ? "Actief" : normalized === "inbox" ? "Meldingen" : normalized === "afschriften" && !isBusiness && bankPendingQuestions > 0 ? `${bankPendingQuestions} te benoemen` : filled ? "Ingevuld" : "Nog te doen";
     return { active, filled, label };
   };
   const helpCopy: Record<string, string> = {
@@ -2341,7 +2342,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
     bank: "Beheer je Lunch Flow-koppeling en opgehaalde bankgegevens.",
     afschriften: accounts.some(a => a.bankProvider === "lunchflow") ? "Bekijk je uitgavenpotjes en vraag bemoedigende bespaartips. Via Help met indelen benoem je onbekende aankopen, één tegelijk." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
-    inbox: "Bewaar documenten/briefjes die je nog wilt verwerken; houd je financiële inbox bij.",
+    inbox: "Je meldingen, bankcontroles en persoonlijke aandachtspunten.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
     backup: "Exporteer of importeer je data lokaal (geen cloud).",
     settings: "Beheer app-opties zoals opslagmodus, hulp en zichtbaarheid van UI-banners.",

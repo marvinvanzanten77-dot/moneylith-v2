@@ -17,6 +17,6 @@ export async function monitoringAdviceRequest(req:VercelRequest){
   if(req.headers.origin!=='https://www.moneylith.nl'||req.body.scope!=='personal'||typeof req.body.noticeId!=='string')throw Error('Ongeldige meldingscontext.');
   const state=await monitorAccount(email);
   const notice=state.notices.find(n=>n.id===req.body.noticeId&&n.active&&!n.dismissedAt);
-  if(!state.preferences.enabled||!notice||notice.kind==='sync'||state.preferences.mutedLabels.includes(notice.label))throw Error('Deze melding is niet meer actief.');
+  if(!state.preferences.enabled||!notice||notice.kind==='sync'||notice.kind==='fuel'||state.preferences.mutedLabels.includes(notice.label))throw Error('Deze melding is niet meer actief.');
   return monitoringAdvice(notice);
 }

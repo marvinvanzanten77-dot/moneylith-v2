@@ -1,3 +1,4 @@
+import {getFuel,fuelSignals,fuelOverview} from '../fuel/prices.js';
 import crypto from 'node:crypto';
 import {cloudCommand,getCloudSnapshot} from '../utils/cloudStore.js';
 import {decryptCloudPayload,encryptCloudPayload} from '../utils/cloudAuth.js';
@@ -14,6 +15,7 @@ export async function getMonitoring(email:string){
   return {revision:envelope.revision as string,state};
 }
 export async function monitorAccount(email:string,action?:unknown,now=new Date()){
+  const fuel=await getFuel().catch(()=>null);
   for(let attempt=0;attempt<4;attempt++){
     const record=await getMonitoring(email);
     const snapshot=await getCloudSnapshot(email);
@@ -21,9 +23,10 @@ export async function monitorAccount(email:string,action?:unknown,now=new Date()
     if(!validateCloudState(source))throw Error('Ongeldige administratie.');
     let state=record.state;
     if(action!==undefined)state=updateMonitoring(state,action,now.toISOString());
-    if(state.sourceRevision!==(snapshot?.revision??null)||!state.checkedAt||amsterdamDate(new Date(state.checkedAt))!==amsterdamDate(now)||now.getTime()-Date.parse(state.checkedAt)>3600000){
+    if(state.fuel?.checkedAt!==fuel?.checkedAt||state.sourceRevision!==(snapshot?.revision??null)||!state.checkedAt||amsterdamDate(new Date(state.checkedAt))!==amsterdamDate(now)||now.getTime()-Date.parse(state.checkedAt)>3600000){
       const result=evaluateMonitoring(source,state.preferences,now);
-      state={...state,notices:reconcileNotices(state.notices,result.signals,now.toISOString()),sourceRevision:snapshot?.revision??null,sourceFetchedAt:result.fetchedAt,checkedAt:now.toISOString(),status:result.status};
+      if(fuel&&state.preferences.enabled&&!state.preferences.mutedLabels.includes('Brandstofprijzen'))result.signals.push(...fuelSignals(fuel,now));
+      state={...state,fuel:fuel?fuelOverview(fuel,now):undefined,notices:reconcileNotices(state.notices,result.signals,now.toISOString()),sourceRevision:snapshot?.revision??null,sourceFetchedAt:result.fetchedAt,checkedAt:now.toISOString(),status:result.status};
     }
     if(JSON.stringify(state)===JSON.stringify(record.state))return state;
     const envelope=JSON.stringify({revision:crypto.randomUUID(),encrypted:encryptCloudPayload(JSON.stringify(state))});

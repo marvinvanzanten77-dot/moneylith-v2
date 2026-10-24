@@ -24,7 +24,7 @@ export function MobileLayout(props:ApplicationLayoutProps&{onFull:()=>void}){
       </header>
       {!online&&<p role="status" className="mb-4 rounded-xl bg-amber-100 p-3 text-sm text-amber-950">Geen verbinding. Getoonde gegevens kunnen verouderd zijn. Bank, AI en accountopslag zijn nu niet bereikbaar.</p>}
       {online&&reconnected&&<div role="status" className="mb-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-900">Weer verbonden. Herlaad om je accountgegevens te synchroniseren. <Button onClick={()=>location.reload()}>Herlaad</Button></div>}
-      <NotificationCenter key={mode} mode={mode} onLogin={()=>{onLogin?.();setView('content');}} hideTrigger expanded={view==='notifications'} onOpen={()=>setView('notifications')} onClose={()=>setView('home')} onUnread={setUnread}/>
+      <NotificationCenter key={mode} mode={mode} onLogin={()=>{onLogin?.();setView('content');}} hideTrigger expanded={view==='notifications'||view==='content'&&mode==='personal'&&step==='Inbox'} onOpen={()=>setView('notifications')} onClose={()=>setView('home')} onUnread={setUnread}/>
       <section data-app-content className="min-w-0 space-y-4">
         {view==='home'&&mode==='personal'&&<BankScanButton/>}
         {view==='home'&&(mobile?<MobileOverview input={mobile.input} bank={mobile.bank} onNavigate={navigate}/>:<SurfaceCard><p>Open een onderdeel om je administratie te bekijken.</p></SurfaceCard>)}

@@ -1,3 +1,4 @@
+import {scanFuel} from '../server/fuel/prices.js';
 import {syncBankAccount} from '../server/lunchflow/accountSync.js';
 import crypto from 'node:crypto';
 import type {VercelRequest,VercelResponse} from '@vercel/node';
@@ -16,7 +17,7 @@ export default async function handler(req:VercelRequest,res:VercelResponse){
     if(!(await getCloudUser(owner.email))?.bankOwnerVerified)return res.status(403).json({ok:false});
     const now=new Date();
     const scanId=`scheduled:${now.toISOString().slice(0,13)}`;
-    const scan=await syncBankAccount(owner.email,owner.apiKey,scanId,now);
+    const [scan]=await Promise.all([syncBankAccount(owner.email,owner.apiKey,scanId,now),scanFuel(now).catch(()=>null)]);
     const result=await dispatchPush(owner.email,await monitorAccount(owner.email));
     return res.status(result.failed?503:200).json({ok:!result.failed,...result,bank:{ok:scan.ok,failed:scan.failed,at:scan.at}});
   }catch{return res.status(503).json({ok:false});}

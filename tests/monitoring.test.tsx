@@ -88,5 +88,11 @@ test('authenticated API and encrypted CAS storage preserve cross-device actions 
  await assert.rejects(()=>monitoringAdviceRequest({...req(),body:{scope:'business-real',noticeId:first.notices[0].id}} as VercelRequest),/context/);
  await assert.rejects(()=>monitoringAdviceRequest({...req(),body:{scope:'personal',noticeId:first.notices[0].id}} as VercelRequest),/niet meer actief/);
  reply=response();await handler(req(),reply.res);assert.equal(reply.result.status,200);assert.equal(reply.result.body.monitoring.notices.length,1);
+ const samples=Array.from({length:8},(_,i)=>{const day='2026-10-'+(15+i);return {station:'arnhem-eduard-van-beinumlaan',day,fetchedAt:day+'T12:00:00.000Z',milliEuros:i===7?2170:2200};});
+ redis.set('ml:fuel:tinq-e10:v1',JSON.stringify({checkedAt:now.toISOString(),failed:0,samples}));
+ const fuel=await monitorAccount(owner,undefined,now);assert.equal(fuel.notices.filter(n=>n.kind==='fuel'&&n.active).length,1);assert.equal(fuel.fuel?.stations[0].price,'2,170');
+ const muted=await monitorAccount(owner,{action:'preferences',enabled:true,mutedLabels:['Brandstofprijzen']},now);assert.equal(muted.notices.filter(n=>n.kind==='fuel'&&n.active).length,0);
+ assert.equal(redis.get('ml:cloud:snapshot:'+owner),snapshot);
+
  }finally{globalThis.fetch=originalFetch;for(const k of Object.keys(process.env))if(!(k in previous))delete process.env[k];Object.assign(process.env,previous);}
 });

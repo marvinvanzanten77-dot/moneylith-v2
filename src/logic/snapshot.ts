@@ -1,3 +1,4 @@
+import {costForMonth} from "./monthlyCosts.js";
 export type SnapshotMode = "personal" | "business";
 
 export interface CoreSnapshot {
@@ -46,13 +47,13 @@ const safeSumFixedCosts = (fixedCosts: any): number => {
   // Support structure with manual items + fixedCostItems pattern from existing code
   if (Array.isArray(fixedCosts)) {
     return fixedCosts.reduce((sum, item) => {
-      const v = typeof item?.bedrag === "number" ? item.bedrag : 0;
+      const v = typeof item?.bedrag === "number" ? costForMonth(item).bedrag : 0;
       return sum + (v || 0);
     }, 0);
   }
-  const manualItems: { bedrag?: number }[] = Array.isArray(fixedCosts.manual) ? fixedCosts.manual : [];
+  const manualItems: { bedrag: number; monthlyAmounts?:Record<string,number|null> }[] = Array.isArray(fixedCosts.manual) ? fixedCosts.manual : [];
   const autoItems: { customMonthlyAmount?: number; estimatedMonthlyAmount?: number }[] = Array.isArray(fixedCosts.auto) ? fixedCosts.auto : [];
-  const manualSum = manualItems.reduce((sum, item) => sum + (typeof item?.bedrag === "number" ? item.bedrag : 0), 0);
+  const manualSum = manualItems.reduce((sum, item) => sum + (typeof item?.bedrag === "number" ? costForMonth(item).bedrag : 0), 0);
   const autoSum = autoItems.reduce((sum, item) => {
     const v = item?.customMonthlyAmount ?? item?.estimatedMonthlyAmount ?? 0;
     return sum + (typeof v === "number" ? v : 0);

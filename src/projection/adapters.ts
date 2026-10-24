@@ -1,3 +1,4 @@
+import {costForMonth} from "../logic/monthlyCosts.js";
 import type { MoneylithSnapshotDomain } from "../core/moneylithSnapshot.js";
 import {
   manualReviewRows,
@@ -91,7 +92,7 @@ export function personalInput(
     debts = rows(data.debts);
   const receipts = (data.inputReviews ?? {}) as InputReviews;
   const manual = (rs: Record<string, unknown>[]) =>
-    manualReviewRows(rs as unknown as Parameters<typeof manualReviewRows>[0]);
+    manualReviewRows(rs as unknown as Parameters<typeof manualReviewRows>[0],asOf.slice(0,7));
   const checks = {
     income: reviewSection("income", "Inkomen", manual(income), receipts),
     fixed: reviewSection(
@@ -170,21 +171,18 @@ export function personalInput(
         "pattern",
       );
   }
-    for (const r of fixed.filter(r => !detected.length || r.paymentRoute || r.budgetCategory))
-      recurring(
-        input,
-        "fixed:" + r.id,
-        name(r),
-        r.paymentRoute === "withheld" ? 0 : r.amountEntered === false || amount(r.bedrag) === null
-          ? null
-          : -amount(r.bedrag)!,
-        Number.isInteger(r.dagVanMaand) &&
-          Number(r.dagVanMaand) > 0 &&
-          Number(r.dagVanMaand) <= 31
-          ? Number(r.dagVanMaand)
-          : options.monthlyDay,
-        "fixed",
-      );
+  for (const r of fixed.filter(r => !detected.length || r.paymentRoute || r.budgetCategory)) {
+    const day=Number.isInteger(r.dagVanMaand)&&Number(r.dagVanMaand)>0&&Number(r.dagVanMaand)<=31?Number(r.dagVanMaand):options.monthlyDay;
+    const row=r as unknown as import("../types").FixedCostManualItem;
+    if(row.monthlyAmounts!==undefined&&row.monthlyVariable!==false){
+      const dates=monthlyDates(asOf,day);
+      if(!dates.length)input.events.push({id:"fixed:"+r.id,label:name(r),date:null,amount:null,source:"fixed",basis:"input"});
+      for(const date of dates){
+        const resolved=costForMonth(row,date.slice(0,7));
+        input.events.push({id:"fixed:"+r.id+":"+date,label:name(r),date,amount:resolved.paymentRoute==="withheld"?0:resolved.amountEntered===false?null:resolved.bedrag===0?0:-amount(resolved.bedrag)!,source:"fixed",basis:"input"});
+      }
+    }else recurring(input,"fixed:"+r.id,name(r),r.paymentRoute==="withheld"?0:r.amountEntered===false||amount(r.bedrag)===null?null:-amount(r.bedrag)!,day,"fixed");
+  }
   for (const r of rows(data.futureIncome))
     input.events.push({
       id: "future:" + r.id,
