@@ -10,12 +10,14 @@ export type BankRuleSettings = { rules: BankRule[]; accountRoles: Record<string,
 export const emptyBankRules: BankRuleSettings = { rules: [], accountRoles: {} };
 const normalize = (text: string) => text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
 const includesTerm = (text: string, term: string) => (` ${normalize(text)} `).includes(` ${normalize(term)} `);
+// Match complete merchant names/tokens, never substrings of unrelated payees.
+export const groceryTerms = ["Albert Heijn", "AH", "Jumbo", "Lidl", "Aldi", "Plus supermarkt", "Dirk van den Broek", "Dirk", "Hoogvliet", "DekaMarkt", "Deka Markt", "Vomar", "Nettorama", "Boni", "Poiesz", "Spar", "Coop", "Picnic", "Ekoplaza", "Odin", "Supermarkt", "Supermarket"];
 const merchantRules: BankRule[] = [
-  { id: "groceries", label: "Boodschappen", kind: "variable", terms: ["Albert Heijn", "AH", "Jumbo", "Lidl", "Aldi", "Plus supermarkt", "Dirk van den Broek", "Hoogvliet", "DekaMarkt"], direction: "out" },
+  { id: "groceries", label: "Boodschappen", kind: "variable", terms: groceryTerms, direction: "out" },
   { id: "variety-store", label: "Overige aankopen", kind: "variable", terms: ["Action"], direction: "out" },
   { id: "sauna", label: "Sauna en wellness", kind: "variable", terms: ["sauna", "thermen"], direction: "out" },
 ];
-export const fuelTerms = ["Shell", "Esso", "BP", "Texaco", "TotalEnergies", "Tango", "Tinq", "Avia", "OK tankstation", "tankstation", "benzinepomp"];
+export const fuelTerms = ["Shell", "Esso", "BP", "Texaco", "TotalEnergies", "Total", "Total Energies", "Tango", "Tinq", "Avia", "OK tankstation", "OK", "tankstation", "benzinepomp", "TinQ Express", "Fieten Olie", "Firezone", "Argos", "Q8", "Gulf", "Tamoil", "Supertank", "Sakko", "Joontjes", "haan", "Berkman", "DCO", "NXT", "Shell Recharge"];
 export function validateBankRules(value: unknown): value is BankRuleSettings {
   if (!value || typeof value !== "object") return false;
   const s = value as BankRuleSettings;
