@@ -87,6 +87,7 @@ export function FixedCostsList({
       },
     ];
     updateItems(next);
+    setEditMonth(currentMonth);
     setExpandedId(id);
   };
 
@@ -170,13 +171,13 @@ export function FixedCostsList({
               disabled={isReadOnly}
               title={item.naam?.trim() || "Naam"}
               summary={
-                <span>
+                <span className="block max-w-32 text-right sm:max-w-none">
                   {display.amountEntered !== false &&
                   Number.isFinite(display.bedrag) &&
                   (display.bedrag !== 0 || display.amountEntered === true)
                     ? formatCurrency(display.bedrag)
                     : "Nog niet ingevuld"}
-                  {variable&&<span className="ml-2 text-xs">Wisselend maandbedrag · {currentMonth}</span>}
+                  {variable&&<span className="block text-xs font-normal">Maandbedrag · {currentMonth}</span>}
                   {item.paymentRoute === "withheld" && <span className="ml-2 text-xs">Al ingehouden op inkomen/toeslagen · geen extra afschrijving</span>}
                   {item.budgetCategory && <span className="ml-2 text-xs">Maandbudget · {item.budgetCategory}</span>}
                   {item.amountRange && <span className="ml-2 text-xs">Wisselend: {formatCurrency(item.amountRange.min, true)}–{formatCurrency(item.amountRange.max, true)}</span>}
