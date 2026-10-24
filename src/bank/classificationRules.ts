@@ -12,10 +12,35 @@ const normalize = (text: string) => text.normalize("NFKC").toLowerCase().replace
 const includesTerm = (text: string, term: string) => (` ${normalize(text)} `).includes(` ${normalize(term)} `);
 // Match complete merchant names/tokens, never substrings of unrelated payees.
 export const groceryTerms = ["Albert Heijn", "AH", "Jumbo", "Lidl", "Aldi", "Plus supermarkt", "Dirk van den Broek", "Dirk", "Hoogvliet", "DekaMarkt", "Deka Markt", "Vomar", "Nettorama", "Boni", "Poiesz", "Spar", "Coop", "Picnic", "Ekoplaza", "Odin", "Supermarkt", "Supermarket"];
+/** Shared suggestions and merchant categories; budgets keep their existing exact labels. */
+export const spendingCategories = [
+  "Boodschappen", "Tanken", "Koffie, snacks en rookwaar", "Coffeeshop",
+  "Eten en drinken buiten de deur", "Spullen en huishouden", "Kleding en schoenen",
+  "Gezondheid en welzijn", "Persoonlijke verzorging", "Vervoer en parkeren",
+  "Vrije tijd en uitjes", "Cadeaus en donaties", "Overige uitgaven",
+];
+// Consolidate former built-in names in the view without rewriting custom categories or decisions.
+export function spendingCategoryLabel(label: string) {
+  const aliases: Record<string,string> = {
+    "Overige aankopen": "Spullen en huishouden",
+    "Sauna en wellness": "Gezondheid en welzijn",
+    "Kleding": "Kleding en schoenen",
+    "Koffie en snacks": "Koffie, snacks en rookwaar",
+    "Tankstation — rookwaar, koffie of snacks": "Koffie, snacks en rookwaar",
+  };
+  return Object.hasOwn(aliases,label) ? aliases[label] : label;
+}
 const merchantRules: BankRule[] = [
   { id: "groceries", label: "Boodschappen", kind: "variable", terms: groceryTerms, direction: "out" },
-  { id: "variety-store", label: "Overige aankopen", kind: "variable", terms: ["Action"], direction: "out" },
-  { id: "sauna", label: "Sauna en wellness", kind: "variable", terms: ["sauna", "thermen"], direction: "out" },
+  // Keep existing rule IDs stable so saved group corrections continue to win.
+  { id: "variety-store", label: "Spullen en huishouden", kind: "variable", terms: ["Action", "bol.com", "bol com", "Temu", "AliExpress", "Amazon", "IKEA", "HEMA", "Blokker", "Xenos", "Holland Recycling", "kringloop", "kringloopcentrum", "kringloopwinkel", "kringloopcentra", "kringloopbedrijf", "kringloopwarenhuis", "Het Goed", "RataPlan", "Coolblue", "MediaMarkt", "Leen Bakker", "JYSK", "Kwantum", "Praxis", "Gamma", "Karwei"], direction: "out" },
+  { id: "clothing", label: "Kleding en schoenen", kind: "variable", terms: ["H&M", "H en M", "C&A", "C en A", "Zara", "Primark", "WE Fashion", "Hunkemoller", "Hunkemöller", "Zeeman", "Uniqlo", "Zalando", "About You", "Omoda", "vanHaren", "van Haren", "Scapino", "Bristol", "Nelson", "Sacha", "Shoeby", "Only", "Jack & Jones", "Bever", "Decathlon", "kledingwinkel", "schoenenwinkel"], direction: "out" },
+  { id: "sauna", label: "Gezondheid en welzijn", kind: "variable", terms: ["sauna", "thermen", "wellness", "SpaWell", "Elysium", "Zwaluwhoeve", "Veluwse Bron", "apotheek", "fysiotherapie", "fysiotherapeut", "tandarts", "opticien", "Specsavers", "Pearle", "Hans Anders"], direction: "out" },
+  { id: "personal-care", label: "Persoonlijke verzorging", kind: "variable", terms: ["Kruidvat", "Etos", "Trekpleister", "Douglas", "ICI Paris", "Rituals", "kapper", "kappers", "barbershop", "barber", "schoonheidssalon"], direction: "out" },
+  { id: "dining", label: "Eten en drinken buiten de deur", kind: "variable", terms: ["restaurant", "pizzeria", "brasserie", "eetcafe", "eetcafé", "Thuisbezorgd", "Uber Eats", "McDonalds", "McDonald's", "Burger King", "KFC", "Subway", "Dominos", "Domino's", "New York Pizza", "FEBO", "snackbar", "Starbucks", "Coffeecompany"], direction: "out" },
+  { id: "transport", label: "Vervoer en parkeren", kind: "variable", terms: ["NS Reizigers", "Nederlandse Spoorwegen", "OVpay", "OV-chipkaart", "Arriva", "Connexxion", "Qbuzz", "GVB", "HTM", "Q-Park", "Q Park", "EasyPark", "Parkmobile", "Yellowbrick", "parkeergarage", "parkeren", "taxi", "Bolt"], direction: "out" },
+  { id: "leisure", label: "Vrije tijd en uitjes", kind: "variable", terms: ["Pathe", "Pathé", "Kinepolis", "Vue Cinemas", "bioscoop", "theater", "museum", "Efteling", "Walibi", "Toverland", "dierentuin", "Ticketmaster", "Eventim", "bowling", "escape room"], direction: "out" },
+  { id: "donations", label: "Cadeaus en donaties", kind: "variable", terms: ["Rode Kruis", "Artsen zonder Grenzen", "KWF", "Unicef", "Amnesty International", "WNF", "Natuurmonumenten", "Greetz", "Fleurop"], direction: "out" },
 ];
 export const fuelTerms = ["Shell", "Esso", "BP", "Texaco", "TotalEnergies", "Total", "Total Energies", "Tango", "Tinq", "Avia", "OK tankstation", "OK", "tankstation", "benzinepomp", "TinQ Express", "Fieten Olie", "Firezone", "Argos", "Q8", "Gulf", "Tamoil", "Supertank", "Sakko", "Joontjes", "haan", "Berkman", "DCO", "NXT", "Shell Recharge"];
 export function validateBankRules(value: unknown): value is BankRuleSettings {

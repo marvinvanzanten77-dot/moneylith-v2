@@ -90,3 +90,52 @@ test("all configured fuel and grocery aliases flow through monthly budgets witho
     assert.deepEqual(visible.map(r=>[r.label,r.cents]), [["Boodschappen — boven maandbudget",1000]], name);
   }
 });
+
+test('merchant taxonomy groups purchases by purpose and retains separate meaningful pots', async () => {
+  const {spendingRows,spendingSummary}=await import('../src/bank/spending');
+  const examples: [string,string][] = [
+    ['Kringloopcentrum West','Spullen en huishouden'],['Het Goed','Spullen en huishouden'],
+    ['RataPlan','Spullen en huishouden'],['bol.com via iDEAL','Spullen en huishouden'],['Temu','Spullen en huishouden'],['Action 123','Spullen en huishouden'],
+    ['H&M centrum','Kleding en schoenen'],['C&A','Kleding en schoenen'],['vanHaren','Kleding en schoenen'],['Zalando','Kleding en schoenen'],
+    ['Sauna centrum','Gezondheid en welzijn'],['Thermen','Gezondheid en welzijn'],['Apotheek','Gezondheid en welzijn'],
+    ['Kruidvat','Persoonlijke verzorging'],['Kapper','Persoonlijke verzorging'],
+    ["McDonald's",'Eten en drinken buiten de deur'],['Thuisbezorgd.nl','Eten en drinken buiten de deur'],
+    ['Q-Park','Vervoer en parkeren'],['OVpay','Vervoer en parkeren'],
+    ['Pathé','Vrije tijd en uitjes'],['Efteling','Vrije tijd en uitjes'],
+    ['Rode Kruis','Cadeaus en donaties'],['Greetz','Cadeaus en donaties'],
+  ];
+  const input=examples.map(([name],i)=>tx(String(i),name,-10));
+  const classified=classifyBankTransactions(input,{},settings);
+  examples.forEach(([,label],i)=>assert.equal(classified[i].category,label,examples[i][0]));
+  assert.deepEqual(classifyBankTransactions(classified,{},settings),classified);
+  assert.equal(input.every(t=>!t.category),true);
+  const summary=spendingSummary(spendingRows(classified,settings),'2026-10','2026-10-24');
+  assert.equal(summary.pots.length,8);
+  assert.equal(summary.totalCents,examples.length*1000);
+});
+test('taxonomy rename reclassifies managed historical labels but preserves user edits and decisions', () => {
+  const prior={...tx('action','Action'),bankRuleId:'variety-store',bankPatternKind:'variable' as const,category:'Overige aankopen',bankPatternCategory:'Overige aankopen',notes:'Keep'};
+  const sauna={...tx('sauna','Sauna'),bankRuleId:'sauna',bankPatternKind:'variable' as const,category:'Sauna en wellness',bankPatternCategory:'Sauna en wellness'};
+  const next=classifyBankTransactions([prior,sauna,{...prior,id:'manual',category:'Mijn cadeautjes'}],{},settings);
+  assert.equal(next[0].category,'Spullen en huishouden');assert.equal(next[0].notes,'Keep');
+  assert.equal(next[1].category,'Gezondheid en welzijn');assert.equal(next[2].category,'Mijn cadeautjes');
+  const explicit=classifyBankTransactions([prior],{[patternKey(prior)]:{kind:'variable',label:'Werkspullen'}},settings);
+  assert.equal(explicit[0].category,'Werkspullen');
+});
+test('unknown sellers, refunds and transfers never become invented purchase categories', () => {
+  const input=[tx('a','Unknown Shop'),tx('b','Action refund',20),tx('c','Bolster'),tx('d','Transactional'),tx('e','Paypal'),tx('f','Saunaland unrelated')];
+  assert.ok(classifyBankTransactions(input,{},settings).every(t=>!t.bankRuleId));
+  const transfer=classifyBankTransactions([tx('x','Action NL91ABNA0417164325')],{},settings)[0];
+  assert.equal(transfer.bankPatternKind,'transfer');
+});
+test('legacy pot names consolidate without changing stored custom categories or decisions', async () => {
+  const {spendingRows,spendingSummary}=await import('../src/bank/spending');
+  const input=['Overige aankopen','Spullen en huishouden','Sauna en wellness','Gezondheid en welzijn','Koffie en snacks','Tankstation — rookwaar, koffie of snacks','Koffie, snacks en rookwaar','Mijn cadeautjes'].map((label,i)=>({...tx(String(i),'merchant'),category:label,bankPatternKind:'variable' as const}));
+  const before=JSON.stringify(input);
+  const pots=spendingSummary(spendingRows(input,settings),'2026-10','2026-10-24').pots;
+  assert.equal(pots.find(p=>p.label==='Spullen en huishouden')?.cents,2000);
+  assert.equal(pots.find(p=>p.label==='Gezondheid en welzijn')?.cents,2000);
+  assert.equal(pots.find(p=>p.label==='Koffie, snacks en rookwaar')?.cents,3000);
+  assert.equal(pots.find(p=>p.label==='Mijn cadeautjes')?.cents,1000);
+  assert.equal(JSON.stringify(input),before);
+});

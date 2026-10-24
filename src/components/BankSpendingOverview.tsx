@@ -1,7 +1,7 @@
 import { potColors } from "../data/potColors";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BankPatterns, type BankPatternsProps } from "./BankPatterns";
-import { emptyBankRules } from "../bank/classificationRules";
+import { emptyBankRules, spendingCategories } from "../bank/classificationRules";
 import { indexBankPatterns, type BankPattern } from "../bank/patterns";
 import { spendingRows, spendingSummary, spendingAboveBudgets, observedBudgetAverage } from "../bank/spending";
 import { SpendingCoach } from "./SpendingCoach";
@@ -10,7 +10,7 @@ import { formatCurrency } from "../utils/format";
 const Donut = lazy(() => import("./charts/CategoryPotsDonut").then(m => ({default: m.CategoryPotsDonut})));
 const euro = (cents: number) => formatCurrency(cents / 100, true);
 const monthLabel = (month: string) => new Intl.DateTimeFormat("nl-NL", {month: "long", year: "numeric", timeZone: "UTC"}).format(new Date(month + "-01T00:00:00Z"));
-const suggested = ["Boodschappen", "Tanken", "Koffie en snacks", "Uit eten", "Kleding", "Vrije tijd", "Overige aankopen"];
+const suggested = spendingCategories;
 function ClassificationQuestion({ group, labels, onSave, onSkip }: { group: BankPattern; labels: string[]; onSave: (label: string) => void; onSkip: () => void }) {
   const [label, setLabel] = useState(""), [error, setError] = useState("");
   const save = (value: string) => { try { if(!value.trim()) throw Error("Geef je potje een naam."); onSave(value.trim()); } catch(e) { setError(e instanceof Error ? e.message : "Opslaan mislukt."); } };
@@ -19,7 +19,7 @@ function ClassificationQuestion({ group, labels, onSave, onSkip }: { group: Bank
     <p className="text-sm text-slate-600">Jij kent deze aankoop het best. Met jouw antwoord komen vergelijkbare betalingen voortaan in het juiste potje.</p>
     <div className="rounded-xl bg-slate-100 p-4"><h3 className="break-words font-semibold">{group.label}</h3><p className="mt-1 text-sm">{euro(Math.abs(Math.round(latest.amount * 100)))} · {latest.date} · {group.transactions.length} {group.transactions.length === 1 ? "aankoop" : "vergelijkbare aankopen"}</p><p className="mt-2 break-words text-sm text-slate-600">{latest.description}</p></div>
     <p className="font-semibold">In welk potje hoort dit?</p>
-    <div className="flex flex-wrap gap-2">{[...new Set([...labels, ...suggested])].slice(0, 12).map(name => <Button key={name} onClick={() => save(name)}>{name}</Button>)}</div>
+    <div className="flex flex-wrap gap-2">{[...new Set([...suggested, ...labels])].map(name => <Button key={name} onClick={() => save(name)}>{name}</Button>)}</div>
     <form className="space-y-2" onSubmit={e => { e.preventDefault(); save(label); }}><label className="block text-sm">Of geef een eigen potnaam<Input value={label} onChange={e => setLabel(e.target.value)} maxLength={150} required /></label><Button type="submit" variant="primary">Indelen en volgende</Button></form>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <Button onClick={onSkip}>Deze weet ik nog niet</Button>

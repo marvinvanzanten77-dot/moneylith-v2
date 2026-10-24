@@ -1,5 +1,5 @@
 import type { MoneylithTransaction, FixedCostManualItem } from "../types";
-import { isOperatingTransaction, type BankRuleSettings } from "./classificationRules.js";
+import { isOperatingTransaction, spendingCategoryLabel, type BankRuleSettings } from "./classificationRules.js";
 export type SpendingRow = { id: string; date: string; cents: number; label: string | null };
 export type SpendingPot = { label: string; cents: number; count: number; share: number; previousCents: number | null };
 const unknown = /^(onbekend|uncategorized|uncategorised|overig|other|geen categorie)$/i;
@@ -13,7 +13,7 @@ export function spendingRows(transactions: MoneylithTransaction[], rules: BankRu
     seen.add(t.id);
     const manual = t.category && t.category !== t.bankPatternCategory ? t.category : null;
     const label = (manual || (t.bankPatternKind === "variable" ? t.category || t.bankRuleLabel : t.category))?.trim();
-    return [{ id: t.id, date: t.date, cents: Math.abs(Math.round(t.amount * 100)), label: label && !unknown.test(label) ? label : null }];
+    return [{ id: t.id, date: t.date, cents: Math.abs(Math.round(t.amount * 100)), label: label && !unknown.test(label) ? spendingCategoryLabel(label) : null }];
   });
 }
 export function spendingSummary(rows: SpendingRow[], month: string, asOf: string) {
