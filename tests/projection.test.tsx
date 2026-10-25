@@ -546,3 +546,43 @@ test("unknown reservations preserve known cash but never imply zero reserved", (
   assert.equal(input.reserve, null);
   assert.equal(validateOptions({ ...opts, reservedNow: 0 }).reservedNow, 0);
 });
+
+test("known debt principal is not reported as unknown when its monthly repayment is missing", () => {
+  const data = { debts: [{id:"debt",naam:"Creditor",saldo:150.85}], accounts:[], income:[], fixedCosts:[] };
+  const input=personalInput(data,opts,"2026-10-25");
+  assert.equal(input.debts.debt,15085);
+  const result=project(input);
+  assert.ok(result.missing.includes("Creditor: maandelijkse aflossing nog invullen bij Schulden"));
+  assert.ok(!result.missing.includes("Creditor: bedrag onbekend"));
+  assert.equal(result.horizons[1].cash,null);
+  const zero=personalInput({...data,debts:[{...data.debts[0],minBetaling:0}]},opts,"2026-10-25");
+  assert.ok(!project(zero).missing.some(m=>m.startsWith("Creditor:")));
+  assert.equal(zero.debts.debt,15085);
+  assert.equal(data.debts[0].saldo,150.85);
+});
+
+test("bank evidence and fresh balances allow a base projection without optional budgets", () => {
+  const data={income:[{id:"i",naam:"Salary",bedrag:2000,amountEntered:true,dagVanMaand:23,bankEvidence:{transactionIds:["t"],through:"2026-10-23"}}],transactions:[{id:"t",provider:"lunchflow",currency:"EUR",amount:2000,date:"2026-10-23"}],accounts:[{id:"a",active:true,bankProvider:"lunchflow",currency:"EUR",bankBalance:2100,bankBalanceFetchedAt:"2026-10-25T09:00:00Z"}],fixedCosts:[],debts:[{id:"d",naam:"Debt without arrangement",saldo:500,minBetaling:0}],inputReviews:{fixed:reviewSection("fixed","Vaste lasten",[],{}).signature}};
+  const options={...emptyOptions(),monthlyDay:23};
+  const before=JSON.stringify(data);
+  const input=personalInput(data,options,"2026-10-25");
+  const result=project(input);
+  assert.equal(result.complete,true);
+  assert.equal(result.horizons[0].available,210000);
+  assert.equal(result.horizons[1].available,410000);
+  assert.equal(result.horizons[2].available,810000);
+  assert.equal(input.debts.d,50000);
+  assert.ok(input.assumptions.some(a=>a.includes("Geen reserveringen")));
+  assert.ok(!input.events.some(e=>e.id.startsWith("variable")));
+  assert.equal(JSON.stringify(data),before);
+  for(const stamp of ["2026-10-24T09:00:00Z","invalid"]){
+    const stale=personalInput({...data,accounts:[{...data.accounts[0],bankBalanceFetchedAt:stamp}]},options,"2026-10-25");
+    assert.equal(stale.opening,null);
+  }
+  const changed=personalInput({...data,income:[{...data.income[0],bedrag:2500}]},options,"2026-10-25");
+  assert.ok(changed.missing.includes("Inkomen nog controleren"));
+  const missing=personalInput({...data,transactions:[]},options,"2026-10-25");
+  assert.ok(missing.missing.includes("Inkomen nog controleren"));
+  const withBudget=project(personalInput(data,{...options,variableMonthly:20000,reservedNow:10000},"2026-10-25"));
+  assert.equal(withBudget.horizons[1].available,380000);
+});

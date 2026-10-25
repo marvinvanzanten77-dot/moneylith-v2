@@ -214,7 +214,7 @@ export function project(input: Input, scenario: Scenario | null = null) {
       (e.amount === null || (e.date === null && e.amount !== 0))
     )
       missing.push(
-        `${e.label}: ${e.amount === null ? "bedrag onbekend" : "betaaldatum onbekend"}`,
+        `${e.label}: ${e.amount === null ? (e.kind === "repayment" ? "maandelijkse aflossing nog invullen bij Schulden" : "bedrag onbekend") : "betaaldatum onbekend"}`,
       );
   if (input.reserve === null)
     missing.push("Huidige reserveringen niet ingevuld");

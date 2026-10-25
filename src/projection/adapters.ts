@@ -77,7 +77,7 @@ export function personalInput(
     scope: "personal",
     asOf,
     opening: null,
-    reserve: options.reservedNow ?? null,
+    reserve: options.reservedNow ?? 0,
     events: [],
     debts: {},
     missing: [],
@@ -124,12 +124,24 @@ export function personalInput(
       receipts,
     ),
   };
-  for (const check of Object.values(checks))
-    if (!check.ready) input.missing.push(check.label + " nog controleren");
+  const transactions = rows(data.transactions);
+  const bankIncome = income.length > 0 && checks.income.valid && income.every(r => {
+    const evidence = r.bankEvidence as {transactionIds?: string[]; through?: string} | undefined;
+    return Array.isArray(evidence?.transactionIds) && validDate(evidence.through) && evidence.through <= asOf &&
+      transactions.some(t => evidence.transactionIds!.includes(String(t.id)) && t.provider === "lunchflow" && t.currency === "EUR" &&
+        t.date === evidence.through && Number(t.amount) > 0 && amount(t.amount) === amount(r.bedrag) &&
+        !["transfer", "financing", "ignore"].includes(String(t.bankPatternKind)));
+  });
+  if (!checks.income.ready && !bankIncome) input.missing.push("Inkomen nog controleren");
+  if (!checks.fixed.ready) input.missing.push("Vaste lasten nog controleren");
+  if (!checks.debts.valid || (!debts.length && !checks.debts.ready)) input.missing.push("Schulden nog controleren");
+  if (bankIncome) input.assumptions.push("Inkomen volgt de gekoppelde bankontvangst; herhaling is een verwachting, geen gegarandeerd salaris.");
+  if (options.reservedNow == null) input.assumptions.push("Geen reserveringen opgegeven: de basisverwachting trekt geen extra reservering af. Dit bevestigt niet dat er geen reserveringen zijn.");
+  if (options.variableMonthly === null) input.assumptions.push("Geen aanvullend uitgavenbudget opgegeven: alleen de bekende lasten en budgetten zijn meegenomen. Overige uitgaven kunnen de ruimte verlagen.");
   const accounts = rows(data.accounts).filter((r) => r.active === true);
   if (!accounts.length || accounts.some((r) => amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance) === null))
     input.missing.push("Actieve rekeningen met ingevulde saldi");
-  else if (!options.confirmOpening)
+  else if (!options.confirmOpening && !accounts.every(r => r.bankProvider === "lunchflow" && r.currency === "EUR" && typeof r.bankBalanceFetchedAt === "string" && Number.isFinite(Date.parse(r.bankBalanceFetchedAt)) && new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(r.bankBalanceFetchedAt)) === asOf))
     input.missing.push(
       "Bevestig dat de rekeningbedragen de huidige saldi zijn",
     );
@@ -139,7 +151,7 @@ export function personalInput(
       0,
     );
     input.assumptions.push(
-      "De rekeningbedragen zijn expliciet bevestigd als huidige saldi. Historische transacties worden niet opnieuw opgeteld.",
+      options.confirmOpening ? "De rekeningbedragen zijn expliciet bevestigd als huidige saldi. Historische transacties worden niet opnieuw opgeteld." : "De saldi zijn vandaag bij Lunch Flow opgehaald. Dit garandeert geen nieuwe verversing bij de bank; historische transacties worden niet opnieuw opgeteld.",
     );
   }
   for (const r of income)
@@ -228,10 +240,10 @@ export function personalInput(
         { kind: "repayment", debtId: String(r.id) },
       );
   }
-  recurring(
+  if (options.variableMonthly !== null) recurring(
     input,
     "variable",
-    "Variabele uitgaven",
+    "Aanvullend uitgavenbudget (naast Fundament)",
     options.variableMonthly === null ? null : -options.variableMonthly,
     options.monthlyDay,
     "assumption",

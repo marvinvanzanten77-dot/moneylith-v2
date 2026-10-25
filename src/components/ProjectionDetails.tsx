@@ -159,7 +159,7 @@ export function ProjectionDetails({
         {input.scope === "personal" && (
           <>
             <label className="block text-sm">
-              Extra variabele uitgaven per maand (€; leeg is onbekend)
+              Extra variabele uitgaven per maand (€; optioneel)
               <Input
                 inputMode="decimal"
                 value={
@@ -179,9 +179,9 @@ export function ProjectionDetails({
                 }}
               />
             </label>
-            <p className="text-xs text-slate-500">Budgetten voor tanken en boodschappen uit Fundament zijn al meegenomen. Vul hier alleen aanvullende uitgaven in om dubbel tellen te voorkomen.</p>
+            <p className="text-xs text-slate-500">Budgetten voor tanken en boodschappen uit Fundament zijn al meegenomen. Vul hier alleen aanvullende uitgaven in om dubbel tellen te voorkomen. Laat je dit leeg, dan neemt de basisverwachting geen extra uitgavenbudget mee.</p>
             <label className="block text-sm">
-              Reeds gereserveerd binnen je saldi (€; leeg is onbekend)
+              Reeds gereserveerd binnen je saldi (€; optioneel)
               <Input
                 inputMode="decimal"
                 value={
@@ -199,6 +199,7 @@ export function ProjectionDetails({
                 }}
               />
             </label>
+            <p className="text-xs text-slate-500">Zonder ingevulde reservering wordt niets extra apart gehouden in de berekening. Dit betekent niet dat al het getoonde geld vrij besteedbaar is.</p>
             <label className="flex gap-2 text-sm">
               <Input
                 type="checkbox"
