@@ -1,3 +1,4 @@
+import {packCloudRequest,unpackCloudResponse,cloudEncoding} from './cloudTransport';
 import {mergeCloudVersions} from './mergeCloud';
 import { collectCloudState, restoreCloudState, validateCloudState, type CloudState } from "./cloudState";
 const metaKey = "moneylith.cloud.sync.v1";
@@ -8,10 +9,10 @@ let baseState: CloudState = {};
 export const cloudHeaders = { "Content-Type": "application/json", "X-Moneylith-Cloud": "1" };
 export async function cloudRequest(action: string, method = "GET", body?: unknown) {
   const response = await fetch(`/api/cloud?action=${action}`, {
-    method, headers: cloudHeaders, body: body === undefined ? undefined : JSON.stringify(body),
+    method, headers: {...cloudHeaders,...(action==='snapshot'&&typeof DecompressionStream!=='undefined'?{'X-Moneylith-Encoding':cloudEncoding}:{})}, body: body === undefined ? undefined : action==='snapshot'?await packCloudRequest(body):JSON.stringify(body),
     signal: AbortSignal.timeout(20000),
   });
-  const data = await response.json();
+  const data = await unpackCloudResponse(await response.json());
   if (!response.ok || !data.ok) throw Error(data.error || "Accountopslag is niet bereikbaar.");
   return data;
 }

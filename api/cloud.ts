@@ -1,3 +1,5 @@
+import {CloudTransportError,packCloudResponse,unpackCloudRequest} from '../server/utils/cloudTransport.js';
+import {cloudWireLimit,cloudEncoding} from '../src/storage/cloudTransport.js';
 import {scanFuel} from '../server/fuel/prices.js';
 import {syncBankAccount} from '../server/lunchflow/accountSync.js';
 import {pushConfig,registerDevice,removeDevice,deviceExists,testDevice,PushInputError} from '../server/push/service.js';
@@ -11,7 +13,7 @@ import { validateCloudState } from "../src/storage/cloudState.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "private, no-store");
-  res.setHeader("Vary", "Cookie, Origin");
+  res.setHeader("Vary", "Cookie, Origin, X-Moneylith-Encoding");
   const fail = (status: number, error: string) => res.status(status).json({ ok: false, error });
   const action = String(req.query.action || "");
   if (req.method !== "GET" && (req.headers.origin !== "https://www.moneylith.nl" || req.headers["x-moneylith-cloud"] !== "1"))
@@ -32,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let body: Record<string, unknown> = {};
     if (req.method !== "GET") {
       const raw = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
-      if (Buffer.byteLength(raw) > 3_500_000) return fail(413, "Administratie is te groot voor cloudopslag.");
+      if (Buffer.byteLength(raw) > cloudWireLimit) return fail(413, "Administratie is te groot voor cloudopslag.");
       body = JSON.parse(raw);
       if (!body || typeof body !== "object" || Array.isArray(body)) return fail(400, "Ongeldige invoer.");
     }
@@ -85,9 +87,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!snapshot) return res.status(200).json({ ok: true, state: null, revision: null });
       const state: unknown = JSON.parse(decryptCloudPayload(snapshot.encrypted));
       if (!validateCloudState(state)) return fail(500, "Cloudgegevens zijn ongeldig; lokale gegevens zijn behouden.");
-      return res.status(200).json({ ok: true, state, revision: snapshot.revision });
+      const result={ok:true,state,revision:snapshot.revision};
+      return res.status(200).json(req.headers['x-moneylith-encoding']===cloudEncoding?packCloudResponse(result):result);
     }
     if (req.method === "PUT" && action === "snapshot") {
+      body=unpackCloudRequest(body);
       if (!validateCloudState(body.state) || !(body.revision === null || (typeof body.revision === "string" && body.revision.length < 100)))
         return fail(400, "Ongeldige administratie of versienummer.");
       const revision = await setCloudSnapshot(config.email, encryptCloudPayload(JSON.stringify(body.state)), body.revision as string | null);
@@ -96,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return fail(405, "Actie niet beschikbaar.");
   } catch (error) {
+    if (error instanceof CloudTransportError) return fail(400,error.message);
     if (error instanceof PushInputError) return fail(400,error.message);
     if (error instanceof InvalidMonitoringAction) return fail(400, error.message);
     if(action === "push") return fail(503,"Pushdienst is tijdelijk niet bereikbaar. Probeer het opnieuw; je financiële gegevens zijn behouden.");

@@ -1,3 +1,4 @@
+import {packCloudRequest,unpackCloudResponse,cloudEncoding} from '../src/storage/cloudTransport';
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -81,6 +82,18 @@ test("owner account activation, durable storage, conflict protection and bank au
     const foreign = request("snapshot", "PUT", { state, revision: saved.body.revision }, cookie);
     foreign.headers.origin = "https://attacker.test";
     assert.equal((await call(foreign)).code, 403);
+    const largeState={...state,"moneylith.personal.transactions":JSON.stringify(Array.from({length:16000},(_,i)=>({id:'tx-'+i,description:'Fictieve betaling met een bewaarde handmatige notitie '.repeat(4),amount:-12.34})))};
+    assert.ok(Buffer.byteLength(JSON.stringify(largeState))>3_500_000);
+    const packed=JSON.parse(await packCloudRequest({state:largeState,revision:saved.body.revision}));
+    assert.equal((await call(request('snapshot','PUT',packed))).code,401);
+    const largeSaved=await call(request('snapshot','PUT',packed,cookie));assert.equal(largeSaved.code,200);
+    assert.equal((await call(request('snapshot','PUT',packed,cookie))).code,409);
+    const compressedGet=request('snapshot','GET',{},cookie);compressedGet.headers['x-moneylith-encoding']=cloudEncoding;
+    const downloaded=await call(compressedGet);assert.equal(downloaded.code,200);
+    assert.deepEqual((await unpackCloudResponse(downloaded.body)).state,largeState);
+    assert.deepEqual((await call(request('snapshot','GET',{},cookie))).body.state,largeState);
+    assert.equal((await call(request('snapshot','PUT',{encoding:cloudEncoding,payload:'broken'},cookie))).code,400);
+    assert.deepEqual((await call(request('snapshot','GET',{},cookie))).body.state,largeState);
     delete process.env.CLOUD_AUTH_SECRET;
     assert.equal(getCloudSessionEmail(request("session", "GET", {}, cookie)), null);
     assert.equal((await call(request("session", "GET"))).code, 503);
