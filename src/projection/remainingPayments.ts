@@ -18,7 +18,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
  const report=reconcilePeriod(period,input.asOf,plan,true,list<MoneylithTransaction>(data.transactions),ledger,rules,paid&&typeof paid==='object'?paid:{});
  const funding:Record<string,number>={card:0,cash:0};
  for(const move of report.cashMoves)funding[move.label==='Naar bunq'?'card':'cash']+=move.cents;
- for(const row of report.rows)if(row.route==='card'||row.route==='cash')funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
+ for(const row of report.rows)if((row.route==='card'||row.route==='cash')&&!row.transactionIds.length)funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
  input.commitments=[];
  for(const row of report.rows.filter(r=>r.kind==='fixed'||r.kind==='debt')){
   const debt=row.kind==='debt'?list<SchuldItem>(data.debts).find(d=>'debt:'+d.id===row.id):undefined;

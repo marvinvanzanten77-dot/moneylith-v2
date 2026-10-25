@@ -1931,6 +1931,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);
           setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
         }}/>}
+        {!isBusinessVariant && <FixedCostsList scope="work" items={fixedCostManualItems} onItemsChange={setFixedCostManualItems} heading="Abonnementskosten" subheading="Werktools en losse credits" addLabel="+ Overig abonnement" emptyLabel="Voeg een abonnement of losse aankoop toe en vul zelf het maandbedrag in." totalLabel="Ingevuld voor deze maand" />}
         <details open={isBusinessVariant || undefined} className="space-y-4"><summary className="cursor-pointer font-semibold">Inschattingen en vaste gegevens bewerken</summary>
         <IncomeList
           confirmed={sections.income.ready}
@@ -1953,6 +1954,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           emptyLabel={isBusinessVariant ? "Nog geen toekomstige inkomsten toegevoegd." : undefined}
         />
         <FixedCostsList
+          scope={isBusinessVariant ? "all" : "general"}
           confirmed={sections.fixed.ready && !fixedItemsSource.some((item) => item.isFixed && !item.isIgnored)}
           items={fixedManualSource}
           onItemsChange={setFixedManualFn}

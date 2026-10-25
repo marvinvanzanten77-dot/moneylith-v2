@@ -79,3 +79,32 @@ test('combined transfer allocates fixed costs once beside debt repayments and pr
  assert.equal(reconcilePeriod('2026-10','2026-10-25',p,true,[t,refund],ledger,emptyBankRules).actual.fixed,0);
  assert.equal(validateDebtLedger({version:1,entries:[{...entry,fixedAllocations:[{fixedId:'tax',cents:30000}]}]}),false);
 });
+
+test('explicitly named phone bank payments match the existing card subscription and never consume bunq funding twice',async()=>{
+ const {classifyBankTransactions,patternKey}=await import('../src/bank/patterns');
+ const {spendingRows}=await import('../src/bank/spending');
+ const {personalInput}=await import('../src/projection/adapters');
+ const {emptyOptions}=await import('../src/projection/engine');
+ const rows=[tx('simyo','2026-11-19',-144.95,'Simyo'),tx('bunq','2026-11-01',-100,'bunq')];
+ const decisions={[patternKey(rows[0])]:{kind:'fixed' as const,label:'Simyo — telefoon',targetId:'phone'},[patternKey(rows[1])]:{kind:'transfer' as const,label:'Bunq'}};
+ const classified=classifyBankTransactions(rows,decisions,emptyBankRules);
+ const fixed=[{id:'phone',naam:'Simyo — telefoon',bedrag:144.95,dagVanMaand:19,paymentRoute:'card' as const},{id:'other',naam:'Other subscription',bedrag:100,dagVanMaand:20,paymentRoute:'card' as const}];
+ const report=reconcilePeriod('2026-10','2026-11-19',makePeriodPlan([],fixed,[],[],'2026-11-19'),true,classified,emptyDebtLedger(),emptyBankRules);
+ assert.equal(report.rows[0].actual,14495);assert.equal(report.rows[1].actual,null);
+ assert.equal(spendingRows(classified,emptyBankRules,fixed).length,0);
+ const forecast=personalInput({fixedCosts:fixed,transactions:classified},emptyOptions(),'2026-11-19');
+ assert.equal(forecast.commitments?.find(r=>r.label===fixed[0].naam)?.remaining,0);
+ assert.equal(forecast.commitments?.find(r=>r.label===fixed[1].naam)?.remaining,0);
+ assert.equal(fixed.length,2);
+});
+
+test('confirmed earlier-invoice payments do not settle the next bill in the same salary period',()=>{
+ const fixed=[{id:'phone',naam:'Simyo',bedrag:144.95,dagVanMaand:19,paymentRoute:'card' as const,bankPaymentFrom:'2026-10-25'}];
+ const older={...tx('old','2026-10-24',-130.99,'Simyo'),bankPatternKind:'fixed' as const,bankRuleLabel:'Simyo'};
+ const upcoming={...tx('new','2026-11-19',-144.95,'Simyo'),bankPatternKind:'fixed' as const,bankRuleLabel:'Simyo'};
+ const plan=makePeriodPlan([],fixed,[],[],'2026-10-25');
+ assert.equal(reconcilePeriod('2026-10','2026-10-25',plan,true,[older],emptyDebtLedger(),emptyBankRules).rows[0].actual,null);
+ assert.equal(reconcilePeriod('2026-10','2026-11-19',plan,true,[older,upcoming],emptyDebtLedger(),emptyBankRules).rows[0].actual,14495);
+ const historic={...older,id:'historic',date:'2026-09-24'};
+ assert.equal(reconcilePeriod('2026-09','2026-10-25',plan,false,[historic],emptyDebtLedger(),emptyBankRules).rows[0].actual,13099);
+});

@@ -25,6 +25,9 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  costGroup?: "work-tools";
+  costKind?: "subscription" | "credits";
+  bankPaymentFrom?: string; // Explicit earliest booking date for the currently expected bill; earlier salary periods remain historical.
   monthlyVariable?: boolean;
   monthlyAmounts?: Record<string, number | null>; // Explicit amounts per YYYY-MM; absent is unknown.
   reviewedInput?: string;

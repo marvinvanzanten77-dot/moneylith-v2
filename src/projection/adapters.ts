@@ -1,6 +1,6 @@
 import {validateBankRules} from "../bank/classificationRules.js";
 import {remainingPayments} from "./remainingPayments.js";
-import {costForMonth} from "../logic/monthlyCosts.js";
+import {costForMonth,costPlannedInMonth} from "../logic/monthlyCosts.js";
 import type { MoneylithSnapshotDomain } from "../core/moneylithSnapshot.js";
 import {
   manualReviewRows,
@@ -187,6 +187,7 @@ export function personalInput(
       const dates=monthlyDates(asOf,day);
       if(!dates.length)input.events.push({id:"fixed:"+r.id,label:name(r),date:null,amount:null,source:"fixed",basis:"input"});
       for(const date of dates){
+        if(!costPlannedInMonth(row,date.slice(0,7)))continue;
         const resolved=costForMonth(row,date.slice(0,7));
         input.events.push({id:"fixed:"+r.id+":"+date,label:name(r),date,amount:resolved.paymentRoute==="withheld"?0:resolved.amountEntered===false?null:resolved.bedrag===0?0:-amount(resolved.bedrag)!,source:"fixed",basis:"input"});
       }

@@ -1,11 +1,11 @@
 import type {IncomeItem, FixedCostManualItem, FixedCostItem, SchuldItem, MoneylithTransaction} from '../types.js';
-import {costForMonth} from '../logic/monthlyCosts.js';
+import {costForMonth,costPlannedInMonth} from '../logic/monthlyCosts.js';
 import {patternKey} from './patterns.js';
 import type {DebtLedger} from './debtPayments.js';
 import type {BankRuleSettings} from './classificationRules.js';
 export const periodPlansKey='moneylith.personal.periodPlans.v1';
 export const periodPaidKey='moneylith.personal.periodPaid.v1';
-export type PeriodRow={id:string;label:string;kind:'income'|'fixed'|'debt';expected:number|null;route?:string;budget?:string;evidence?:{key:string;transactionIds:string[]};party?:string};
+export type PeriodRow={id:string;label:string;kind:'income'|'fixed'|'debt';expected:number|null;costGroup?:'work-tools';route?:string;paymentFrom?:string;budget?:string;evidence?:{key:string;transactionIds:string[]};party?:string};
 export type PeriodPlan={capturedAt:string;rows:PeriodRow[]};
 export type PeriodPlans=Record<string,PeriodPlan>;
 export type PeriodPaid=Record<string,Record<string,number>>;
@@ -25,8 +25,10 @@ export function makePeriodPlan(income:IncomeItem[],fixed:FixedCostManualItem[],d
  const period=salaryPeriod(asOf), active=detected.filter(i=>i.isFixed&&!i.isIgnored);
  const rows:PeriodRow[]=income.map(i=>({id:'income:'+i.id,label:i.naam,kind:'income',expected:i.amountEntered===false?null:cents(i.bedrag),evidence:i.bankEvidence}));
  for(const raw of fixed.filter(i=>!active.length||i.paymentRoute||i.budgetCategory)){
-  const i=costForMonth(raw,raw.dagVanMaand>0&&raw.dagVanMaand<23?periodBounds(period).end.slice(0,7):period);
-  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.amountEntered===false?null:cents(i.bedrag),route:i.paymentRoute,budget:i.budgetCategory,evidence:i.bankEvidence});
+  const month=raw.dagVanMaand>0&&raw.dagVanMaand<23?periodBounds(period).end.slice(0,7):period;
+  if(!costPlannedInMonth(raw,month))continue;
+  const i=costForMonth(raw,month);
+  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.amountEntered===false?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
  }
  for(const i of active)rows.push({id:'detected:'+i.id,label:i.customLabel||i.descriptionPattern,kind:'fixed',expected:cents(i.customMonthlyAmount??i.estimatedMonthlyAmount),party:i.descriptionPattern});
  for(const d of debts)rows.push({id:'debt:'+d.id,label:d.naam,kind:'debt',expected:(d.saldo??d.openBedrag)===0?0:cents(d.minimaleMaandlast??d.minBetaling)??0});
@@ -65,8 +67,14 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   }
   if(['transfer','financing','ignore'].includes(t.bankPatternKind??''))continue;
   const candidates=plan.rows.filter(r=>{
-   if(r.kind==='debt'||r.route==='withheld'||['card','cash'].includes(r.route??'')||(r.kind==='income')!==(t.amount>0))return false;
+   if(r.kind==='debt'||r.route==='withheld'||r.route==='cash'||(r.kind==='income')!==(t.amount>0))return false;
+   if(r.paymentFrom&&/^\d{4}-\d{2}-\d{2}$/.test(r.paymentFrom)&&Number.isFinite(Date.parse(r.paymentFrom))&&new Date(r.paymentFrom).toISOString().slice(0,10)===r.paymentFrom&&period>=salaryPeriod(r.paymentFrom)&&t.date<r.paymentFrom)return false;
    if(r.budget)return norm(r.budget)===norm(t.bankRuleLabel??t.category??'');
+   const explicitlyLinked=t.bankPatternKind==='fixed'&&norm(r.label)===norm(t.bankRuleLabel??t.category??'');
+   if(explicitlyLinked)return true;
+   // Card is the usual route, not proof of an invisible card payment. Only an
+   // explicitly named bank group can identify an alternative direct bank payment.
+   if(r.route==='card')return false;
    if(r.evidence){
     if(r.evidence.transactionIds.includes(t.id)||r.evidence.key===patternKey(t))return true;
     const anchors=all.filter(a=>r.evidence!.transactionIds.includes(a.id));
@@ -117,4 +125,12 @@ export function findBankReversals(all:MoneylithTransaction[]){
   if(candidates.length===1){reversedDebits.add(candidates[0].id);reversals.add(credit.id);}else if(candidates.length>1){for(const c of candidates)uncertainDebits.add(c.id);}
  }
  return {reversedDebits,credits:reversals,uncertainDebits};
+}
+
+/** Refresh editable work costs only in the open period; historical snapshots stay intact. */
+export function refreshWorkCostPlan(saved:PeriodPlan,latest:PeriodPlan):PeriodPlan {
+ const work=latest.rows.filter(r=>r.costGroup==='work-tools');
+ const ids=new Set(work.map(r=>r.id));
+ const rows=[...saved.rows.filter(r=>r.costGroup!=='work-tools'&&!ids.has(r.id)),...work];
+ return JSON.stringify(rows)===JSON.stringify(saved.rows)?saved:{...saved,rows};
 }

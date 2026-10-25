@@ -1,4 +1,4 @@
-import {costForMonth,currentCostMonth} from "./monthlyCosts.js";
+import {costForMonth,currentCostMonth,costPlannedInMonth} from "./monthlyCosts.js";
 export type ReviewKey = "income" | "fixed" | "debts" | "assets";
 export type InputReviews = Partial<Record<ReviewKey, string | null>>;
 export type ReviewRow = { id: string; name: string; amount: number; complete?: boolean; details?: unknown };
@@ -13,8 +13,8 @@ export type InputSection = {
   bankVerified?: boolean;
 };
 
-export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number}; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null> }[], month=currentCostMonth()): ReviewRow[] {
-  return items.map(({reviewedInput: _receipt, ...raw}) => { const item=costForMonth(raw,month); return ({
+export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number}; costKind?:"subscription"|"credits"; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null> }[], month=currentCostMonth()): ReviewRow[] {
+  return items.filter(item=>costPlannedInMonth(item,month)).map(({reviewedInput: _receipt, ...raw}) => { const item=costForMonth(raw,month); return ({
     id: item.id, name: item.naam, amount: item.paymentRoute === "withheld" ? 0 : item.bedrag,
     complete: item.amountEntered !== false && (item.bedrag !== 0 || item.amountEntered === true),
     ...((item.paymentRoute || item.budgetCategory || item.amountRange || item.monthlyAmounts) ? {details: {...item,...(item.monthlyAmounts&&item.monthlyVariable!==false?{effectiveMonth:month}:{})}} : {}),
@@ -47,7 +47,7 @@ export function foundationStatus(income: InputSection, fixed: InputSection, goal
 }
 
 /** A row receipt does not assert that the entire list is complete. */
-export function recordReview(item: {id:string; naam:string; bedrag:number; amountEntered?:boolean; reviewedInput?:string; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null>}) {
+export function recordReview(item: {id:string; naam:string; bedrag:number; amountEntered?:boolean; reviewedInput?:string; costKind?:"subscription"|"credits"; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null>}) {
   const {reviewedInput, ...fields} = item;
   const section = reviewSection("income", "Regel", manualReviewRows([fields]), {});
   const signature = JSON.stringify({...fields,...(fields.monthlyAmounts&&fields.monthlyVariable!==false?{effectiveMonth:currentCostMonth()}:{})});
