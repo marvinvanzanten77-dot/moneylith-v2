@@ -307,13 +307,10 @@ export function StepSchulden({
   const strategyKey: SimulatorStrategyKey = selectedStrategy === "steady" || selectedStrategy === "buffered"
     ? "balanced" : selectedStrategy ?? "balanced";
 
-  const monthlyBudget = Math.max(
-
-    capacityForView,
-
-    snapshot?.monthlyPressure ?? debtSummary?.totalMinPayment ?? debts.reduce((sum, d) => sum + (d.minimaleMaandlast || 0), 0),
-
-  );
+  // Available room and strategy suggestions never increase agreed repayments.
+  const monthlyBudget = debts.reduce((sum, debt) => sum + Math.min(
+    Math.max(0, debt.saldo || 0), Math.max(0, debt.minimaleMaandlast || 0),
+  ), 0);
 
   const simulation = simulatePayoff(
 
@@ -427,11 +424,10 @@ export function StepSchulden({
 
   const monthsToClear = simulation.monthsToZero;
 
-  const totalMinPerMonth = fullpayMonthStats?.monthPayment ?? simulation.monthlyPressureNow;
+  const totalMinPerMonth = simulation.monthlyPressureNow;
 
-  const freeAfterDebt = fullpayMonthStats ? fullpayMonthStats.freeAfter : simulation.freeRoomNow;
-  const displayMonthsToClear =
-    selectedStrategy === "fullpay" && fullpayMonthStats ? fullpayMonthStats.maxMonth ?? monthsToClear : monthsToClear;
+  const freeAfterDebt = capacityForView - totalMinPerMonth;
+  const displayMonthsToClear = monthsToClear;
 
 
 
@@ -1863,7 +1859,7 @@ export function StepSchulden({
 
                   <div className="flex justify-between text-sm">
 
-                    <span>Maanddruk (maand 1, strategie)</span>
+                    <span>Afgesproken aflossing per maand</span>
 
                     <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
 
@@ -2041,7 +2037,7 @@ export function StepSchulden({
             <h2 className="text-lg font-semibold text-slate-50">Schulddruk op je maand</h2>
 
 
-            <p className="mt-1 text-xs text-slate-400">Samenvatting van je totale schuld en minimale maandelijkse druk.</p>
+            <p className="mt-1 text-xs text-slate-400">Alleen jouw afgesproken aflossingen tellen mee. Extra ruimte wordt niet automatisch aan aflossen besteed.</p>
 
 
             <div className="mt-3 space-y-2 text-sm">
@@ -2060,7 +2056,7 @@ export function StepSchulden({
 
               <div className="flex justify-between">
 
-                <span>Maanddruk (maand 1, strategie)</span>
+                <span>Afgesproken aflossing per maand</span>
 
                 <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
 
@@ -2305,14 +2301,15 @@ export function StepSchulden({
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-slate-50 space-y-3">
-            <h3 className="text-lg font-semibold">Strategie-uitkomst</h3>
+            <h3 className="text-lg font-semibold">Jouw afgesproken aflossingen</h3>
+            {selectedStrategy === "fullpay" && fullpayMonthStats && <p className="text-xs text-slate-300">Gekozen voorstel: {formatCurrency(fullpayMonthStats.monthPayment)} in de eerste voorstelmaand. Dit verandert je afspraken pas als je de bedragen zelf overneemt.</p>}
             <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-200 space-y-1">
               <div className="flex justify-between">
                 <span>Schulden</span>
                 <span className="font-semibold">{formatCurrency(totalDebt)}</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span>Maanddruk (maand 1, strategie)</span>
+                <span>Afgesproken aflossing per maand</span>
                 <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
               </div>
               <div className="mt-2 flex items-center justify-between">

@@ -3,6 +3,7 @@ import type { SchuldItem } from "../components/SchuldenkaartCard";
 export type StrategyKey = "snowball" | "balanced" | "avalanche" | "fullpay";
 
 export type CustomPlan = {
+  allowExtraPayments?: boolean;
   priorityOrder?: string[]; // ordered debt ids to target with extra budget
   extraPerDebt?: Record<string, number>; // optional custom per-debt override for minPayment
   monthlyBudgetOverride?: number;
@@ -119,7 +120,7 @@ export function simulatePayoff(
     let budgetLeft = Math.max(0, monthlyBudget - monthPressure);
 
     // Step 2: extra budget to current target
-    if (budgetLeft > 0) {
+    if (customPlan?.allowExtraPayments === true && budgetLeft > 0) {
       const order = resolveTargetOrder();
       const target = order.find((d) => d.remaining > 0);
       if (target) {
@@ -130,6 +131,7 @@ export function simulatePayoff(
       }
     }
 
+    if (monthPressure === 0) break; // No arrangement is not permission to repay another debt.
     pressureByMonth.push(monthPressure);
     freeRoomByMonth.push(Math.max(0, monthlyBudget - monthPressure));
   }
@@ -158,6 +160,6 @@ if (import.meta?.env?.DEV) {
   });
   const res1 = simulatePayoff([debt(47, 60)], 100, "snowball");
   console.assert(res1.monthsToZero === 1, "Remaining < maandlast should clear in 1 month");
-  const res2 = simulatePayoff([debt(100, 0)], 50, "snowball");
+  const res2 = simulatePayoff([debt(100, 0)], 50, "snowball", {allowExtraPayments:true});
   console.assert(res2.monthsToZero !== null, "Zero minPayment should still clear with extra budget");
 }
