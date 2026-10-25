@@ -548,7 +548,7 @@ test("unknown reservations preserve known cash but never imply zero reserved", (
 });
 
 test("known debt principal is not reported as unknown when its monthly repayment is missing", () => {
-  const data = { debts: [{id:"debt",naam:"Creditor",saldo:150.85}], accounts:[], income:[], fixedCosts:[] };
+  const data = { debts: [{id:"debt",naam:"Creditor",saldo:150.85,firstPaymentDate:"2026-11-23",remainingPayments:2}], accounts:[], income:[], fixedCosts:[] };
   const input=personalInput(data,opts,"2026-10-25");
   assert.equal(input.debts.debt,15085);
   const result=project(input);
@@ -585,4 +585,21 @@ test("bank evidence and fresh balances allow a base projection without optional 
   assert.ok(missing.missing.includes("Inkomen nog controleren"));
   const withBudget=project(personalInput(data,{...options,variableMonthly:20000,reservedNow:10000},"2026-10-25"));
   assert.equal(withBudget.horizons[1].available,380000);
+});
+
+test("debts without an arrangement never block the base outlook or invent repayments", () => {
+ const data={income:[],fixedCosts:[],accounts:[{id:"a",active:true,startBalance:1000}],debts:[{id:"d",naam:"No arrangement",saldo:500}],inputReviews:{income:reviewSection("income","Inkomen",[],{}).signature,fixed:reviewSection("fixed","Vaste lasten",[],{}).signature}};
+ const before=JSON.stringify(data);
+ const input=personalInput(data,opts,"2026-10-25");
+ const result=project(input);
+ assert.equal(result.complete,true);
+ assert.deepEqual(result.missing,[]);
+ assert.equal(input.debts.d,50000);
+ assert.ok(!input.events.some(e=>e.debtId==="d"));
+ assert.ok(input.assumptions.some(a=>a.includes("geen aflossing ingepland")));
+ for(const h of result.horizons)assert.equal(h.available,100000);
+ assert.equal(JSON.stringify(data),before);
+ const scheduled=personalInput({...data,debts:[{...data.debts[0],firstPaymentDate:"2026-11-23",remainingPayments:2}]},opts,"2026-10-25");
+ assert.equal(project(scheduled).complete,false);
+ assert.ok(project(scheduled).missing.some(m=>m.includes("maandelijkse aflossing")));
 });

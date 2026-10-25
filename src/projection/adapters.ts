@@ -117,8 +117,9 @@ export function personalInput(
         name: name(r),
         amount: (r.saldo ?? r.openBedrag ?? NaN) as number,
         complete:
-          Number.isFinite(r.minimaleMaandlast ?? r.minBetaling) &&
-          Number(r.minimaleMaandlast ?? r.minBetaling ?? -1) >= 0,
+          (r.minimaleMaandlast ?? r.minBetaling) == null ||
+          (Number.isFinite(r.minimaleMaandlast ?? r.minBetaling) &&
+          Number(r.minimaleMaandlast ?? r.minBetaling) >= 0),
         details: r,
       })),
       receipts,
@@ -209,6 +210,14 @@ export function personalInput(
       payment = amount(r.minimaleMaandlast ?? r.minBetaling);
     if (principal !== null && principal >= 0)
       input.debts[String(r.id)] = principal;
+    // A debt balance is not itself a scheduled cash outflow. Absent arrangements
+    // stay outside the base forecast; incomplete explicit schedules remain unknown.
+    if ((r.minimaleMaandlast ?? r.minBetaling) == null &&
+        r.firstPaymentDate === undefined && r.remainingPayments === undefined &&
+        !(r.bankRepayment as {enabled?: boolean} | undefined)?.enabled) {
+      if (principal !== 0) input.assumptions.push(name(r) + ": geen aflossing ingepland; de openstaande schuld blijft bestaan en is niet als maandelijkse betaling meegerekend.");
+      continue;
+    }
     const day =
       Number.isInteger(r.afschrijfDag) &&
       Number(r.afschrijfDag) > 0 &&
