@@ -10,6 +10,7 @@ export type InputSection = {
   valid: boolean;
   ready: boolean;
   hasRows: boolean;
+  bankVerified?: boolean;
 };
 
 export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number}; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null> }[], month=currentCostMonth()): ReviewRow[] {
@@ -51,4 +52,22 @@ export function recordReview(item: {id:string; naam:string; bedrag:number; amoun
   const section = reviewSection("income", "Regel", manualReviewRows([fields]), {});
   const signature = JSON.stringify({...fields,...(fields.monthlyAmounts&&fields.monthlyVariable!==false?{effectiveMonth:currentCostMonth()}:{})});
   return {valid:section.valid, signature, ready:section.valid && reviewedInput === signature};
+}
+
+/** Share the same bank evidence check between Fundament, forecasts and AI readiness. */
+export function reviewBankIncome(items: Parameters<typeof manualReviewRows>[0], transactions: unknown[], reviews: InputReviews, asOf: string): InputSection {
+  const section = reviewSection("income", "Inkomen", manualReviewRows(items, asOf.slice(0,7)), reviews);
+  const bankVerified = items.length > 0 && section.valid && items.every(item => {
+    const evidence = (item as typeof item & {bankEvidence?: {transactionIds?: string[]; through?: string}}).bankEvidence;
+    const date = evidence?.through;
+    return Array.isArray(evidence?.transactionIds) && typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0,10) === date && date <= asOf &&
+      transactions.some(raw => {
+        if (!raw || typeof raw !== "object") return false;
+        const t = raw as Record<string, unknown>;
+        return evidence.transactionIds!.includes(String(t.id)) && t.provider === "lunchflow" && t.currency === "EUR" && t.date === date &&
+          typeof t.amount === "number" && Number.isFinite(t.amount) && t.amount > 0 && Math.round(t.amount*100) === Math.round(item.bedrag*100) &&
+          !["transfer", "financing", "ignore"].includes(String(t.bankPatternKind));
+      });
+  });
+  return {...section, ready:section.ready || bankVerified, bankVerified};
 }

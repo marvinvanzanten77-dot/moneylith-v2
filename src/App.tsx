@@ -21,7 +21,7 @@ import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspace
 import { NavigationStep } from "./components/NavigationStep";
 import { InputReview } from "./components/InputReview";
 import { formatCurrency } from "./utils/format";
-import { reviewSection, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
+import { reviewSection, reviewBankIncome, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FixedCostsList } from "./components/FixedCostsList";
 import { VermogenCard } from "./components/VermogenCard";
@@ -1271,7 +1271,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const debtItems = business ? debtsBusiness : debts;
     const assetItems = business ? assetsBusiness : assets;
     return {
-      income: reviewSection("income", "Inkomen", manualReviewRows(incomes), receipts),
+      income: business ? reviewSection("income", "Inkomen", manualReviewRows(incomes), receipts) : reviewBankIncome(incomes, transactions, receipts, today()),
       fixed: reviewSection("fixed", "Vaste lasten", useDetected ? [...detected.map((item) => ({
         id: item.id, name: item.customLabel || item.descriptionPattern,
         amount: item.customMonthlyAmount ?? item.estimatedMonthlyAmount,
@@ -1398,6 +1398,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const sections = variant === "business" ? businessSections : personalSections;
     const receipts = variant === "business" ? businessReviews : personalReviews;
     const save = variant === "business" ? setBusinessReviews : setPersonalReviews;
+    if (sections[key].bankVerified) return <p className="text-sm text-emerald-200">Inkomen overgenomen uit je bankgegevens. Geen extra bevestiging nodig; toekomstige inkomsten kunnen afwijken.</p>;
     return <InputReview section={sections[key]} onReview={(signature) => save({ ...receipts, [key]: signature })} />;
   };
 
@@ -1955,7 +1956,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           </div>
           <p className="text-xl font-bold text-white">{ready ? formatCurrency(freeAmount) : "—"}</p>
           <p className="text-xs text-slate-200" role="status">{marginStatus}</p>
-          {!ready && <p className="text-sm text-slate-200">Vul je inkomen en vaste lasten in en bevestig dat beide overzichten compleet zijn. Heb je geen inkomen of vaste lasten? Bevestig dan expliciet € 0.</p>}
+          {!ready && <p className="text-sm text-slate-200">{!sections.income.ready && "Vul of controleer je inkomen. Gekoppeld bankinkomen wordt automatisch herkend. "}{!sections.fixed.ready && "Vul je vaste lasten aan en bevestig dat dit overzicht compleet is. "}Heb je geen inkomen of vaste lasten? Bevestig dat dan expliciet.</p>}
           <p className="text-xs text-slate-300">
             Inkomsten en vaste lasten komen uit de tabellen hierboven. Ingehouden lasten worden niet opnieuw afgetrokken. Bevestigde budgetten tellen eenmaal mee. De wizardlijst wordt aangevuld met lasten met een opgegeven betaalwijze en budgetten.
           </p>

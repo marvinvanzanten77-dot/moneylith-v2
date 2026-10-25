@@ -2,6 +2,7 @@ import {costForMonth} from "../logic/monthlyCosts.js";
 import type { MoneylithSnapshotDomain } from "../core/moneylithSnapshot.js";
 import {
   manualReviewRows,
+  reviewBankIncome,
   reviewSection,
   type InputReviews,
 } from "../logic/inputReadiness.js";
@@ -94,7 +95,7 @@ export function personalInput(
   const manual = (rs: Record<string, unknown>[]) =>
     manualReviewRows(rs as unknown as Parameters<typeof manualReviewRows>[0],asOf.slice(0,7));
   const checks = {
-    income: reviewSection("income", "Inkomen", manual(income), receipts),
+    income: reviewBankIncome(income as unknown as Parameters<typeof manualReviewRows>[0], rows(data.transactions), receipts, asOf),
     fixed: reviewSection(
       "fixed",
       "Vaste lasten",
@@ -125,14 +126,7 @@ export function personalInput(
       receipts,
     ),
   };
-  const transactions = rows(data.transactions);
-  const bankIncome = income.length > 0 && checks.income.valid && income.every(r => {
-    const evidence = r.bankEvidence as {transactionIds?: string[]; through?: string} | undefined;
-    return Array.isArray(evidence?.transactionIds) && validDate(evidence.through) && evidence.through <= asOf &&
-      transactions.some(t => evidence.transactionIds!.includes(String(t.id)) && t.provider === "lunchflow" && t.currency === "EUR" &&
-        t.date === evidence.through && Number(t.amount) > 0 && amount(t.amount) === amount(r.bedrag) &&
-        !["transfer", "financing", "ignore"].includes(String(t.bankPatternKind)));
-  });
+  const bankIncome = checks.income.bankVerified;
   if (!checks.income.ready && !bankIncome) input.missing.push("Inkomen nog controleren");
   if (!checks.fixed.ready) input.missing.push("Vaste lasten nog controleren");
   if (!checks.debts.valid || (!debts.length && !checks.debts.ready)) input.missing.push("Schulden nog controleren");

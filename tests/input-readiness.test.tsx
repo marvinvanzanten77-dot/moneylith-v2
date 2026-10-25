@@ -120,3 +120,20 @@ test("individual row review persists, invalidates after edits and never confirms
   assert.match(renderToStaticMarkup(<RecordReview item={item} onReview={()=>{}} />),/Deze regel gecontroleerd/);
   assert.match(renderToStaticMarkup(<RecordReview item={{...item,amountEntered:false}} onReview={()=>{}} />),/disabled/);
 });
+
+test("bank income unlocks foundation with reviewed costs and remains unknown when evidence mismatches", async () => {
+  const {reviewBankIncome}=await import('../src/logic/inputReadiness');
+  const items=[{id:'salary',naam:'Salary',bedrag:2000,amountEntered:true,bankEvidence:{transactionIds:['tx'],through:'2026-10-23'}}];
+  const tx=[{id:'tx',provider:'lunchflow',currency:'EUR',amount:2000,date:'2026-10-23'}];
+  const income=reviewBankIncome(items,tx,{},'2026-10-25');
+  const fixed=checked('fixed',[row(500)]);
+  assert.equal(income.ready,true);
+  assert.equal(income.bankVerified,true);
+  assert.equal(income.total-fixed.total,1500);
+  assert.notEqual(foundationStatus(income,fixed,[]),'Nog onvoldoende gegevens');
+  assert.equal(reviewBankIncome(items,[],{},'2026-10-25').ready,false);
+  assert.equal(reviewBankIncome([{...items[0],bedrag:3000}],tx,{},'2026-10-25').ready,false);
+  assert.equal(reviewBankIncome(items,[{...tx[0],bankPatternKind:'transfer'}],{},'2026-10-25').ready,false);
+  assert.equal(reviewBankIncome([],tx,{},'2026-10-25').ready,false);
+  assert.equal(foundationStatus(income,reviewSection('fixed','Vaste lasten',[],{}),[]),'Nog onvoldoende gegevens');
+});
