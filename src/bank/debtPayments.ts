@@ -2,7 +2,7 @@ import {findBankReversals} from "./periodReconciliation.js";
 import type {SchuldItem,MoneylithTransaction} from '../types.js';
 export const debtLedgerKey='moneylith.personal.debtPayments.v1';
 export type RepaymentRule={enabled:boolean;counterparty:string;reference:string;fromDate:string;accountId?:string};
-export type DebtPayment={transactionId:string;accountId:string;date:string;paidCents:number;allocations:{debtId:string;cents:number}[];source:'confirmed'|'automatic'};
+export type DebtPayment={transactionId:string;accountId:string;date:string;paidCents:number;allocations:{debtId:string;cents:number}[];fixedAllocations?:{fixedId:string;cents:number}[];source:'confirmed'|'automatic'};
 export type DebtLedger={version:1;entries:DebtPayment[]};
 export const emptyDebtLedger=():DebtLedger=>({version:1,entries:[]});
 const cents=(n:number|undefined)=>typeof n==='number'&&Number.isFinite(n)?Math.round(n*100):NaN;
@@ -10,7 +10,7 @@ const normalize=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p
 const validDate=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
 export function validateDebtLedger(value:unknown):value is DebtLedger{
  const v=value as DebtLedger;
- return !!v&&v.version===1&&Array.isArray(v.entries)&&new Set(v.entries.map(e=>e?.transactionId)).size===v.entries.length&&v.entries.every(e=>e&&typeof e.transactionId==='string'&&!!e.transactionId&&typeof e.accountId==='string'&&validDate(e.date)&&Number.isSafeInteger(e.paidCents)&&e.paidCents>0&&['confirmed','automatic'].includes(e.source)&&Array.isArray(e.allocations)&&e.allocations.length>0&&new Set(e.allocations.map(a=>a.debtId)).size===e.allocations.length&&e.allocations.every(a=>typeof a.debtId==='string'&&Number.isSafeInteger(a.cents)&&a.cents>0)&&e.allocations.reduce((n,a)=>n+a.cents,0)<=e.paidCents);
+ return !!v&&v.version===1&&Array.isArray(v.entries)&&new Set(v.entries.map(e=>e?.transactionId)).size===v.entries.length&&v.entries.every(e=>e&&typeof e.transactionId==='string'&&!!e.transactionId&&typeof e.accountId==='string'&&validDate(e.date)&&Number.isSafeInteger(e.paidCents)&&e.paidCents>0&&['confirmed','automatic'].includes(e.source)&&Array.isArray(e.allocations)&&e.allocations.length>0&&new Set(e.allocations.map(a=>a.debtId)).size===e.allocations.length&&e.allocations.every(a=>typeof a.debtId==='string'&&Number.isSafeInteger(a.cents)&&a.cents>0)&&(e.fixedAllocations===undefined||(Array.isArray(e.fixedAllocations)&&new Set(e.fixedAllocations.map(a=>a?.fixedId)).size===e.fixedAllocations.length&&e.fixedAllocations.every(a=>a&&typeof a.fixedId==='string'&&!!a.fixedId&&Number.isSafeInteger(a.cents)&&a.cents>0)))&&e.allocations.reduce((n,a)=>n+a.cents,0)+(e.fixedAllocations??[]).reduce((n,a)=>n+a.cents,0)<=e.paidCents);
 }
 /** References are explicit opt-in. A scheduled date or creditor name alone never establishes payment. */
 export function reconcileDebtPayments(debts:SchuldItem[],transactions:MoneylithTransaction[],ledger:DebtLedger,asOf:string,businessAccountIds:string[]=[]){
@@ -77,8 +77,8 @@ export function confirmDebtAllocation(debts:SchuldItem[],transaction:MoneylithTr
  if(existing&&(existing.paidCents!==paid||existing.accountId!==transaction.accountId||existing.date!==date))throw Error('De bankbetaling is gewijzigd; controleer de bestaande verdeling.');
  if(existing?.allocations.some(a=>a.debtId===debtId))throw Error('Deze betaling is al op deze schuld verwerkt.');
  const allocations=[...(existing?.allocations??[]),{debtId,cents:allocationCents}];
- if(allocations.reduce((n,a)=>n+a.cents,0)>paid)throw Error('De verdeling is hoger dan de bankbetaling.');
- const payment:DebtPayment={transactionId:transaction.id,accountId:transaction.accountId,date,paidCents:paid,allocations,source:'confirmed'};
+ if(allocations.reduce((n,a)=>n+a.cents,0)+(existing?.fixedAllocations??[]).reduce((n,a)=>n+a.cents,0)>paid)throw Error('De verdeling is hoger dan de bankbetaling.');
+ const payment:DebtPayment={transactionId:transaction.id,accountId:transaction.accountId,date,paidCents:paid,allocations,...(existing?.fixedAllocations?{fixedAllocations:existing.fixedAllocations}:{}),source:'confirmed'};
  const next=applyConfirmedDebtPayment(debts,{...payment,allocations:[{debtId,cents:allocationCents}]});
  return {debts:next,ledger:{version:1 as const,entries:[...ledger.entries.filter(e=>e.transactionId!==transaction.id),payment]}};
 }

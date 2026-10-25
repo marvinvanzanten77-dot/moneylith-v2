@@ -60,6 +60,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   if(payment){
    assigned.add(t.id);
    for(const a of payment.allocations){const id='debt:'+a.debtId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
+   for(const a of payment.fixedAllocations??[]){const id='fixed:'+a.fixedId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
    continue;
   }
   if(['transfer','financing','ignore'].includes(t.bankPatternKind??''))continue;
@@ -96,7 +97,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
  };
  const total=(field:'actual'|'expected'|'forecast')=>({income:sum('income',field),fixed:sum('fixed',field),debt:sum('debt',field)});
  const cashMoves=booked.filter(t=>t.amount<0&&(/\bbunq\b/i.test((t.counterparty??'')+' '+t.description)||/geldopname|geldautomaat|cash withdrawal|\batm\b/i.test(t.description)));
- const residual=booked.flatMap(t=>{const p=ledgerTx.get(t.id);const left=p?p.paidCents-p.allocations.reduce((n,a)=>n+a.cents,0):0;return left>0?[{...t,amount:-left/100}]:[];});
+ const residual=booked.flatMap(t=>{const p=ledgerTx.get(t.id);const left=p?p.paidCents-p.allocations.reduce((n,a)=>n+a.cents,0)-(p.fixedAllocations??[]).reduce((n,a)=>n+a.cents,0):0;return left>0?[{...t,amount:-left/100}]:[];});
  const other=[...residual,...booked.filter(t=>!assigned.has(t.id)&&!reversals.has(t.id)&&!cashMoves.some(c=>c.id===t.id)&&!['transfer','ignore'].includes(t.bankPatternKind??''))];
  return {period,start,end,through,closed,rows,expected:total('expected'),actual:total('actual'),forecast:total('forecast'),hasSavedPlan,capturedAt:hasSavedPlan?plan.capturedAt:null,
   checkWindow:Number(asOf.slice(8))>=23||Number(asOf.slice(8))<=7,

@@ -64,3 +64,18 @@ test('confirmed mixed debt allocations preserve remainder, prevent double applic
  const r=reconcilePeriod('2026-10','2026-10-25',p,true,[t],two.ledger,emptyBankRules);
  assert.equal(r.actual.debt,20000);assert.equal(r.unmatched[0].cents,-20000);assert.equal(r.unmatched[0].partlyAllocated,true);
 });
+
+test('combined transfer allocates fixed costs once beside debt repayments and preserves the unallocated remainder',async()=>{
+ const {validateDebtLedger,confirmDebtAllocation}=await import('../src/bank/debtPayments');
+ const t=tx('mixed-fixed','2026-10-24',-400,'Parent');
+ const entry={transactionId:t.id,accountId:t.accountId,date:t.date,paidCents:40000,source:'confirmed' as const,allocations:[{debtId:'a',cents:10000},{debtId:'b',cents:10000}],fixedAllocations:[{fixedId:'insurance',cents:5300},{fixedId:'tax',cents:3300}]};
+ const ledger={version:1 as const,entries:[entry]};assert.ok(validateDebtLedger(ledger));
+ const p=makePeriodPlan([],[{id:'insurance',naam:'Insurance',bedrag:53,dagVanMaand:23,paymentRoute:'third-party'},{id:'tax',naam:'Tax',bedrag:33,dagVanMaand:23,paymentRoute:'third-party'}],[],[],'2026-10-25');
+ const r=reconcilePeriod('2026-10','2026-10-25',p,true,[t,t],ledger,emptyBankRules);
+ assert.equal(r.actual.fixed,8600);assert.equal(r.unmatched[0].cents,-11400);
+ assert.throws(()=>confirmDebtAllocation([{id:'c',naam:'C',openBedrag:300}],t,ledger,'c',11500));
+ const next=confirmDebtAllocation([{id:'c',naam:'C',openBedrag:300}],t,ledger,'c',10000);assert.deepEqual(next.ledger.entries[0].fixedAllocations,entry.fixedAllocations);
+ const refund={...tx('refund-fixed','2026-10-25',400,'Parent'),description:'Terugboeking'};
+ assert.equal(reconcilePeriod('2026-10','2026-10-25',p,true,[t,refund],ledger,emptyBankRules).actual.fixed,0);
+ assert.equal(validateDebtLedger({version:1,entries:[{...entry,fixedAllocations:[{fixedId:'tax',cents:30000}]}]}),false);
+});
