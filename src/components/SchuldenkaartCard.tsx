@@ -10,6 +10,7 @@ type SchuldenSummary = {
 };
 
 export type SchuldItem = {
+  bankRepayment?: import("../bank/debtPayments").RepaymentRule;
   id: string;
   naam: string;
   saldo: number;
@@ -299,7 +300,8 @@ export const SchuldenkaartCard = ({
                         />
                       </div>
                     ) : (
-                      <><div className="space-y-2"><label className="block">Eerste resterende aflossing<input readOnly={isReadOnly} aria-label="Eerste resterende aflossing" type="date" className="w-full rounded-lg border p-2" value={item.firstPaymentDate ?? ""} onChange={e => updateItem(item.id,{firstPaymentDate:e.target.value || undefined})} /></label><label className="block">Resterende maandtermijnen<input readOnly={isReadOnly} aria-label="Resterende maandtermijnen" type="number" min="1" max="600" className="w-full rounded-lg border p-2" value={item.remainingPayments ?? ""} onChange={e => updateItem(item.id,{remainingPayments:e.target.value ? Math.max(1,Math.floor(Number(e.target.value))):undefined})} /></label><p className="text-xs">Vul beide velden in voor een eindig maandschema. Een geplande betaling verlaagt je geregistreerde schuld niet automatisch.</p></div>
+                      <><div className="space-y-2"><label className="block">Eerste resterende aflossing<input readOnly={isReadOnly} aria-label="Eerste resterende aflossing" type="date" className="w-full rounded-lg border p-2" value={item.firstPaymentDate ?? ""} onChange={e => updateItem(item.id,{firstPaymentDate:e.target.value || undefined})} /></label><label className="block">Resterende maandtermijnen<input readOnly={isReadOnly} aria-label="Resterende maandtermijnen" type="number" min="1" max="600" className="w-full rounded-lg border p-2" value={item.remainingPayments ?? ""} onChange={e => updateItem(item.id,{remainingPayments:e.target.value ? Math.max(1,Math.floor(Number(e.target.value))):undefined})} /></label><p className="text-xs">Vul beide velden in voor een eindig maandschema. Een geplande datum is geen bewijs van betaling. Een geboekte bankbetaling met een ingestelde aflossingsomschrijving kan de schuld wel automatisch verlagen.</p></div>
+                    {variant==='personal'&&item.bankRepayment&&<div className="space-y-2 rounded-lg bg-sky-50 p-3 text-sm"><label><input type="checkbox" disabled={isReadOnly} checked={item.bankRepayment.enabled} onChange={e=>updateItem(item.id,{bankRepayment:{...item.bankRepayment!,enabled:e.target.checked}})}/> Aflossingen automatisch verwerken</label><p>Zet in je bankomschrijving: <strong>{item.bankRepayment.reference}</strong></p><p>Bij {item.bankRepayment.counterparty}, vanaf {item.bankRepayment.fromDate}. Alleen de afgesproken maandtermijn wordt verwerkt, eenmaal per betaling. Andere bedragen blijven apart.</p></div>}
                     <label className="flex flex-col gap-1">
                         <span className="text-[11px] font-semibold text-slate-600">Aflosdag (bijv. 15 of 15-01-2024)</span>
                         <input

@@ -81,7 +81,7 @@ test('scheduled bank processor loads with native production ESM resolution',asyn
  const folder=await fs.mkdtemp(path.join(os.tmpdir(),'moneylith-bank-esm-'));
  try{
   await fs.writeFile(path.join(folder,'package.json'),'{"type":"module"}');
-  for(const file of ['server/lunchflow/accountSync','server/lunchflow/client','server/utils/cloudStore','server/utils/cloudAuth','server/utils/cookies','src/bank/processSync','src/bank/lunchflowMerge','src/bank/patterns','src/bank/financialImport','src/bank/classificationRules','src/bank/lunchflowTypes','src/storage/cloudState','src/storage/cloudRecovery','src/monitoring/engine','src/bank/spending','src/bank/choiceGuidance']){
+  for(const file of ['server/lunchflow/accountSync','server/lunchflow/client','server/utils/cloudStore','server/utils/cloudAuth','server/utils/cookies','src/bank/processSync','src/bank/debtPayments','src/bank/lunchflowMerge','src/bank/patterns','src/bank/financialImport','src/bank/classificationRules','src/bank/lunchflowTypes','src/storage/cloudState','src/storage/cloudRecovery','src/monitoring/engine','src/bank/spending','src/bank/choiceGuidance']){
    const source=await fs.readFile(file+'.ts','utf8');const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
    const dest=path.join(folder,file+'.js');await fs.mkdir(path.dirname(dest),{recursive:true});await fs.writeFile(dest,output);
   }

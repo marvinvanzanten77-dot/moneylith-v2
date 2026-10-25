@@ -1,3 +1,4 @@
+import {DebtPaymentsPanel} from "./components/DebtPaymentsPanel";
 import {costForMonth} from "./logic/monthlyCosts";
 import {processBankSync} from "./bank/processSync";
 import {collectCloudState} from "./storage/cloudState";
@@ -2060,7 +2061,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const setUiState = isBusinessVariant ? setDebtsUiStateBusiness : setDebtsUiState;
 
     return (
-      <StepSchulden
+      <><StepSchulden
         financialSnapshot={isBusinessVariant ? undefined : financialSnapshot}
         debts={isBusinessVariant ? businessDebtCards : personalDebtCards}
         onDebtsChange={items => setDebtsFn(fromDebtCardItems(items))}
@@ -2073,7 +2074,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         futureIncomes={futureIncomesForMode}
         debtsUiState={uiState}
         onDebtsUiStateChange={setUiState}
-      />
+      />{!isBusinessVariant&&<DebtPaymentsPanel debts={debts} transactions={transactions}/> }</>
     );
   };
 
@@ -2197,8 +2198,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     if (normalizedStep === "bank") return (
       <div className="space-y-4">
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
-        const {result,financial} = processBankSync(collectCloudState(window.localStorage), snapshots, mappings, today());
-        persistLunchflow(window.localStorage, result, financial);
+        const {result,financial,debtPayments} = processBankSync(collectCloudState(window.localStorage), snapshots, mappings, today());
+        persistLunchflow(window.localStorage, result, financial, debtPayments?.applied?debtPayments:undefined);
+        if(debtPayments?.applied){setDebts(debtPayments.debts);window.dispatchEvent(new Event("moneylith:cloud-restored"));}
         setAccounts(result.accounts);
         setTransactions(result.transactions);
         if (financial) {
@@ -2213,7 +2215,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         <h3 className="font-semibold">Verwerkt in je eigen administratie</h3>
         <p>{bankImportResult.addedIncome} inkomsten en {bankImportResult.addedFixed} vaste lasten toegevoegd aan Fundament. {bankImportResult.updatedIncome} inkomsten bijgewerkt naar de laatste bankontvangst. Controleer daar bedragen en betaaldagen en bevestig de invoer.</p>
         <p className="mt-2 text-sm">Overige afschrijvingen in de opgehaalde gegevens van de laatste 30 dagen: {formatCurrency(bankImportResult.otherOutflows30Days)} ({bankImportResult.otherOutflowCount} transacties). Dit zijn geen vastgestelde maandlasten; ook eenmalige uitgaven kunnen hierin staan.</p>
-        <p className="mt-2 text-sm">{bankImportResult.excludedTransfers} mogelijke interne overboekingen uitgesloten van herkenning. Handmatige invoer blijft behouden; inkomen met “Volg het laatst opgehaalde inkomen” wordt bijgewerkt. Schuldsaldi, doelen en toekomstige bedragen worden niet afgeleid.</p>
+        <p className="mt-2 text-sm">{bankImportResult.excludedTransfers} mogelijke interne overboekingen uitgesloten van herkenning. Handmatige invoer blijft behouden; inkomen met “Volg het laatst opgehaalde inkomen” wordt bijgewerkt. Schulden worden alleen verlaagd bij expliciet gekoppelde aflossingen. Doelen en toekomstige bedragen worden niet afgeleid.</p>
         {bankImportResult.blocked.length > 0 && <p className="mt-2 text-sm">{bankImportResult.blocked.length} herkenningen niet automatisch toegevoegd omdat er al eigen invoer is. Vergelijk in Fundament: {bankImportResult.blocked.map(c => `${c.naam} (${formatCurrency(c.bedrag)})`).join(", ")}.</p>}
       </div>}
       </div>

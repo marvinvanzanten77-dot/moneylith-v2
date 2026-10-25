@@ -38,7 +38,10 @@ export async function syncBankAccount(email:string,apiKey:string,scanId:string=c
    const mappings=current.filter(a=>snapshots.some(s=>s.account.id===a.bankAccountId)).map(a=>({providerId:a.bankAccountId!,targetId:a.id}));
    const processed=processBankSync(state,snapshots,mappings,amsterdamDate(now));
    const ok=processed.result.reports.filter(r=>r.ok).length,failed=current.length-ok;
-   const message=failure||(!current.length?'Geen rekeningen gekoppeld. Open Bank om rekeningen te verbinden.':failed?`Banksynchronisatie gedeeltelijk of niet geslaagd (${ok} van ${current.length} rekeningen). Eerdere gegevens van mislukte rekeningen zijn behouden. ${processed.result.reports.filter(r=>!r.ok).map(r=>r.message).join(' ')}`:`${ok} rekeningen opgehaald en verwerkt. Er zijn ${processed.result.reports.reduce((n,r)=>n+r.added,0)} nieuwe geboekte transacties. Lunch Flow kan achterlopen op de bank.`);
+   const baseMessage=failure||(!current.length?'Geen rekeningen gekoppeld. Open Bank om rekeningen te verbinden.':failed?`Banksynchronisatie gedeeltelijk of niet geslaagd (${ok} van ${current.length} rekeningen). Eerdere gegevens van mislukte rekeningen zijn behouden. ${processed.result.reports.filter(r=>!r.ok).map(r=>r.message).join(' ')}`:`${ok} rekeningen opgehaald en verwerkt. Er zijn ${processed.result.reports.reduce((n,r)=>n+r.added,0)} nieuwe geboekte transacties. Lunch Flow kan achterlopen op de bank.`);
+   const debtMessage=processed.debtPayments?.applied?` ${processed.debtPayments.applied} aflossingen verwerkt in Schulden. Het banksaldo is niet nogmaals verlaagd.`:'';
+   const questions=processed.debtPayments?.questions.length??0;
+   const message=baseMessage+debtMessage+(questions?` ${questions} betalingen vragen controle bij Schulden.`:'');
    const scan:BankScan={id:scanId,at:now.toISOString(),ok,failed:failure?Math.max(1,failed):failed,added:processed.result.reports.reduce((n,r)=>n+r.added,0),updatedIncome:processed.financial?.updatedIncome??0,message};
    const next={...processed.state,[scanKey]:JSON.stringify(scan)};
    if(await setCloudSnapshot(email,encryptCloudPayload(JSON.stringify(next)),record?.revision??null))return scan;

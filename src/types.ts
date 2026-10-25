@@ -44,6 +44,7 @@ export interface FixedCostManualItem {
 }
 
 export type SchuldItem = {
+  bankRepayment?: import("./bank/debtPayments").RepaymentRule;
   id: string;
   naam: string;
   crediteur?: string;

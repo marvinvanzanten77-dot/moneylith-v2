@@ -165,6 +165,7 @@ export function persistLunchflow(
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
   result: ReturnType<typeof mergeLunchflow>,
   financial?: { income: import("../types").IncomeItem[]; fixedCosts: import("../types").FixedCostManualItem[]; seen: string[]; rules?: import("./classificationRules").BankRuleSettings; decisions?: import("./patterns").PatternDecisions },
+  debtPayments?: Pick<ReturnType<typeof import("./debtPayments").reconcileDebtPayments>, "debts" | "ledger">,
 ) {
   const keys = [
     "moneylith.personal.accounts",
@@ -179,6 +180,7 @@ export function persistLunchflow(
       keys.push("moneylith.personal.bankPatterns.v1"); values.push(financial.decisions);
     }
   }
+  if(debtPayments){keys.push("moneylith.personal.debts","moneylith.personal.debtPayments.v1");values.push(debtPayments.debts,debtPayments.ledger);}
   const previous = keys.map((key) => storage.getItem(key));
   try {
     keys.forEach((key, i) => storage.setItem(key, JSON.stringify(values[i])));
