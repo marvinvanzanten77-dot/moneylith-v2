@@ -26,6 +26,7 @@ export type Input = {
   assumptions: string[];
   goals: Goal[];
   savedScenario?: Event[];
+  commitments?: Array<{label:string;expected:number|null;paid:number|null;remaining:number|null;date:string|null;note:string}>;
 };
 export type Options = {
   monthlyDay: number | null;

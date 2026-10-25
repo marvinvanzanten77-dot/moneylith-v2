@@ -49,14 +49,14 @@ test('withheld fixed cost remains recorded but no second cash debit; unknown amo
  assert.equal(manualReviewRows([{...withheld,amountEntered:false}])[0].complete,false);
  const input=personalInput({fixedCosts:[withheld,budget]}, {...emptyOptions(),monthlyDay:23},'2026-10-22');
  assert.equal(input.events.find(e=>e.id==='fixed:cak:2026-10-23')?.amount,0);
- assert.equal(input.events.find(e=>e.id==='fixed:budget:2026-10-23')?.amount,-5000);
+ assert.equal(input.events.filter(e=>e.id.startsWith('fixed:budget:budget:')&&e.date!>='2026-10-23'&&e.date!<='2026-11-22').reduce((s,e)=>s+e.amount!,0),-5000);
 });
 test('remaining debt schedules start on exact date and stop after two and three payments',()=>{
  const debts=[{id:'a',naam:'Lening A',openBedrag:200,minBetaling:100,firstPaymentDate:'2026-10-23',remainingPayments:2},{id:'b',naam:'Lening B',openBedrag:300,minBetaling:100,firstPaymentDate:'2026-10-23',remainingPayments:3}];
  const input=personalInput({debts},emptyOptions(),'2026-10-22');
  assert.deepEqual(input.events.filter(e=>e.debtId==='a').map(e=>e.date),['2026-10-23','2026-11-23']);
  assert.deepEqual(input.events.filter(e=>e.debtId==='b').map(e=>e.date),['2026-10-23','2026-11-23','2026-12-23']);
- assert.equal(personalInput({debts},emptyOptions(),'2026-12-24').events.filter(e=>e.source==='debt').length,0);
+ const unpaid=personalInput({debts},emptyOptions(),'2026-12-24').events.filter(e=>e.source==='debt');assert.equal(unpaid.length,5);assert.ok(unpaid.every(e=>e.date==='2026-12-25')); // elapsed dates do not establish payment
  assert.equal(personalInput({debts:[{...debts[0],firstPaymentDate:undefined}]},emptyOptions(),'2026-10-22').missing.some(m=>m.includes('aflosschema')),true);
 });
 test('specific third party fixed payments can precede general family financing without using name alone',()=>{
@@ -68,7 +68,8 @@ test('specific third party fixed payments can precede general family financing w
 test('budget and withheld manual costs still count correctly alongside legacy detected costs',()=>{
  const input=personalInput({fixedCosts:[budget,{id:'health',naam:'Inhouding',bedrag:100,amountEntered:true,paymentRoute:'withheld',dagVanMaand:23}],detectedFixedCosts:[{id:'rent',descriptionPattern:'Huur',estimatedMonthlyAmount:500,isFixed:true,isIgnored:false}]},{...emptyOptions(),monthlyDay:23},'2026-10-22');
  const due=input.events.filter(e=>e.date==='2026-10-23'&&e.id.startsWith('fixed:'));
- assert.equal(due.reduce((s,e)=>s+(e.amount??0),0),-55000);
+ assert.equal(due.filter(e=>e.id.startsWith('fixed:rent')).reduce((s,e)=>s+(e.amount??0),0),-100000); // unpaid current period plus next period
+ assert.equal(input.events.filter(e=>e.id.startsWith('fixed:budget:budget:')&&e.date!<='2026-11-22').reduce((s,e)=>s+e.amount!,0),-5000);
 });
 test('AI context explicitly treats salary withholdings as notes and distinguishes budget excess',async()=>{
  const {buildChatRequest}=await import('../src/ai/context');

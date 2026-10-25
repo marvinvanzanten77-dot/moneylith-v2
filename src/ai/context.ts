@@ -137,6 +137,7 @@ export function buildChatRequest(value: unknown) {
       "goals",
       "aiBuckets",
       "fuelOverrides",
+      "bankRules", "debtPayments", "periodPaid",
     ]);
     projectionInput = personalInput((context as {data: import("../core/moneylithSnapshot.js").MoneylithSnapshotDomain}).data, projectionOptions, today());
   } else {
@@ -206,6 +207,7 @@ export function buildChatRequest(value: unknown) {
     };
   }
   const requestedScenario = questionScenario(body.question, projectionInput, projectionOptions);
+  (context as Record<string, unknown>).remainingCommitments = projectionInput.commitments ?? [];
   const projection = compare(projectionInput, requestedScenario.scenario ?? body.projectionScenario as import("../projection/engine.js").Scenario | null);
   const computedReply = projectionQuestion(body.question) ? projectionSummary(projection, requestedScenario.note) : undefined;
   (context as Record<string, unknown>).forecast = projection.scenario.complete ? projection.scenario.horizons : null;

@@ -20,6 +20,9 @@ export type MoneylithSnapshotDomain = {
   inbox?: unknown;
   aiBuckets?: unknown;
   fuelOverrides?: unknown;
+  bankRules?: unknown;
+  debtPayments?: unknown;
+  periodPaid?: unknown;
 };
 
 export type MoneylithSnapshot = {
@@ -68,6 +71,9 @@ const normalizeDomain = (domain?: MoneylithSnapshotDomain): MoneylithSnapshotDom
   inbox: asArray(domain?.inbox),
   aiBuckets: asArray(domain?.aiBuckets),
   fuelOverrides: asObject(domain?.fuelOverrides),
+  bankRules: asObject(domain?.bankRules),
+  debtPayments: asObject(domain?.debtPayments),
+  periodPaid: asObject(domain?.periodPaid),
 });
 
 const normalizeMessages = (

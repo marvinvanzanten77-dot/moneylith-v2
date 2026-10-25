@@ -1,3 +1,4 @@
+import {BankBalanceSync} from "./BankBalanceSync";
 import {UpdateApp} from '../pwa/UpdateApp';
 import { MobileLayout } from "../mobile/MobileLayout";
 import { useCompactMode } from "../mobile/useCompactMode";
@@ -111,6 +112,7 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
               Stap: {step}
             </div>
           </div>
+          {mode === "personal" && <BankBalanceSync bank={props.mobile?.bank}/>}
           <NotificationCenter key={mode} mode={mode} onLogin={onLogin} expanded={mode==='personal'&&step==='Inbox'?true:undefined} hideTrigger={mode==='personal'&&step==='Inbox'}/>
           {banner}
           <div className="space-y-4">{children}</div>

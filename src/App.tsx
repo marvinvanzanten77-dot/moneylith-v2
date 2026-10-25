@@ -1,3 +1,7 @@
+import {periodPaidKey,type PeriodPaid} from "./bank/periodReconciliation";
+import {findBankReversals} from "./bank/periodReconciliation";
+import {confirmDebtAllocation,emptyDebtLedger,debtLedgerKey} from "./bank/debtPayments";
+import {PeriodFoundation} from "./components/PeriodFoundation";
 import {DebtPaymentsPanel} from "./components/DebtPaymentsPanel";
 import {costForMonth} from "./logic/monthlyCosts";
 import {processBankSync} from "./bank/processSync";
@@ -241,6 +245,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assets, setAssets] = useLocalStorage<AssetItem[]>("moneylith.personal.assets", []);
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
+  const [periodPaid,setPeriodPaid]=useLocalStorage<PeriodPaid>(periodPaidKey,{});
+  const [projectionDebtLedger]=useLocalStorage(debtLedgerKey,emptyDebtLedger());
   const [bankRules, setBankRules] = useLocalStorage<BankRuleSettings>("moneylith.personal.bankRules.v1", emptyBankRules);
   const [bankPatternDecisions, setBankPatternDecisions] = useLocalStorage<PatternDecisions>("moneylith.personal.bankPatterns.v1", {});
   const [bankImportSeen, setBankImportSeen] = useLocalStorage<string[]>("moneylith.personal.bankImportSeen", []);
@@ -1312,7 +1318,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         futureIncome: futureIncomeItems,
         detectedFixedCosts: mergedFixedCostItems,
         inputReviews: personalReviews,
-        transactions,
+        transactions:classifiedBankTransactions,
         income: incomeItems,
         fixedCosts: fixedCostManualItems,
         debts,
@@ -1322,6 +1328,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         inbox: inboxItems,
         aiBuckets: aiBucketsStoredPersonal,
         fuelOverrides: fuelOverridesStoredPersonal,
+        bankRules, debtPayments:projectionDebtLedger, periodPaid,
       },
       business: {
         accounts: accountsBusiness,
@@ -1359,6 +1366,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     fixedCostManualItemsBusiness,
     fuelOverridesStoredBusiness,
     fuelOverridesStoredPersonal,
+    bankRules, projectionDebtLedger, periodPaid, classifiedBankTransactions,
     goals,
     goalsBusiness,
     inboxItems,
@@ -1915,6 +1923,15 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           <p>{bankPendingQuestions} aankoopgroepen uit deze maand wachten op jouw uitleg. Help ze bij Patronen in het juiste potje te plaatsen. Vaste lasten blijven in dit overzicht.</p>
           <button type="button" className="mt-2 rounded-lg bg-amber-500 px-3 py-2 font-semibold" onClick={() => setCurrentStep("afschriften")}>Betalingen benoemen</button>
         </div>}
+        {!isBusinessVariant && <PeriodFoundation paid={periodPaid} setPaid={setPeriodPaid} income={incomeItems} fixed={fixedCostManualItems} detected={mergedFixedCostItems} debts={debts} transactions={classifiedBankTransactions} rules={bankRules} asOf={projectionDate} onFixedChange={setFixedCostManualItems} onDebtPayment={(transactionId,debtId,cents)=>{
+          const tx=transactions.find(t=>t.id===transactionId);if(!tx||bankRules.accountRoles[tx.accountId]==='business')throw Error('Geen persoonlijke bankbetaling gevonden.');
+          const reversals=findBankReversals(transactions);if(reversals.reversedDebits.has(tx.id)||reversals.uncertainDebits.has(tx.id))throw Error('Deze betaling is mogelijk teruggeboekt; controleer eerst de bankhistorie.');
+          const ledger=JSON.parse(localStorage.getItem(debtLedgerKey)??JSON.stringify(emptyDebtLedger()));
+          const next=confirmDebtAllocation(debts,tx,ledger,debtId,cents);
+          persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);
+          setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
+        }}/>}
+        <details open={isBusinessVariant || undefined} className="space-y-4"><summary className="cursor-pointer font-semibold">Inschattingen en vaste gegevens bewerken</summary>
         <IncomeList
           confirmed={sections.income.ready}
           items={incomeItemsSource}
@@ -1947,7 +1964,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         />
         {renderInputReview(variant, "fixed")}
         {fixedHelp && <p className="text-xs text-slate-200">{fixedHelp}</p>}
-        <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-slate-100 shadow-sm space-y-2">
+        {isBusinessVariant && <div className="rounded-xl border border-white/20 bg-white/10 p-4 text-slate-100 shadow-sm space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-slate-50">{freeLabel}</p>
             <span className="rounded-full border border-white/20 px-3 py-0.5 text-[11px] text-slate-100">
@@ -1960,7 +1977,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
           <p className="text-xs text-slate-300">
             Inkomsten en vaste lasten komen uit de tabellen hierboven. Ingehouden lasten worden niet opnieuw afgetrokken. Bevestigde budgetten tellen eenmaal mee. De wizardlijst wordt aangevuld met lasten met een opgegeven betaalwijze en budgetten.
           </p>
-        </div>
+        </div>}
+        </details>
       </div>
     );
   };

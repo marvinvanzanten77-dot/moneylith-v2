@@ -1,0 +1,71 @@
+import type {MoneylithSnapshotDomain} from '../core/moneylithSnapshot.js';
+import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithTransaction} from '../types.js';
+import {makePeriodPlan,reconcilePeriod,salaryPeriod,periodBounds} from '../bank/periodReconciliation.js';
+import {emptyBankRules,validateBankRules} from '../bank/classificationRules.js';
+import {emptyDebtLedger,validateDebtLedger} from '../bank/debtPayments.js';
+import {costForMonth} from '../logic/monthlyCosts.js';
+import {addDays,type Input,type Options} from './engine.js';
+const list=<T>(v:unknown):T[]=>Array.isArray(v)?v.filter(x=>x&&typeof x==='object'):[];
+const euro=(c:number)=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(c/100);
+/** Reconcile commitments against booked evidence; never change source data or bank balances. */
+export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,options:Options){
+ const fixed=list<FixedCostManualItem>(data.fixedCosts),detected=list<FixedCostItem>(data.detectedFixedCosts);
+ const rules=validateBankRules(data.bankRules)?data.bankRules:emptyBankRules;
+ const ledger=validateDebtLedger(data.debtPayments)?data.debtPayments:emptyDebtLedger();
+ const period=salaryPeriod(input.asOf),bounds=periodBounds(period);
+ const plan=makePeriodPlan(list<IncomeItem>(data.income),fixed,detected,list<SchuldItem>(data.debts),input.asOf);
+ const paid=data.periodPaid&&typeof data.periodPaid==='object'?(data.periodPaid as Record<string,Record<string,number>>)[period]:undefined;
+ const report=reconcilePeriod(period,input.asOf,plan,true,list<MoneylithTransaction>(data.transactions),ledger,rules,paid&&typeof paid==='object'?paid:{});
+ const funding:Record<string,number>={card:0,cash:0};
+ for(const move of report.cashMoves)funding[move.label==='Naar bunq'?'card':'cash']+=move.cents;
+ for(const row of report.rows)if(row.route==='card'||row.route==='cash')funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
+ input.commitments=[];
+ for(const row of report.rows.filter(r=>r.kind==='fixed'||r.kind==='debt')){
+  const debt=row.kind==='debt'?list<SchuldItem>(data.debts).find(d=>'debt:'+d.id===row.id):undefined;
+  if(row.kind==='debt'&&(!debt||debt.firstPaymentDate!==undefined||debt.remainingPayments!==undefined||!row.expected))continue;
+  const raw=fixed.find(f=>'fixed:'+f.id===row.id);
+  const id=row.id.startsWith('detected:')?'fixed:'+row.id.slice(9):row.id;
+  if(row.route==='withheld')continue;
+  const matches=(event:Input['events'][number])=>event.id===id||event.id.startsWith(id+':');
+  if(row.budget&&raw){
+   input.events=input.events.filter(e=>!matches(e));
+   let start=addDays(input.asOf,1);
+   const horizon=addDays(input.asOf,365);
+   while(start<=horizon){
+    const p=salaryPeriod(start),end=periodBounds(p).end;
+    const resolved=costForMonth(raw,p);
+    const budget=resolved.amountEntered===false||!Number.isFinite(resolved.bedrag)?null:Math.round(resolved.bedrag*100);
+    const remaining=budget===null?null:Math.max(0,budget-(p===period?(row.actual??0):0));
+    const days=Math.round((Date.parse(end)-Date.parse(start))/86400000)+1;
+    for(let n=0;n<days&&addDays(start,n)<=horizon;n++)input.events.push({id:id+':budget:'+addDays(start,n),label:row.label+' — resterend budget',date:addDays(start,n),amount:remaining===null?null:-(Math.floor(remaining/days)+(n<remaining%days?1:0)),source:'fixed',basis:'assumption'});
+    start=addDays(end,1);
+   }
+   const left=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
+   const elapsed=Math.round((Date.parse(input.asOf)-Date.parse(bounds.start))/86400000)+1;
+   const duration=Math.round((Date.parse(bounds.end)-Date.parse(bounds.start))/86400000)+1;
+   const pace=row.actual!==null&&elapsed>=7?Math.round(row.actual/elapsed*duration):null;
+   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining:left,date:bounds.end,note:pace!==null&&row.expected!==null&&pace>row.expected?`Bij hetzelfde uitgaventempo ongeveer ${euro(pace-row.expected)} boven budget; dit is een aanname en nog niet extra afgetrokken.`:'Resterend budget gelijkmatig verdeeld tot de 22ste; aankoopdagen zijn aannames.'});
+   continue;
+  }
+  // Only this salary period is reconciled. Later periods keep their configured amounts.
+  input.events=input.events.filter(e=>!(matches(e)&&(e.date===null||e.date<=bounds.end)));
+  const observed=detected.find(d=>'detected:'+d.id===row.id)?.lastDate;
+  const day=debt?.afschrijfDag||raw?.dagVanMaand||(observed&&/^\d{4}-\d{2}-\d{2}$/.test(observed)?Number(observed.slice(8)):null)||options.monthlyDay;
+  let date:string|null=null;
+  if(day&&Number.isInteger(day)&&day>=1&&day<=31){
+   const month=day>=23?bounds.start.slice(0,7):bounds.end.slice(0,7);
+   const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).getUTCDate();
+   date=month+'-'+String(Math.min(day,end)).padStart(2,'0');
+  }
+  let remaining=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
+  let funded=0;
+  if((row.route==='card'||row.route==='cash')&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
+  const pending=remaining===null||remaining>0;
+  const assumed=pending&&(!date||date<=input.asOf);
+  if(assumed)date=addDays(input.asOf,1);
+  const note=funded>0?`${euro(funded)} al naar bunq/contant verplaatst; geen tweede bankuitgave. De betaling van deze post is daarmee niet bewezen. `+(assumed?'Resterende financiering voorlopig morgen gepland.':''):assumed?'Nog niet volledig via betaling herkend; voorlopig morgen ingepland, geen bevestigde incassodatum.':row.reversed?'Teruggeboekt: opnieuw als nog te betalen opgenomen.':'Alleen het nog niet herkende deel wordt verwacht; betaald geldt pas na sync of bevestiging.';
+  if(pending)input.events.push({id:id+':remaining:'+period,label:row.label+' — nog verwacht',date,amount:remaining===null?null:-remaining,source:debt?'debt':'fixed',...(debt?{kind:'repayment' as const,debtId:debt.id}:{}),basis:!assumed&&raw?.monthlyAmounts!==undefined?'input':'assumption'});
+  input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining,date,note});
+ }
+ input.assumptions.push('De huidige salarisperiode loopt van '+bounds.start+' tot '+bounds.end+'. Reeds herkende betalingen zitten in het banksaldo en worden niet opnieuw afgetrokken. Nog niet herkende lasten blijven gepland; een verstreken datum bewijst geen betaling.','Budgetten voor dagelijkse uitgaven gebruiken alleen het resterende bedrag tot de 22ste. Hetzelfde uitgaventempo is een indicatie, geen bewezen extra uitgave. Bunq en contant blijven beperkt zichtbaar: een top-up of opname bewijst geen betaling van een specifieke last.');
+}

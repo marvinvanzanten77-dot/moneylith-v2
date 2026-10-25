@@ -28,7 +28,7 @@ export interface FixedCostManualItem {
   monthlyVariable?: boolean;
   monthlyAmounts?: Record<string, number | null>; // Explicit amounts per YYYY-MM; absent is unknown.
   reviewedInput?: string;
-  paymentRoute?: "bank" | "card" | "third-party" | "withheld";
+  paymentRoute?: "bank" | "card" | "cash" | "third-party" | "withheld";
   amountRange?: { min: number; max: number };
   budgetCategory?: string;
   budgetSince?: string; // YYYY-MM; budgets never rewrite earlier months.

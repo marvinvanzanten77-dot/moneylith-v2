@@ -1,3 +1,5 @@
+import {validateBankRules} from "../bank/classificationRules.js";
+import {remainingPayments} from "./remainingPayments.js";
 import {costForMonth} from "../logic/monthlyCosts.js";
 import type { MoneylithSnapshotDomain } from "../core/moneylithSnapshot.js";
 import {
@@ -133,7 +135,7 @@ export function personalInput(
   if (bankIncome) input.assumptions.push("Inkomen volgt de gekoppelde bankontvangst; herhaling is een verwachting, geen gegarandeerd salaris.");
   if (options.reservedNow == null) input.assumptions.push("Geen reserveringen opgegeven: de basisverwachting trekt geen extra reservering af. Dit bevestigt niet dat er geen reserveringen zijn.");
   if (options.variableMonthly === null) input.assumptions.push("Geen aanvullend uitgavenbudget opgegeven: alleen de bekende lasten en budgetten zijn meegenomen. Overige uitgaven kunnen de ruimte verlagen.");
-  const accounts = rows(data.accounts).filter((r) => r.active === true);
+  const accounts = rows(data.accounts).filter((r) => r.active === true && (!validateBankRules(data.bankRules) || data.bankRules.accountRoles[String(r.id)] !== "business"));
   if (!accounts.length || accounts.some((r) => amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance) === null))
     input.missing.push("Actieve rekeningen met ingevulde saldi");
   else if (!options.confirmOpening && !accounts.every(r => r.bankProvider === "lunchflow" && r.currency === "EUR" && typeof r.bankBalanceFetchedAt === "string" && Number.isFinite(Date.parse(r.bankBalanceFetchedAt)) && new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(r.bankBalanceFetchedAt)) === asOf))
@@ -174,12 +176,12 @@ export function personalInput(
         amount(r.customMonthlyAmount ?? r.estimatedMonthlyAmount) === null
           ? null
           : -amount(r.customMonthlyAmount ?? r.estimatedMonthlyAmount)!,
-        options.monthlyDay,
+        validDate(r.lastDate)?Number(r.lastDate.slice(8)):options.monthlyDay ?? 23,
         "pattern",
       );
   }
   for (const r of fixed.filter(r => !detected.length || r.paymentRoute || r.budgetCategory)) {
-    const day=Number.isInteger(r.dagVanMaand)&&Number(r.dagVanMaand)>0&&Number(r.dagVanMaand)<=31?Number(r.dagVanMaand):options.monthlyDay;
+    const day=Number.isInteger(r.dagVanMaand)&&Number(r.dagVanMaand)>0&&Number(r.dagVanMaand)<=31?Number(r.dagVanMaand):options.monthlyDay ?? 23;
     const row=r as unknown as import("../types").FixedCostManualItem;
     if(row.monthlyAmounts!==undefined&&row.monthlyVariable!==false){
       const dates=monthlyDates(asOf,day);
@@ -229,7 +231,7 @@ export function personalInput(
       for (let n=0; n<Number(r.remainingPayments); n++) {
         const y=Number(first.slice(0,4)), m=Number(first.slice(5,7))-1+n;
         const date=new Date(Date.UTC(y,m,Math.min(firstDay,new Date(Date.UTC(y,m+1,0)).getUTCDate()))).toISOString().slice(0,10);
-        if(date > asOf && date <= addDays(asOf,365) && principal !== 0) input.events.push({id:`debt:${r.id}:${date}`,label:name(r),date,amount:payment === null ? null : -payment,source:"debt",basis:"assumption",kind:"repayment",debtId:String(r.id)});
+        if(date <= addDays(asOf,365) && principal !== 0) input.events.push({id:`debt:${r.id}:${date}`,label:name(r),date:date<=asOf?addDays(asOf,1):date,amount:payment === null ? null : -payment,source:"debt",basis:"assumption",kind:"repayment",debtId:String(r.id)});
       }
       input.assumptions.push(name(r) + ": resterende betaaldata zijn vastgelegd; een verstreken datum bewijst geen betaling. Werk het schuldsaldo bij na betaling.");
     } else if (principal !== 0)
@@ -267,12 +269,13 @@ export function personalInput(
     });
   input.assumptions.push(
     "Inhoudingen op loonstroken zijn uitsluitend administratief en veranderen het ontvangen inkomen of de prognose niet. Lasten met betaalwijze ingehouden zijn al verwerkt in het ontvangen inkomen; geen tweede afschrijving.",
-    "Maandinkomsten en lasten herhalen volgens de ingevoerde bedragen. Rente en tariefwijzigingen zonder invoer zijn niet berekend. Doelen zijn voornemens, geen extra automatische betalingen.",
+    "Ontbrekende toekomstige betaaldata van vaste lasten worden voorlopig op de 23ste gepland. Maandinkomsten en lasten herhalen volgens de ingevoerde bedragen. Rente en tariefwijzigingen zonder invoer zijn niet berekend. Doelen zijn voornemens, geen extra automatische betalingen.",
   );
   if (options.monthlyDay !== null)
     input.assumptions.push(
       `Ontbrekende maandelijkse betaalmomenten zijn aangenomen op dag ${options.monthlyDay}; korte maanden gebruiken hun laatste dag.`,
     );
+  remainingPayments(input,data,options);
   return input;
 }
 export function businessInput(

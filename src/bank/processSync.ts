@@ -1,3 +1,4 @@
+import {periodPlansKey,capturePeriodPlan,makePeriodPlan,type PeriodPlans} from "./periodReconciliation.js";
 import {reconcileDebtPayments,debtLedgerKey,emptyDebtLedger,validateDebtLedger} from './debtPayments.js';
 import {mergeLunchflow,type LunchMapping} from './lunchflowMerge.js';
 import {classifyBankTransactions,type PatternDecisions} from './patterns.js';
@@ -29,6 +30,8 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
   financial.updatedIncome=income.filter((item,index)=>JSON.stringify(item)!==JSON.stringify(financial.income[index])).length;
  }
  const next={...state};
+ const periodPlans=financial?capturePeriodPlan(read<PeriodPlans>(state,periodPlansKey,{}),makePeriodPlan(income,fixed,detected,read<import('../types').SchuldItem[]>(state,'moneylith.personal.debts',[]),asOf),asOf):undefined;
+ if(periodPlans)next[periodPlansKey]=JSON.stringify(periodPlans);
  const ledger=read(state,debtLedgerKey,emptyDebtLedger());
  if(!validateDebtLedger(ledger))throw Error('Ongeldige aflossingshistorie; synchronisatie niet opgeslagen.');
  const debtPayments=result.reports.some(r=>r.ok)?reconcileDebtPayments(read<import('../types').SchuldItem[]>(state,'moneylith.personal.debts',[]),result.transactions,ledger,asOf,Object.entries(rules.accountRoles).filter(([,role])=>role==='business').map(([id])=>id)):undefined;
@@ -37,5 +40,5 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
  next['moneylith.personal.accounts']=JSON.stringify(result.accounts);
  next['moneylith.personal.transactions']=JSON.stringify(result.transactions);
  if(financial){next['moneylith.personal.income']=JSON.stringify(financial.income);next['moneylith.personal.fixedCosts']=JSON.stringify(financial.fixedCosts);next['moneylith.personal.bankImportSeen']=JSON.stringify(financial.seen);}
- return {state:next,result,financial,debtPayments};
+ return {state:next,result,financial:financial?{...financial,periodPlans}:undefined,debtPayments};
 }
