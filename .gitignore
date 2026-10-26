@@ -7,3 +7,6 @@ dist/
 Thumbs.db
 .vercel
 .env*.local
+
+# bunq private installation keys and session tokens
+.bunq/

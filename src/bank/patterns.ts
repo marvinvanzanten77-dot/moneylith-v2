@@ -43,7 +43,7 @@ export function indexBankPatterns(transactions: MoneylithTransaction[], asOf: st
   if (!Number.isFinite(end) || ![90, 180, 365, 730].includes(days)) throw Error("Ongeldige analyseperiode.");
   const seen = new Set<string>();
   const rows = transactions.filter(t => {
-    if (seen.has(t.id) || t.provider !== "lunchflow" || t.currency !== "EUR" || !Number.isFinite(t.amount) || t.amount === 0 ||
+    if (seen.has(t.id) || (t.provider !== 'lunchflow' && t.provider !== 'bunq') || t.currency !== "EUR" || !Number.isFinite(t.amount) || t.amount === 0 ||
         !/^\d{4}-\d{2}-\d{2}$/.test(t.date) || !Number.isFinite(day(t.date)) || new Date(t.date).toISOString().slice(0, 10) !== t.date || day(t.date) > end || day(t.date) < end - days) return false;
     seen.add(t.id); return true;
   });
@@ -76,7 +76,7 @@ export function indexBankPatterns(transactions: MoneylithTransaction[], asOf: st
 }
 export function classifyBankTransactions(transactions: MoneylithTransaction[], decisions: PatternDecisions, settings: BankRuleSettings = emptyBankRules) {
   return transactions.map(tx => {
-    if (tx.provider !== "lunchflow") return tx;
+    if ((tx.provider !== 'lunchflow' && tx.provider !== 'bunq')) return tx;
     const original = { ...tx, bankRuleId: undefined, bankRuleLabel: undefined };
     const rule = matchingBankRule(original, settings);
     const grouped = rule ? { ...original, bankRuleId: rule.id, bankRuleLabel: rule.label } : original;
@@ -85,6 +85,7 @@ export function classifyBankTransactions(transactions: MoneylithTransaction[], d
     const decision = individual ?? decisions[patternKey(original)] ?? decisions[patternKey(grouped)];
     const chosen = decision ?? rule;
     if (!chosen) {
+      if(tx.provider==='bunq'&&tx.bankPatternKind&&tx.bankRuleLabel&&!tx.bankRuleId)return tx;
       if (!tx.bankRuleId&&!tx.bankPatternCategory) return tx;
       return { ...original, category: tx.category === tx.bankPatternCategory ? undefined : tx.category,
         bankPatternCategory: undefined, bankPatternKind: undefined };

@@ -15,7 +15,8 @@
     "test": "node --import tsx --test tests/*.test.tsx",
     "typecheck": "tsc --noEmit",
     "test:lunchflow": "node --import tsx scripts/test-lunchflow.ts",
-    "dev:local": "vite --host 127.0.0.1 --port 5173 --strictPort"
+    "dev:local": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "test:bunq": "node --import tsx scripts/test-bunq.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

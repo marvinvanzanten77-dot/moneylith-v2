@@ -64,7 +64,7 @@ export function reviewBankIncome(items: Parameters<typeof manualReviewRows>[0], 
       transactions.some(raw => {
         if (!raw || typeof raw !== "object") return false;
         const t = raw as Record<string, unknown>;
-        return evidence.transactionIds!.includes(String(t.id)) && t.provider === "lunchflow" && t.currency === "EUR" && t.date === date &&
+        return evidence.transactionIds!.includes(String(t.id)) && (t.provider === 'lunchflow' || t.provider === 'bunq') && t.currency === "EUR" && t.date === date &&
           typeof t.amount === "number" && Number.isFinite(t.amount) && t.amount > 0 && Math.round(t.amount*100) === Math.round(item.bedrag*100) &&
           !["transfer", "financing", "ignore"].includes(String(t.bankPatternKind));
       });

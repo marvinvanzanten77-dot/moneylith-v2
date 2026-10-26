@@ -30,7 +30,7 @@ export function analyzeFinancialImport(transactions: MoneylithTransaction[], asO
   const end = day(asOf);
   if (!Number.isFinite(end)) throw Error("Ongeldige analysedatum.");
   const recent = transactions.filter(t =>
-    t.provider === "lunchflow" && t.currency === "EUR" &&
+    (t.provider === 'lunchflow' || t.provider === 'bunq') && t.currency === "EUR" &&
     Number.isFinite(t.amount) && t.amount !== 0 &&
     /^\d{4}-\d{2}-\d{2}$/.test(t.date) &&
     day(t.date) <= end && day(t.date) >= end - 120,
@@ -105,7 +105,7 @@ export function refreshLatestIncome(transactions: MoneylithTransaction[], income
     const anchors = transactions.filter(t => evidence.transactionIds.includes(t.id) && t.amount > 0);
     const sources = new Set(anchors.filter(t => t.counterparty?.trim()).map(t => `${t.accountId}:${normalized(t.counterparty!)}`));
     if (sources.size !== 1) return item;
-    const candidates = transactions.filter(t => t.provider === "lunchflow" && t.currency === "EUR" && Number.isFinite(t.amount) && t.amount > 0 && t.date <= asOf && t.date >= evidence.through &&
+    const candidates = transactions.filter(t => (t.provider === 'lunchflow' || t.provider === 'bunq') && t.currency === "EUR" && Number.isFinite(t.amount) && t.amount > 0 && t.date <= asOf && t.date >= evidence.through &&
       /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(Date.parse(t.date)) && new Date(t.date).toISOString().slice(0,10) === t.date &&
       !["transfer","financing","ignore"].includes(t.bankPatternKind ?? "") && !refund.test(t.description) &&
       sources.has(`${t.accountId}:${normalized(t.counterparty ?? "")}`) && (salary.test(t.description) || t.bankPatternKind === "income"));

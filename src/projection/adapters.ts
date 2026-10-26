@@ -136,15 +136,15 @@ export function personalInput(
   if (options.reservedNow == null) input.assumptions.push("Geen reserveringen opgegeven: de basisverwachting trekt geen extra reservering af. Dit bevestigt niet dat er geen reserveringen zijn.");
   if (options.variableMonthly === null) input.assumptions.push("Geen aanvullend uitgavenbudget opgegeven: alleen de bekende lasten en budgetten zijn meegenomen. Overige uitgaven kunnen de ruimte verlagen.");
   const accounts = rows(data.accounts).filter((r) => r.active === true && (!validateBankRules(data.bankRules) || data.bankRules.accountRoles[String(r.id)] !== "business"));
-  if (!accounts.length || accounts.some((r) => amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance) === null))
+  if (!accounts.length || accounts.some((r) => amount((r.bankProvider === 'lunchflow' || r.bankProvider === 'bunq') ? r.bankBalance : r.startBalance) === null))
     input.missing.push("Actieve rekeningen met ingevulde saldi");
-  else if (!options.confirmOpening && !accounts.every(r => r.bankProvider === "lunchflow" && r.currency === "EUR" && typeof r.bankBalanceFetchedAt === "string" && Number.isFinite(Date.parse(r.bankBalanceFetchedAt)) && new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(r.bankBalanceFetchedAt)) === asOf))
+  else if (!options.confirmOpening && !accounts.every(r => (r.bankProvider === 'lunchflow' || r.bankProvider === 'bunq') && r.currency === "EUR" && typeof r.bankBalanceFetchedAt === "string" && Number.isFinite(Date.parse(r.bankBalanceFetchedAt)) && new Intl.DateTimeFormat("en-CA", {timeZone:"Europe/Amsterdam",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(r.bankBalanceFetchedAt)) === asOf))
     input.missing.push(
       "Bevestig dat de rekeningbedragen de huidige saldi zijn",
     );
   else {
     input.opening = accounts.reduce(
-      (sum, r) => sum + amount(r.bankProvider === "lunchflow" ? r.bankBalance : r.startBalance)!,
+      (sum, r) => sum + amount((r.bankProvider === 'lunchflow' || r.bankProvider === 'bunq') ? r.bankBalance : r.startBalance)!,
       0,
     );
     input.assumptions.push(

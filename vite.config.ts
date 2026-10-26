@@ -1,3 +1,6 @@
+import {readFileSync,existsSync} from 'node:fs';
+import {parse} from 'dotenv';
+import {bunqLocal} from './server/bunq/localPlugin';
 import {randomUUID} from "node:crypto";
 import { lunchflowLocal } from "./server/lunchflow/localPlugin";
 import { defineConfig, loadEnv } from "vite";
@@ -11,6 +14,7 @@ export default defineConfig(({ command }) => ({
     }},
     ...(command === "serve"
       ? [
+          bunqLocal(existsSync('.env.bunq.local')?parse(readFileSync('.env.bunq.local')).BUNQ_API_KEY||'':''),
           lunchflowLocal(
             loadEnv("", process.cwd(), "LUNCHFLOW_").LUNCHFLOW_API_KEY || "",
           ),

@@ -43,7 +43,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
  const {start,end}=periodBounds(period),through=end<asOf?end:asOf,closed=end<asOf;
  const seen=new Set<string>();
  const all=transactions.filter(t=>{
-  if(seen.has(t.id)||t.provider!=='lunchflow'||t.currency!=='EUR'||!Number.isFinite(t.amount)||!/^\d{4}-\d{2}-\d{2}$/.test(t.date)||!Number.isFinite(Date.parse(t.date))||new Date(t.date).toISOString().slice(0,10)!==t.date||t.date>asOf||rules.accountRoles[t.accountId]==='business')return false;
+  if(seen.has(t.id)||(t.provider !== 'lunchflow' && t.provider !== 'bunq')||t.currency!=='EUR'||!Number.isFinite(t.amount)||!/^\d{4}-\d{2}-\d{2}$/.test(t.date)||!Number.isFinite(Date.parse(t.date))||new Date(t.date).toISOString().slice(0,10)!==t.date||t.date>asOf||rules.accountRoles[t.accountId]==='business')return false;
   seen.add(t.id);return true;
  });
  const booked=all.filter(t=>t.date>=start&&t.date<=through);
@@ -120,7 +120,7 @@ export function findBankReversals(all:MoneylithTransaction[]){
  const uncertainDebits=new Set<string>();
  all=all.map(t=>({...t,amount:t.providerData?.amount??t.amount,date:t.providerData?.date??t.date,counterparty:t.providerData?.counterparty??t.counterparty,description:t.providerData?.description??t.description}));
  const reversedDebits=new Set<string>();
- for(const credit of all.filter(t=>t.amount>0&&/terugboek|storno|restitutie|refund/i.test(t.providerData?.description??t.description)).sort((a,b)=>a.date.localeCompare(b.date))){
+ for(const credit of all.filter(t=>t.amount>0&&(t.providerData?.paymentSubType==='REVERSAL'||/terugboek|storno|restitutie|refund/i.test(t.providerData?.description??t.description))).sort((a,b)=>a.date.localeCompare(b.date))){
   const candidates=all.filter(t=>t.amount<0&&t.accountId===credit.accountId&&t.date<=credit.date&&Math.round(-t.amount*100)===Math.round(credit.amount*100)&&norm(t.counterparty??'')!==''&&norm(t.counterparty??'')===norm(credit.counterparty??'')&&!reversedDebits.has(t.id)).sort((a,b)=>b.date.localeCompare(a.date));
   if(candidates.length===1){reversedDebits.add(candidates[0].id);reversals.add(credit.id);}else if(candidates.length>1){for(const c of candidates)uncertainDebits.add(c.id);}
  }

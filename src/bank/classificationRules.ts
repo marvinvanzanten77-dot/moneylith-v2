@@ -61,7 +61,7 @@ export function validateBankRules(value: unknown): value is BankRuleSettings {
       (r.belowCents === undefined || r.aboveCents === undefined || r.aboveCents < r.belowCents));
 }
 export function matchingBankRule(tx: MoneylithTransaction, settings: BankRuleSettings): BankRule | undefined {
-  if (tx.provider !== "lunchflow" || tx.currency !== "EUR" || !Number.isFinite(tx.amount) || tx.amount === 0) return;
+  if ((tx.provider !== 'lunchflow' && tx.provider !== 'bunq') || tx.currency !== "EUR" || !Number.isFinite(tx.amount) || tx.amount === 0) return;
   const text = `${tx.providerData?.counterparty ?? tx.counterparty ?? ""} ${tx.providerData?.description ?? tx.description}`;
   const amount = Math.abs(Math.round(tx.amount * 100));
   // A confirmed full destination IBAN is required; suffixes or equal amounts alone are not proof.

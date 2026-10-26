@@ -1,3 +1,4 @@
+import {BunqCard} from './components/BunqCard';
 import {PaymentReview} from './components/PaymentReview';
 import {persistClassificationReview,classificationAuditKey,correctClassification,undoClassification,type ClassificationAudit} from './bank/classificationAudit';
 import {periodPaidKey,type PeriodPaid} from "./bank/periodReconciliation";
@@ -2127,7 +2128,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
-    if (!isBusinessVariant && (compactMode || accountsSource.some(a => a.bankProvider === "lunchflow") || transactionsSource.some(t => t.provider === "lunchflow"))) {
+    if (!isBusinessVariant && (compactMode || accountsSource.some(a => (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')) || transactionsSource.some(t => (t.provider === 'lunchflow' || t.provider === 'bunq')))) {
       return <BankSpendingOverview projection={personalProjection} asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
@@ -2216,6 +2217,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     if (normalizedStep === "biz-rekeningen") return renderRekeningen("business");
     if (normalizedStep === "bank") return (
       <div className="space-y-4">
+      <BunqCard accounts={accounts} onApply={(snapshots,mappings)=>{const {result,financial,debtPayments}=processBankSync(collectCloudState(localStorage),snapshots,mappings,today(),'bunq');persistLunchflow(localStorage,result,financial,debtPayments?.applied?debtPayments:undefined);window.dispatchEvent(new Event('moneylith:cloud-restored'));return result.reports;}}/>
       <LunchflowAccess accounts={accounts} onApply={(snapshots, mappings) => {
         const {result,financial,debtPayments} = processBankSync(collectCloudState(window.localStorage), snapshots, mappings, today());
         persistLunchflow(window.localStorage, result, financial, debtPayments?.applied?debtPayments:undefined);
@@ -2362,7 +2364,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     focus: "Stel doelen/focuspunten voor de komende periode en koppel ze aan je cashflow.",
     rekeningen: "Voeg betaal- en spaarrekeningen toe; actieve rekeningen worden gebruikt voor afschriften.",
     bank: "Beheer je Lunch Flow-koppeling en opgehaalde bankgegevens.",
-    afschriften: accounts.some(a => a.bankProvider === "lunchflow") ? "Bekijk je uitgavenpotjes en vraag bemoedigende bespaartips. Via Help met indelen benoem je onbekende aankopen, één tegelijk." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
+    afschriften: accounts.some(a => (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')) ? "Bekijk je uitgavenpotjes en vraag bemoedigende bespaartips. Via Help met indelen benoem je onbekende aankopen, één tegelijk." : "Upload bankafschriften (CSV/XLSX/PDF) om uitgaven te analyseren.",
     inbox: "Je meldingen, bankcontroles en persoonlijke aandachtspunten.",
     action: "Simuleer wat er gebeurt als alles zo blijft; vooruitblik op je koers.",
     backup: "Exporteer of importeer je data lokaal (geen cloud).",

@@ -1,3 +1,5 @@
+import {bunqAccounts,bunqTest,bunqConnect} from '../server/bunq/service.js';
+import {bunqFailure} from '../server/bunq/client.js';
 import {CloudTransportError,packCloudResponse,unpackCloudRequest} from '../server/utils/cloudTransport.js';
 import {cloudWireLimit,cloudEncoding} from '../src/storage/cloudTransport.js';
 import {scanFuel} from '../server/fuel/prices.js';
@@ -60,6 +62,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, email });
     }
     if (!authenticated) return fail(401, "Log in met je Moneylith-account.");
+    if(req.method === "POST" && action === "bunq") {
+      if(body.operation==='status')return res.status(200).json({ok:true,configured:!!process.env.BUNQ_API_KEY?.trim()});
+      if(body.operation==='accounts')return res.status(200).json({ok:true,accounts:await bunqAccounts(config.email)});
+      if(body.operation==='test')return res.status(200).json({ok:true,diagnostic:await bunqTest(config.email)});
+      if(body.operation==='connect')return res.status(200).json({ok:true,reports:await bunqConnect(config.email,body.mappings as import('../src/bank/lunchflowMerge.js').LunchMapping[])});
+      return fail(400,'Ongeldige bunq-actie.');
+    }
     if(req.method === "POST" && action === "bank-scan") {
       const [scan]=await Promise.all([syncBankAccount(config.email,config.apiKey),scanFuel().catch(()=>null)]);
       await monitorAccount(config.email);
@@ -100,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return fail(405, "Actie niet beschikbaar.");
   } catch (error) {
+    if(action === "bunq"){const e=bunqFailure(error);return res.status(503).json({ok:false,error:e.message,code:e.code});}
     if (error instanceof CloudTransportError) return fail(400,error.message);
     if (error instanceof PushInputError) return fail(400,error.message);
     if (error instanceof InvalidMonitoringAction) return fail(400, error.message);

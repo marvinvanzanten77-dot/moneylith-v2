@@ -65,6 +65,11 @@ test("owner account activation, durable storage, conflict protection and bank au
     assert.equal((await call(request("register", "POST", { email: owner, password, ownerCode: code }))).code, 409);
     assert.equal((await call(request("login", "POST", { email: owner, password: "wrong-password-long" }))).code, 401);
     assert.equal((await call(request("login", "POST", { email: owner, password }))).code, 200);
+    assert.equal((await call(request('bunq','POST',{operation:'accounts'}))).code,401);
+    const forbiddenBunq=request('bunq','POST',{operation:'accounts'},cookie);forbiddenBunq.headers.origin='https://attacker.test';assert.equal((await call(forbiddenBunq)).code,403);
+    delete process.env.BUNQ_API_KEY;
+    assert.equal((await call(request('bunq','POST',{operation:'status'},cookie))).body.configured,false);
+    assert.equal((await call(request('bunq','POST',{operation:'accounts'},cookie))).body.code,'configuration');
     const state = { "moneylith.personal.income": JSON.stringify([{ id: "income", naam: "Test", bedrag: 100 }]) };
     const saved = await call(request("snapshot", "PUT", { state, revision: null }, cookie));
     assert.equal(saved.code, 200);

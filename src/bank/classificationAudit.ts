@@ -3,7 +3,7 @@ import type {MoneylithTransaction} from '../types.js';
 export const classificationAuditKey='moneylith.personal.classificationAudit.v1';
 export type ClassificationAudit={id:string;at:string;transactionId:string;keys:string[];before:Record<string,PatternDecision|undefined>;after:PatternDecision;beforeCategory?:Pick<MoneylithTransaction,'category'|'bankPatternCategory'|'bankPatternKind'|'bankRuleId'|'bankRuleLabel'>;undoneAt?:string};
 export function correctClassification(tx:MoneylithTransaction,label:string,future:boolean,decisions:PatternDecisions,history:ClassificationAudit[]){
- if(tx.provider!=='lunchflow'||!label.trim()||label.length>150)throw Error('Kies een geldige bankbetaling en categorie.');
+ if((tx.provider !== 'lunchflow' && tx.provider !== 'bunq')||!label.trim()||label.length>150)throw Error('Kies een geldige bankbetaling en categorie.');
  const keys=['transaction:'+tx.id,...(future?[patternKey({...tx,bankRuleId:undefined,bankRuleLabel:undefined})]:[])];
  const after:PatternDecision={kind:'variable',label:label.trim()};
  const audit:ClassificationAudit={id:crypto.randomUUID(),at:new Date().toISOString(),transactionId:tx.id,keys,beforeCategory:{category:tx.category,bankPatternCategory:tx.bankPatternCategory,bankPatternKind:tx.bankPatternKind,bankRuleId:tx.bankRuleId,bankRuleLabel:tx.bankRuleLabel},before:Object.fromEntries(keys.map(k=>[k,decisions[k]])),after};

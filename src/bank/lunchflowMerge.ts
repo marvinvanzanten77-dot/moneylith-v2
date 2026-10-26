@@ -6,6 +6,7 @@ export function mergeLunchflow(
   transactions: MoneylithTransaction[],
   snapshots: LunchSnapshot[],
   mappings: LunchMapping[],
+  provider: "lunchflow" | "bunq" = "lunchflow",
 ) {
   const nextAccounts = accounts.map((a) => ({ ...a })),
     nextTransactions = transactions.map((t) => ({ ...t }));
@@ -25,12 +26,14 @@ export function mergeLunchflow(
     providers.add(mapping.providerId);
     const linked = nextAccounts.find(
       (a) =>
-        a.bankProvider === "lunchflow" &&
+        a.bankProvider === provider &&
         a.bankAccountId === mapping.providerId,
     );
+    if(snapshot.account.iban&&nextAccounts.some(a=>a.iban?.replace(/\s/g,'').toUpperCase()===snapshot.account.iban!.replace(/\s/g,'').toUpperCase()&&a.id!==mapping.targetId&&a.id!==linked?.id))
+      throw Error('Deze bankrekening staat al in Moneylith. Koppel de bestaande rekening in plaats van een nieuwe te maken.');
     const targetId =
       mapping.targetId === "new"
-        ? `lunchflow:account:${mapping.providerId}`
+        ? `${provider}:account:${mapping.providerId}`
         : mapping.targetId;
     if (targets.has(targetId) || (linked && linked.id !== targetId))
       throw Error("Een rekening is al gekoppeld. Kies de bestaande koppeling.");
@@ -41,7 +44,7 @@ export function mergeLunchflow(
       throw Error("De gekozen Moneylith-rekening bestaat niet meer.");
     if (
       existing?.bankAccountId &&
-      (existing.bankProvider !== "lunchflow" ||
+      (existing.bankProvider !== provider ||
         existing.bankAccountId !== mapping.providerId)
     )
       throw Error(
@@ -88,7 +91,8 @@ export function mergeLunchflow(
         active: true,
         source: "bank" as const,
       }),
-      bankProvider: "lunchflow",
+      bankProvider: provider,
+      ...(snapshot.account.iban?{iban:snapshot.account.iban}:{}),
       bankAccountId: mapping.providerId,
       currency: "EUR",
       bankBalance: balance.value.amount,
@@ -101,7 +105,7 @@ export function mergeLunchflow(
     let added = 0,
       updated = 0;
     for (const tx of txs.value) {
-      const stableId = `lunchflow:${mapping.providerId}:${tx.id}`;
+      const stableId = `${provider}:${mapping.providerId}:${tx.id}`;
       const i = byId.get(stableId),
         old = i === undefined ? undefined : nextTransactions[i];
       // Preserve user-edited descriptions/counterparties; keep provider originals separately.
@@ -118,7 +122,7 @@ export function mergeLunchflow(
         id: stableId,
         external_id: stableId,
         accountId: targetId,
-        provider: "lunchflow",
+        provider,
         providerAccountId: mapping.providerId,
         providerTransactionId: tx.id,
         source: "bank",
@@ -134,6 +138,8 @@ export function mergeLunchflow(
         description,
         counterparty,
         providerData: {
+          ...(tx.counterpartyIban?{counterpartyIban:tx.counterpartyIban}:{}),
+          ...(tx.paymentSubType?{paymentSubType:tx.paymentSubType}:{}),
           description: tx.description,
           counterparty: tx.merchant,
           amount: tx.amount,

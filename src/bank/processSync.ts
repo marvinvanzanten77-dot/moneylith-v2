@@ -1,3 +1,4 @@
+import {classifyBunq} from './bunqClassification.js';
 import {periodPlansKey,capturePeriodPlan,makePeriodPlan,type PeriodPlans} from "./periodReconciliation.js";
 import {reconcileDebtPayments,debtLedgerKey,emptyDebtLedger,validateDebtLedger} from './debtPayments.js';
 import {mergeLunchflow,type LunchMapping} from './lunchflowMerge.js';
@@ -10,7 +11,7 @@ import type {MoneylithAccount,MoneylithTransaction,IncomeItem,FixedCostManualIte
 export type BankScan={lastSuccessfulAt?:string;updatedTransactions?:number;id:string;at:string;ok:number;failed:number;added:number;updatedIncome:number;message:string};
 const read=<T>(state:CloudState,key:string,fallback:T):T=>state[key]?JSON.parse(state[key]) as T:fallback;
 /** One transformation for browser imports and server scans. Existing manual values and business books are preserved. */
-export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappings:LunchMapping[],asOf:string){
+export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappings:LunchMapping[],asOf:string,provider:"lunchflow"|"bunq"="lunchflow"){
  const accounts=read<MoneylithAccount[]>(state,'moneylith.personal.accounts',[]);
  const txs=read<MoneylithTransaction[]>(state,'moneylith.personal.transactions',[]);
  const income=read<IncomeItem[]>(state,'moneylith.personal.income',[]);
@@ -20,8 +21,8 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
  const decisions=read<PatternDecisions>(state,'moneylith.personal.bankPatterns.v1',{});
  const detected=read<FixedCostItem[]>(state,'fixed-cost-items',[]);
  if(![accounts,txs,income,fixed,seen,detected].every(Array.isArray)||!validateBankRules(rules))throw Error('Bankadministratie is ongeldig; eerdere gegevens blijven behouden.');
- const result=mergeLunchflow(accounts,txs,snapshots,mappings);
- result.transactions=classifyBankTransactions(result.transactions,decisions,rules);
+ const result=mergeLunchflow(accounts,txs,snapshots,mappings,provider);
+ result.transactions=classifyBunq(classifyBankTransactions(result.transactions,decisions,rules),result.accounts,fixed,rules);
  const financial=result.reports.some(r=>r.ok)?prefillFinancialImport(result.transactions.filter(t=>rules.accountRoles[t.accountId]!=='business'),income,fixed,seen,asOf,detected.some(i=>i.isFixed&&!i.isIgnored)):undefined;
  // An explicitly linked personal salary may arrive on a business-designated bank account.
  // Respect that opt-in link without auto-importing other business income into Personal.

@@ -75,7 +75,7 @@ export type MoneylithTransaction = {
   category?: string | null;
   external_id?: string;
   currency?: string;
-  provider?: "lunchflow";
+  provider?: "lunchflow" | "bunq";
   providerAccountId?: string;
   providerTransactionId?: string;
   bankRuleId?: string;
@@ -83,7 +83,7 @@ export type MoneylithTransaction = {
   bankPatternCategory?: string;
   bankPatternKind?: import("./bank/patterns").PatternKind;
   notes?: string;
-  providerData?: { description: string; counterparty?: string; amount: number; date: string };
+  providerData?: { counterpartyIban?: string; paymentSubType?: string; description: string; counterparty?: string; amount: number; date: string };
   source?: "bank" | "csv" | "manual" | "inbox";
 };
 
@@ -188,7 +188,7 @@ export interface MoneylithAccount {
   isPrimary?: boolean;
   startBalance?: number;
   currency?: string;
-  bankProvider?: "lunchflow";
+  bankProvider?: "lunchflow" | "bunq";
   bankAccountId?: string;
   bankBalance?: number;
   bankBalanceFetchedAt?: string;

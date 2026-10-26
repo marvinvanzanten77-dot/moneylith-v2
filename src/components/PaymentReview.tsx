@@ -12,7 +12,7 @@ export function PaymentReview(props:Props){
  const [lines,setLines]=useState([{target:'',amount:''}]),[message,setMessage]=useState(''),[category,setCategory]=useState(''),[future,setFuture]=useState(false);
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{if(open)dialog.current?.showModal();else dialog.current?.close();},[open]);
- const txs=props.transactions.filter(t=>t.provider==='lunchflow'&&t.currency==='EUR'&&t.amount<0&&t.date<=props.asOf&&!props.businessIds.includes(t.accountId));
+ const txs=props.transactions.filter(t=>(t.provider === 'lunchflow' || t.provider === 'bunq')&&t.currency==='EUR'&&t.amount<0&&t.date<=props.asOf&&!props.businessIds.includes(t.accountId));
  const questions=reconcileDebtPayments(props.debts,props.transactions,props.ledger,props.asOf,props.businessIds).questions;
  const candidates=new Set([...questions.map(q=>q.transactionId),...txs.filter(t=>!props.ledger.entries.some(e=>e.transactionId===t.id)&&!props.ledger.ignoredTransactionIds?.includes(t.id)&&!t.bankPatternKind).map(t=>t.id)]).size;
  const run=(action:()=>void)=>{try{action();setMessage('Bewaard. Overzichten zijn bijgewerkt; het banksaldo is niet opnieuw aangepast.');}catch(e){setMessage(e instanceof Error?e.message:'Opslaan mislukt.');}};

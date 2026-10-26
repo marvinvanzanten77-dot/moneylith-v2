@@ -99,7 +99,7 @@ export function BankPatterns(props: BankPatternsProps) {
           <option value={90}>Laatste 90 dagen</option><option value={180}>Laatste 180 dagen</option><option value={365}>Laatste jaar</option><option value={730}>Laatste twee jaar</option>
         </Select></label>
         <label className="text-sm">Rekening<Select value={account} onChange={e => { setAccount(e.target.value); setLimit(20); }}>
-          <option value="">Alle rekeningen</option>{props.accounts.filter(a => a.bankProvider === "lunchflow").map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          <option value="">Alle rekeningen</option>{props.accounts.filter(a => (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </Select></label>
         <label className="text-sm">Tonen<Select value={filter} onChange={e => { setFilter(e.target.value); setLimit(20); }}>
           <option value="questions">Nog te benoemen herhalingen</option><option value="all">Alle transactiegroepen</option><option value="repeating">Alle herhalingen (ook oudere)</option><option value="classified">Benoemd / automatisch herkend</option>

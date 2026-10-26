@@ -19,7 +19,7 @@ export function PeriodFoundation(props:Props){
  const latest=useMemo(()=>makePeriodPlan(income,fixed,detected,debts,asOf),[income,fixed,detected,debts,asOf]);
  useEffect(()=>{if(!plans[current])setPlans(capturePeriodPlan(plans,latest,asOf));else {const updated=refreshWorkCostPlan(plans[current],latest);if(updated!==plans[current])setPlans({...plans,[current]:updated});}},[current,plans,latest,asOf,setPlans]);
  const report=reconcilePeriod(period,asOf,period===current?latest:plans[period]??latest,period===current||!!plans[period],transactions,ledger,rules,paid[period]);
- const periods=[...new Set([current,...Object.keys(plans),...transactions.filter(t=>t.provider==='lunchflow'&&rules.accountRoles[t.accountId]!=='business'&&t.date<=asOf).map(t=>salaryPeriod(t.date))])].sort().reverse();
+ const periods=[...new Set([current,...Object.keys(plans),...transactions.filter(t=>(t.provider === 'lunchflow' || t.provider === 'bunq')&&rules.accountRoles[t.accountId]!=='business'&&t.date<=asOf).map(t=>salaryPeriod(t.date))])].sort().reverse();
  const forecast=report.forecast;
  const free=forecast.income!==null&&forecast.fixed!==null&&forecast.debt!==null?forecast.income-forecast.fixed-forecast.debt:null;
  return <SurfaceCard className="space-y-4" data-period-foundation>

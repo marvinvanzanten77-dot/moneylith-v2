@@ -3,7 +3,7 @@ import {applyConfirmedDebtPayment,validateDebtLedger,type DebtLedger,type DebtPa
 import {findBankReversals} from './periodReconciliation.js';
 export function confirmPaymentDistribution(debts:SchuldItem[],fixed:FixedCostManualItem[],transactions:MoneylithTransaction[],ledger:DebtLedger,transactionId:string,allocations:DebtPayment['allocations'],fixedAllocations:NonNullable<DebtPayment['fixedAllocations']>,asOf:string,businessIds:string[]=[]){
  const tx=transactions.find(t=>t.id===transactionId),reversals=findBankReversals(transactions);
- if(!validateDebtLedger(ledger)||!tx||tx.provider!=='lunchflow'||tx.currency!=='EUR'||tx.date>asOf||businessIds.includes(tx.accountId)||reversals.reversedDebits.has(tx.id)||reversals.uncertainDebits.has(tx.id))throw Error('Kies een persoonlijke geboekte betaling zonder onzekere terugboeking.');
+ if(!validateDebtLedger(ledger)||!tx||(tx.provider !== 'lunchflow' && tx.provider !== 'bunq')||tx.currency!=='EUR'||tx.date>asOf||businessIds.includes(tx.accountId)||reversals.reversedDebits.has(tx.id)||reversals.uncertainDebits.has(tx.id))throw Error('Kies een persoonlijke geboekte betaling zonder onzekere terugboeking.');
  const old=ledger.entries.find(e=>e.transactionId===tx.id);
  const payment:DebtPayment={transactionId:tx.id,accountId:tx.accountId,date:tx.providerData?.date??tx.date,paidCents:Math.round(-(tx.providerData?.amount??tx.amount)*100),allocations:[...(old?.allocations??[]),...allocations],fixedAllocations:[...(old?.fixedAllocations??[]),...fixedAllocations],source:'confirmed'};
  if(old&&(old.paidCents!==payment.paidCents||old.date!==payment.date||old.accountId!==payment.accountId))throw Error('De bankbetaling is gewijzigd. Controleer eerst de bestaande verdeling.');

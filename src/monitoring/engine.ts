@@ -33,7 +33,7 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   const fixed=read<FixedCostManualItem[]>(state,'moneylith.personal.fixedCosts',[]);
   const accounts=read<MoneylithAccount[]>(state,'moneylith.personal.accounts',[]);
   if(!validateBankRules(rules)||!Array.isArray(transactions)||!Array.isArray(fixed)||!Array.isArray(accounts))throw Error('Ongeldige gegevens voor monitoring.');
-  const selected=accounts.filter(a=>a.active!==false && a.bankProvider==='lunchflow' && rules.accountRoles[a.id]!=='business');
+  const selected=accounts.filter(a=>a.active!==false && (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq') && rules.accountRoles[a.id]!=='business');
   const timestamps=selected.map(a=>a.bankLastSync).filter((s):s is string=>typeof s==='string'&&Number.isFinite(Date.parse(s)));
   const fetchedAt=timestamps.length===selected.length && timestamps.length ? timestamps.sort()[0]:null;
   const signals:Signal[]=[];

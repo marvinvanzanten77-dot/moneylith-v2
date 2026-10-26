@@ -1,4 +1,5 @@
 export type LunchAccount = {
+  iban?: string;
   id: string;
   label: string;
   institution: string;
@@ -7,6 +8,8 @@ export type LunchAccount = {
   upstream: string;
 };
 export type LunchTransaction = {
+  counterpartyIban?: string;
+  paymentSubType?: string;
   id: string;
   accountId: string;
   amount: number;

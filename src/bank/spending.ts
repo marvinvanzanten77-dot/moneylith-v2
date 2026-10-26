@@ -10,7 +10,7 @@ export function spendingRows(transactions: MoneylithTransaction[], rules: BankRu
   const knownFixed = new Set(fixed.flatMap(i => i.bankEvidence?.transactionIds ?? []));
   const seen = new Set<string>();
   return transactions.flatMap(t => {
-    if (seen.has(t.id) || t.provider !== "lunchflow" || t.currency !== "EUR" || !Number.isFinite(t.amount) || t.amount >= 0 ||
+    if (seen.has(t.id) || (t.provider !== 'lunchflow' && t.provider !== 'bunq') || t.currency !== "EUR" || !Number.isFinite(t.amount) || t.amount >= 0 ||
       !/^\d{4}-\d{2}-\d{2}$/.test(t.date) || !Number.isFinite(Date.parse(t.date)) || new Date(t.date).toISOString().slice(0,10) !== t.date ||
       !isOperatingTransaction(t, rules) || t.bankPatternKind === "fixed" || knownFixed.has(t.id)) return [];
     seen.add(t.id);

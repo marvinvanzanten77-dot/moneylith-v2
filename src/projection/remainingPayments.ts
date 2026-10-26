@@ -43,8 +43,8 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    const left=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
    const elapsed=Math.round((Date.parse(input.asOf)-Date.parse(bounds.start))/86400000)+1;
    const duration=Math.round((Date.parse(bounds.end)-Date.parse(bounds.start))/86400000)+1;
-   const txs=list<MoneylithTransaction>(data.transactions).filter(t=>t.provider==='lunchflow'&&t.date<=input.asOf&&rules.accountRoles[t.accountId]!=='business');
-   const accountIds=list<MoneylithAccount>(data.accounts).filter(a=>a.active&&a.bankProvider==='lunchflow'&&rules.accountRoles[a.id]!=='business').map(a=>a.id);
+   const txs=list<MoneylithTransaction>(data.transactions).filter(t=>(t.provider === 'lunchflow' || t.provider === 'bunq')&&t.date<=input.asOf&&rules.accountRoles[t.accountId]!=='business');
+   const accountIds=list<MoneylithAccount>(data.accounts).filter(a=>a.active&&(a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')&&rules.accountRoles[a.id]!=='business').map(a=>a.id);
    const covered=accountIds.length>0&&accountIds.every(id=>txs.some(t=>t.accountId===id&&t.date<=bounds.start));
    const samples=row.transactionIds.length;
    const pace=covered&&samples>=3&&row.actual!==null&&elapsed>=7?Math.round(row.actual/elapsed*duration):null;
@@ -63,7 +63,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
   }
   let remaining=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
   let funded=0;
-  if((row.route==='card'||row.route==='cash')&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
+  if((row.route==='cash'||(row.route==='card'&&!list<MoneylithAccount>(data.accounts).some(a=>a.active&&a.bankProvider==='bunq'&&rules.accountRoles[a.id]!=='business')))&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
   const pending=remaining===null||remaining>0;
   const assumed=pending&&(!date||date<=input.asOf);
   if(assumed)date=addDays(input.asOf,1);
@@ -71,5 +71,5 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
   if(pending)input.events.push({id:id+':remaining:'+period,label:row.label+' — nog verwacht',date,amount:remaining===null?null:-remaining,source:debt?'debt':'fixed',...(debt?{kind:'repayment' as const,debtId:debt.id}:{}),basis:!assumed&&raw?.monthlyAmounts!==undefined?'input':'assumption'});
   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining,date,note});
  }
- input.assumptions.push('De huidige salarisperiode loopt van '+bounds.start+' tot '+bounds.end+'. Reeds herkende betalingen zitten in het banksaldo en worden niet opnieuw afgetrokken. Nog niet herkende lasten blijven gepland; een verstreken datum bewijst geen betaling.','Budgetten voor dagelijkse uitgaven gebruiken alleen het resterende bedrag tot de 22ste. Hetzelfde uitgaventempo is een indicatie, geen bewezen extra uitgave. Bunq en contant blijven beperkt zichtbaar: een top-up of opname bewijst geen betaling van een specifieke last.');
+ input.assumptions.push('De huidige salarisperiode loopt van '+bounds.start+' tot '+bounds.end+'. Reeds herkende betalingen zitten in het banksaldo en worden niet opnieuw afgetrokken. Nog niet herkende lasten blijven gepland; een verstreken datum bewijst geen betaling.','Budgetten voor dagelijkse uitgaven gebruiken alleen het resterende bedrag tot de 22ste. Hetzelfde uitgaventempo is een indicatie, geen bewezen extra uitgave. Zonder gekoppelde bunq-rekening blijven bunq-betalingen beperkt zichtbaar. Een top-up of contante opname bewijst geen betaling van een specifieke last. Bij gekoppelde bunq-rekeningen telt de werkelijke aankoop, niet de top-up.');
 }

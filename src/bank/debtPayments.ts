@@ -17,7 +17,7 @@ export function validateDebtLedger(value:unknown):value is DebtLedger{
 export function reconcileDebtPayments(debts:SchuldItem[],transactions:MoneylithTransaction[],ledger:DebtLedger,asOf:string,businessAccountIds:string[]=[]){
  if(!validDate(asOf)||!validateDebtLedger(ledger))throw Error('Ongeldige aflossingsadministratie.');
  let next=structuredClone(debts);const entries=structuredClone(ledger.entries),questions:{transactionId:string;date:string;reason:string}[]=[];
- const reversalCheck=findBankReversals(transactions.filter(t=>t.provider==='lunchflow'&&t.currency==='EUR'&&t.date<=asOf&&!businessAccountIds.includes(t.accountId)));
+ const reversalCheck=findBankReversals(transactions.filter(t=>(t.provider === 'lunchflow' || t.provider === 'bunq')&&t.currency==='EUR'&&t.date<=asOf&&!businessAccountIds.includes(t.accountId)));
  const reversed=reversalCheck.reversedDebits;
  const history=structuredClone(ledger.history??[]);
  const apply=(payment:DebtPayment)=>{const ids=new Set(payment.allocations.map(a=>a.debtId));const beforeDebts=structuredClone(next.filter(d=>ids.has(d.id)));next=applyConfirmedDebtPayment(next,payment);history.push({id:crypto.randomUUID(),at:new Date().toISOString(),transactionId:payment.transactionId,afterEntry:structuredClone(payment),beforeDebts,afterDebts:structuredClone(next.filter(d=>ids.has(d.id)))});};
@@ -29,7 +29,7 @@ export function reconcileDebtPayments(debts:SchuldItem[],transactions:MoneylithT
   if(!old&&ledger.ignoredTransactionIds?.includes(tx.id))continue;
   if(reversalCheck.uncertainDebits.has(tx.id)){questions.push({transactionId:tx.id,date:tx.date,reason:'Mogelijke terugboeking bij deze aflossing; controleer de bankbetaling. Er is niets automatisch gewijzigd.'});continue;}
   if(old){if(reversed.has(tx.id)){questions.push({transactionId:tx.id,date:tx.date,reason:'Een verwerkte aflossing is teruggeboekt. Controleer het schuldsaldo; de eerdere afboeking is niet automatisch teruggedraaid.'});continue;}if(cents(tx.amount)!==-old.paidCents||tx.date!==old.date||tx.accountId!==old.accountId)questions.push({transactionId:tx.id,date:tx.date,reason:'Een eerder verwerkte betaling is gewijzigd. Controleer de aflossing; er is niets opnieuw afgeboekt.'});continue;}
-  if(tx.provider!=='lunchflow'||tx.currency!=='EUR'||!validDate(tx.date)||tx.date>asOf||cents(tx.amount)>=0||!Number.isSafeInteger(cents(tx.amount))||businessAccountIds.includes(tx.accountId)||['transfer','fixed','ignore'].includes(tx.bankPatternKind??''))continue;
+  if((tx.provider !== 'lunchflow' && tx.provider !== 'bunq')||tx.currency!=='EUR'||!validDate(tx.date)||tx.date>asOf||cents(tx.amount)>=0||!Number.isSafeInteger(cents(tx.amount))||businessAccountIds.includes(tx.accountId)||['transfer','fixed','ignore'].includes(tx.bankPatternKind??''))continue;
   if(reversed.has(tx.id))continue;
   const party=normalize(tx.providerData?.counterparty??tx.counterparty??'');
   const related=next.filter(d=>{const r=d.bankRepayment;return r?.enabled&&normalize(r.counterparty)===party&&!!party&&(!r.accountId||r.accountId===tx.accountId)&&validDate(r.fromDate)&&tx.date>=r.fromDate&&cents(d.saldo??d.openBedrag)>0;});
@@ -74,7 +74,7 @@ export function applyConfirmedDebtPayment(debts:SchuldItem[],payment:DebtPayment
 
 /** User-confirmed allocation; a second click or duplicate debt allocation cannot reduce a balance again. */
 export function confirmDebtAllocation(debts:SchuldItem[],transaction:MoneylithTransaction,ledger:DebtLedger,debtId:string,allocationCents:number){
- if(!validateDebtLedger(ledger)||transaction.provider!=='lunchflow'||transaction.currency!=='EUR'||!Number.isSafeInteger(allocationCents)||allocationCents<=0)throw Error('Ongeldige aflossing.');
+ if(!validateDebtLedger(ledger)||(transaction.provider !== 'lunchflow' && transaction.provider !== 'bunq')||transaction.currency!=='EUR'||!Number.isSafeInteger(allocationCents)||allocationCents<=0)throw Error('Ongeldige aflossing.');
  const paid=-cents(transaction.providerData?.amount??transaction.amount),date=transaction.providerData?.date??transaction.date;
  if(!Number.isSafeInteger(paid)||paid<=0||!validDate(date))throw Error('Kies een geboekte uitgaande betaling.');
  const existing=ledger.entries.find(e=>e.transactionId===transaction.id);
