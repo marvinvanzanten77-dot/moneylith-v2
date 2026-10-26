@@ -67,6 +67,7 @@ export function matchingBankRule(tx: MoneylithTransaction, settings: BankRuleSet
   // A confirmed full destination IBAN is required; suffixes or equal amounts alone are not proof.
   const hasIban = (iban: string) => new RegExp("\\b" + iban.split("").join("\\s*") + "\\b", "i").test(text);
   return [...settings.rules, ...merchantRules].find(r => r.enabled !== false &&
+    !(tx.provider==='bunq'&&tx.providerData?.paymentSubType==='BILLING'&&r.kind==='transfer') &&
     (!r.accountId || r.accountId === tx.accountId) &&
     (!r.counterpartyIban || hasIban(r.counterpartyIban)) &&
     (!r.direction || (r.direction === "out" ? tx.amount < 0 : tx.amount > 0)) &&

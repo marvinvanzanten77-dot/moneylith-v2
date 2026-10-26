@@ -13,8 +13,8 @@ export type InputSection = {
   bankVerified?: boolean;
 };
 
-export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; budgetCategory?: string; amountRange?: {min:number;max:number}; costKind?:"subscription"|"credits"; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null> }[], month=currentCostMonth()): ReviewRow[] {
-  return items.filter(item=>costPlannedInMonth(item,month)).map(({reviewedInput: _receipt, ...raw}) => { const item=costForMonth(raw,month); return ({
+export function manualReviewRows(items: { id: string; naam: string; bedrag: number; amountEntered?: boolean; reviewedInput?: string; paymentRoute?: string; bankObservedOnly?: boolean; budgetCategory?: string; amountRange?: {min:number;max:number}; costKind?:"subscription"|"credits"; monthlyVariable?:boolean; monthlyAmounts?:Record<string,number|null> }[], month=currentCostMonth()): ReviewRow[] {
+  return items.filter(item=>!item.bankObservedOnly&&costPlannedInMonth(item,month)).map(({reviewedInput: _receipt, ...raw}) => { const item=costForMonth(raw,month); return ({
     id: item.id, name: item.naam, amount: item.paymentRoute === "withheld" ? 0 : item.bedrag,
     complete: item.amountEntered !== false && (item.bedrag !== 0 || item.amountEntered === true),
     ...((item.paymentRoute || item.budgetCategory || item.amountRange || item.monthlyAmounts) ? {details: {...item,...(item.monthlyAmounts&&item.monthlyVariable!==false?{effectiveMonth:month}:{})}} : {}),

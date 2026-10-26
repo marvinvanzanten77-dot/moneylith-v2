@@ -180,7 +180,7 @@ export function personalInput(
         "pattern",
       );
   }
-  for (const r of fixed.filter(r => !detected.length || r.paymentRoute || r.budgetCategory)) {
+  for (const r of fixed.filter(r => !r.bankObservedOnly && (!detected.length || r.paymentRoute || r.budgetCategory))) {
     const day=Number.isInteger(r.dagVanMaand)&&Number(r.dagVanMaand)>0&&Number(r.dagVanMaand)<=31?Number(r.dagVanMaand):options.monthlyDay ?? 23;
     const row=r as unknown as import("../types").FixedCostManualItem;
     if(row.monthlyAmounts!==undefined&&row.monthlyVariable!==false){

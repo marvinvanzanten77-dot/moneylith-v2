@@ -71,3 +71,47 @@ test('bunq requires explicitly mapping an existing manual IBAN instead of silent
  assert.throws(()=>processBankSync(state,[snapshot({ok:true,value:[]})],[{providerId:'1:2',targetId:'new'}],'2026-10-26','bunq'),/bestaande rekening/);
  const linked=processBankSync(state,[snapshot({ok:true,value:[]})],[{providerId:'1:2',targetId:'manual'}],'2026-10-26','bunq');assert.equal(linked.result.accounts.length,1);assert.equal(linked.result.accounts[0].id,'manual');assert.equal(linked.result.accounts[0].bankProvider,'bunq');
 });
+
+test('bunq billing is a cost, supplier variants match, manual forecasts survive and observed costs do not repeat',async()=>{
+ const {classifyBunq,addBunqObservedCosts}=await import('../src/bank/bunqClassification');
+ const {classifyBankTransactions}=await import('../src/bank/patterns');
+ const {manualReviewRows}=await import('../src/logic/inputReadiness');
+ const rules={accountRoles:{},rules:[{id:'topup',kind:'transfer' as const,label:'Top-up',terms:['bunq']}]};
+ const fixed=[{id:'phone',naam:'Simyo — telefoonabonnement',bedrag:144.95,amountEntered:true,dagVanMaand:19,paymentRoute:'card' as const,bankPaymentFrom:'2026-10-25'}];
+ const t=(id:string,party:string,amount:number,subtype='PAYMENT')=>({id,provider:'bunq' as const,accountId:'card',date:'2026-10-26',amount,currency:'EUR',description:party,counterparty:party,providerData:{counterparty:party,description:party,amount,date:'2026-10-26',paymentSubType:subtype}});
+ const tx=[t('fee','bunq BV',-9.99,'BILLING'),t('fund','bunq',-100),t('phone','SIMYO',-144.95),t('git','GITHUB, INC.',-2.76),t('suno','SUNO INC.',-16.46),t('processor','Adyen Merchant Payout EUR',-80)];
+ const initial=classifyBankTransactions(tx,{},rules);
+ assert.equal(initial[0].bankPatternKind,undefined);assert.equal(initial[1].bankPatternKind,'transfer');
+ const costs=addBunqObservedCosts(initial,fixed,rules,[],'2026-10-26');
+ assert.deepEqual(costs.fixedCosts[0],fixed[0]);assert.equal(costs.fixedCosts.length,4);
+ const classified=classifyBunq(initial,[],costs.fixedCosts,rules);
+ assert.equal(classified[0].bankPatternKind,'fixed');assert.equal(classified[2].bankRuleLabel,fixed[0].naam);assert.equal(classified[5].bankPatternKind,undefined);
+ const report=reconcilePeriod('2026-10','2026-10-26',makePeriodPlan([],costs.fixedCosts,[],[],'2026-10-26'),true,classified,emptyDebtLedger(),rules);
+ assert.equal(report.rows.find(r=>r.label==='GitHub')?.actual,276);assert.equal(report.rows.find(r=>r.label==='GitHub')?.expected,null);
+ assert.equal(report.rows[0].actual,14495);
+ const input=personalInput({fixedCosts:costs.fixedCosts,transactions:classified,bankRules:rules},emptyOptions(),'2026-10-26');
+ assert.ok(!input.events.some(e=>e.id.includes('bunq-observed:')));assert.ok(input.assumptions.some(s=>s.includes('GitHub')));
+ assert.equal(manualReviewRows(costs.fixedCosts).length,1);
+ assert.equal(addBunqObservedCosts(classified,costs.fixedCosts,rules,costs.seen,'2026-10-26').fixedCosts.length,4);
+ assert.equal(addBunqObservedCosts(classified,fixed,rules,costs.seen,'2026-10-26').fixedCosts.length,1,'deleted suggestions stay deleted');
+ const decision={'transaction:git':{kind:'variable' as const,label:'Eigen keuze'}};
+ const corrected=classifyBunq(classifyBankTransactions(tx,decision,rules),[],costs.fixedCosts,rules,decision);
+ assert.equal(corrected[3].bankPatternKind,'variable');
+ const business=classifyBunq(tx,[],costs.fixedCosts,{...rules,accountRoles:{card:'business'}});
+ assert.equal(business[2].bankPatternKind,undefined);
+});
+
+test('bunq positive direct debit requires review; explicit reversal offsets once and cannot settle a future Simyo bill',async()=>{
+ const {findBankReversals}=await import('../src/bank/periodReconciliation');
+ const debit={id:'d',provider:'bunq' as const,accountId:'card',date:'2026-09-24',amount:-94.49,currency:'EUR',description:'SIMYO',counterparty:'SIMYO',bankPatternKind:'fixed' as const,bankRuleLabel:'Simyo — telefoonabonnement'};
+ const credit={...debit,id:'c',amount:94.49,date:'2026-10-14',providerData:{paymentSubType:'SDD'}};
+ assert.ok(findBankReversals([debit,credit]).uncertainDebits.has('d'));
+ assert.equal(findBankReversals([debit,credit]).reversedDebits.size,0);
+ const explicit={...credit,description:'Terugboeking SIMYO'};
+ assert.ok(findBankReversals([debit,explicit]).reversedDebits.has('d'));
+ const fixed=[{id:'phone',naam:debit.bankRuleLabel,bedrag:144.95,amountEntered:true,dagVanMaand:19,paymentRoute:'card' as const,bankPaymentFrom:'2026-10-25'}];
+ const report=reconcilePeriod('2026-10','2026-10-26',makePeriodPlan([],fixed,[],[],'2026-10-26'),true,[debit,explicit],emptyDebtLedger(),emptyBankRules);
+ assert.equal(report.rows[0].actual,null);assert.equal(report.rows[0].expected,14495);
+ const past=reconcilePeriod('2026-09','2026-10-26',makePeriodPlan([],fixed,[],[],'2026-09-26'),true,[debit,credit],emptyDebtLedger(),emptyBankRules);
+ assert.equal(past.rows[0].actual,null);assert.match(past.rows[0].status,/Mogelijke terugboeking/);
+});

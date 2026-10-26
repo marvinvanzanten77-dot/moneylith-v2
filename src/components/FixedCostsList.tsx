@@ -72,7 +72,7 @@ export function FixedCostsList({
   const updateItem = (id: string, patch: Partial<FixedCostManualItem>) => {
     if (isReadOnly) return;
     updateItems(
-      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+      items.map((item) => (item.id === id ? { ...item, ...patch, ...(('bedrag' in patch || 'monthlyAmounts' in patch) ? {bankObservedOnly:false} : {}) } : item)),
     );
   };
 
@@ -182,7 +182,7 @@ export function FixedCostsList({
               title={item.naam?.trim() || "Naam"}
               summary={
                 <span className="block max-w-32 text-right sm:max-w-none">
-                  {!costPlannedInMonth(item,currentMonth)?"Niet gepland":display.amountEntered !== false &&
+                  {item.bankObservedOnly?"Alleen betaalde kosten":!costPlannedInMonth(item,currentMonth)?"Niet gepland":display.amountEntered !== false &&
                   Number.isFinite(display.bedrag) &&
                   (display.bedrag !== 0 || display.amountEntered === true)
                     ? formatCurrency(display.bedrag)
@@ -198,6 +198,7 @@ export function FixedCostsList({
             >
               {isExpanded && (
                 <div className="border-t border-amber-100 px-3 py-3 text-sm text-slate-800">
+                  {item.bankObservedOnly&&<p className="mb-3">Betaalde bedragen staan in je salarisperiode. Een toekomstig maandbedrag is nog niet ingepland. Vul hieronder een verwachting in als je die wilt meenemen.</p>}
                   <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
                     <label className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-slate-600">
@@ -289,7 +290,7 @@ export function FixedCostsList({
                     else {const current=costForMonth(item,currentMonth);updateItem(item.id,{monthlyVariable:false,bedrag:current.bedrag,amountEntered:current.amountEntered});}
                   }}/>Bedrag wisselt per maand</label>{variable&&<><label>Maand bewerken<input className={recordControlClass+" block"} aria-label="Maand bewerken" type="month" value={editMonth} onChange={e=>{if(/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))setEditMonth(e.target.value);}} disabled={isReadOnly}/></label><p className="text-xs">Overzicht: {currentMonth}. {item.costKind==="credits"?"Een maand zonder geplande aankoop wordt niet herhaald in Vooruitblik.":"Niet-ingevulde maanden blijven onbekend, ook in Vooruitblik."} Eerdere maandbedragen blijven bewaard wanneer je een andere maand invult.</p></>}</div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {scope==="work"&&<label className="min-w-0">Soort kosten<select aria-label="Soort werkkosten" className={recordControlClass+" block w-full"} value={item.costKind??'subscription'} onChange={e=>updateItem(item.id,{costKind:e.target.value as 'subscription'|'credits',monthlyVariable:true,monthlyAmounts:item.monthlyAmounts??{[editMonth]:item.amountEntered===false?null:item.bedrag}})}><option value="subscription">Abonnement</option><option value="credits">Losse credits / promotie</option></select><span className="text-xs">Losse credits tellen alleen mee in maanden waarvoor je een bedrag hebt ingevuld.</span></label>}
+                    {scope==="work"&&<label className="min-w-0">Soort kosten<select aria-label="Soort werkkosten" className={recordControlClass+" block w-full"} value={item.bankObservedOnly?'observed':item.costKind??'subscription'} onChange={e=>updateItem(item.id,{costKind:e.target.value as 'subscription'|'credits',monthlyVariable:true,monthlyAmounts:item.monthlyAmounts??{[editMonth]:item.amountEntered===false?null:item.bedrag}})}>{item.bankObservedOnly&&<option value="observed" disabled>Nog niet vastgesteld</option>}<option value="subscription">Abonnement</option><option value="credits">Losse credits / promotie</option></select><span className="text-xs">Losse credits tellen alleen mee in maanden waarvoor je een bedrag hebt ingevuld.</span></label>}
                     <label className="min-w-0">Betaalwijze<select aria-label="Betaalwijze" className={recordControlClass + " block w-full min-w-0"} value={item.paymentRoute ?? "bank"} disabled={isReadOnly} onChange={e => updateItem(item.id, {paymentRoute:e.target.value as FixedCostManualItem["paymentRoute"]})}>
                       <option value="bank">Rechtstreeks via ING / bankrekening</option><option value="card">Via creditcard / bunq</option><option value="cash">Contant</option><option value="third-party">Via iemand anders</option><option value="withheld">Al ingehouden op ontvangen inkomen / toeslagen</option>
                     </select></label>

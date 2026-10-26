@@ -25,6 +25,7 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  bankObservedOnly?: boolean; // Actual payments only until the user enters a forecast.
   costGroup?: "work-tools";
   costKind?: "subscription" | "credits";
   bankPaymentFrom?: string; // Explicit earliest booking date for the currently expected bill; earlier salary periods remain historical.

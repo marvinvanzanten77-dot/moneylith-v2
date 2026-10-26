@@ -28,7 +28,7 @@ export function makePeriodPlan(income:IncomeItem[],fixed:FixedCostManualItem[],d
   const month=raw.dagVanMaand>0&&raw.dagVanMaand<23?periodBounds(period).end.slice(0,7):period;
   if(!costPlannedInMonth(raw,month))continue;
   const i=costForMonth(raw,month);
-  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
+  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.bankObservedOnly?null:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
  }
  for(const i of active)rows.push({id:'detected:'+i.id,label:i.customLabel||i.descriptionPattern,kind:'fixed',expected:cents(i.customMonthlyAmount??i.estimatedMonthlyAmount),party:i.descriptionPattern});
  for(const d of debts)rows.push({id:'debt:'+d.id,label:d.naam,kind:'debt',expected:(d.saldo??d.openBedrag)===0?0:cents(d.minimaleMaandlast??d.minBetaling)??0});
@@ -120,17 +120,18 @@ export function findBankReversals(all:MoneylithTransaction[]){
  const uncertainDebits=new Set<string>();
  all=all.map(t=>({...t,amount:t.providerData?.amount??t.amount,date:t.providerData?.date??t.date,counterparty:t.providerData?.counterparty??t.counterparty,description:t.providerData?.description??t.description}));
  const reversedDebits=new Set<string>();
- for(const credit of all.filter(t=>t.amount>0&&(t.providerData?.paymentSubType==='REVERSAL'||/terugboek|storno|restitutie|refund/i.test(t.providerData?.description??t.description))).sort((a,b)=>a.date.localeCompare(b.date))){
+ for(const credit of all.filter(t=>t.amount>0&&(t.providerData?.paymentSubType==='REVERSAL'||(t.provider==='bunq'&&t.providerData?.paymentSubType==='SDD')||/terugboek|storno|restitutie|refund/i.test(t.providerData?.description??t.description))).sort((a,b)=>a.date.localeCompare(b.date))){
   const candidates=all.filter(t=>t.amount<0&&t.accountId===credit.accountId&&t.date<=credit.date&&Math.round(-t.amount*100)===Math.round(credit.amount*100)&&norm(t.counterparty??'')!==''&&norm(t.counterparty??'')===norm(credit.counterparty??'')&&!reversedDebits.has(t.id)).sort((a,b)=>b.date.localeCompare(a.date));
-  if(candidates.length===1){reversedDebits.add(candidates[0].id);reversals.add(credit.id);}else if(candidates.length>1){for(const c of candidates)uncertainDebits.add(c.id);}
+  const explicit=credit.providerData?.paymentSubType==='REVERSAL'||/terugboek|storno|restitutie|refund/i.test(credit.description);
+  if(candidates.length===1&&explicit){reversedDebits.add(candidates[0].id);reversals.add(credit.id);}else if(candidates.length>0){for(const c of candidates)uncertainDebits.add(c.id);}
  }
  return {reversedDebits,credits:reversals,uncertainDebits};
 }
 
 /** Refresh editable work costs only in the open period; historical snapshots stay intact. */
 export function refreshWorkCostPlan(saved:PeriodPlan,latest:PeriodPlan):PeriodPlan {
- const work=latest.rows.filter(r=>r.costGroup==='work-tools');
+ const work=latest.rows.filter(r=>r.costGroup==='work-tools'||r.id.startsWith('fixed:bunq-observed:'));
  const ids=new Set(work.map(r=>r.id));
- const rows=[...saved.rows.filter(r=>r.costGroup!=='work-tools'&&!ids.has(r.id)),...work];
+ const rows=[...saved.rows.filter(r=>r.costGroup!=='work-tools'&&!r.id.startsWith('fixed:bunq-observed:')&&!ids.has(r.id)),...work];
  return JSON.stringify(rows)===JSON.stringify(saved.rows)?saved:{...saved,rows};
 }

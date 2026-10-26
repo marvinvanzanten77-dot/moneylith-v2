@@ -45,7 +45,7 @@ De bunq-acties lopen via de bestaande geauthenticeerde `api/cloud`-route, dezelf
 - Volledige suite: 259 tests geslaagd. Strenge typecheck en productiebuild uitgevoerd.
 - Echte bunq-sandbox: installatie, sessie, één rekening, saldo en betalingsoverzicht geslaagd. Het overzicht was leeg; paginering en geboekte aankopen zijn met fictieve responses getest.
 - Browser: bunq testen/koppelen met fictieve API-responses, alle persoonlijke en zakelijke tabs, desktop en mobiel, twee apparaten en opslagfoutherstel geslaagd.
-- Jouw echte bunq-rekening en productie zijn nog niet getest: persoonlijke sleutel ontbreekt. Geen productie-activatie of deployment in deze stap.
+- Productie geactiveerd op 26 oktober 2026: echte eigenaarstest, rekeninglijst, saldo en 1.083 geboekte betalingen geslaagd. Eén actieve bunq-rekening gekoppeld; gecombineerde ING/bunq-scan: drie rekeningen geslaagd. Herhaling voegde geen duplicaten toe. Sleutel uitsluitend serverzijdig.
 
 Officiële bronnen (geraadpleegd 26 oktober 2026):
 - https://doc.bunq.com/basics/signing
@@ -57,3 +57,12 @@ Officiële bronnen (geraadpleegd 26 oktober 2026):
 - https://doc.bunq.com/monetary-account
 - https://raw.githubusercontent.com/bunq/doc/refs/heads/develop/swagger.json
 - https://help.bunq.com/articles/bunq-developer-create-and-share-your-apps
+
+## Herkenning van kosten (26 oktober 2026)
+
+- `BILLING` op bunq wordt niet door een algemene bunq-top-upregel verborgen.
+- Unieke leveranciersnamen koppelen onder meer SIMYO aan de bestaande telefoonpost. Handmatige bedragen, betaalgrenzen en correcties blijven behouden.
+- Herkende werkkosten zonder bestaande post verschijnen als **Alleen betaalde kosten**. Het periodeoverzicht berekent de daadwerkelijke betalingen; een onbekende toekomstverwachting is geen nulbedrag. Deze observaties worden niet automatisch herhaald in Vooruitblik. Daar staat expliciet welke toekomstige bedragen nog niet zijn ingepland. Een zelf ingevuld bedrag maakt de post weer een normale verwachting.
+- Generieke betaalverwerkers en OpenAI bewijzen niet welk abonnement of welke credits zijn gekocht; die blijven handmatig te koppelen.
+- Een positieve SDD met een gelijk eerder bedrag bij dezelfde tegenpartij markeert een mogelijke terugboeking. Alleen expliciete terugboekingstekst of REVERSAL en één unieke match bevestigen de verrekening; ambigue matches blijven onbekend.
+- Regressies controleren leveranciersvarianten, bankkosten versus top-ups, bestaande invoer, verwijderde suggesties, isolatie, geen herhaling van waargenomen kosten en toekomstige Simyo-facturen.

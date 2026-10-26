@@ -24,6 +24,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
   const debt=row.kind==='debt'?list<SchuldItem>(data.debts).find(d=>'debt:'+d.id===row.id):undefined;
   if(row.kind==='debt'&&(!debt||debt.firstPaymentDate!==undefined||debt.remainingPayments!==undefined||!row.expected))continue;
   const raw=fixed.find(f=>'fixed:'+f.id===row.id);
+  if(raw?.bankObservedOnly){input.assumptions.push(row.label+': alleen betaalde kosten bekend; toekomstige bedragen zijn nog niet ingepland.');continue;}
   const id=row.id.startsWith('detected:')?'fixed:'+row.id.slice(9):row.id;
   if(row.route==='withheld')continue;
   const matches=(event:Input['events'][number])=>event.id===id||event.id.startsWith(id+':');

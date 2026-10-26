@@ -1,4 +1,4 @@
-import {classifyBunq} from './bunqClassification.js';
+import {classifyBunq,addBunqObservedCosts} from './bunqClassification.js';
 import {periodPlansKey,capturePeriodPlan,makePeriodPlan,type PeriodPlans} from "./periodReconciliation.js";
 import {reconcileDebtPayments,debtLedgerKey,emptyDebtLedger,validateDebtLedger} from './debtPayments.js';
 import {mergeLunchflow,type LunchMapping} from './lunchflowMerge.js';
@@ -22,8 +22,10 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
  const detected=read<FixedCostItem[]>(state,'fixed-cost-items',[]);
  if(![accounts,txs,income,fixed,seen,detected].every(Array.isArray)||!validateBankRules(rules))throw Error('Bankadministratie is ongeldig; eerdere gegevens blijven behouden.');
  const result=mergeLunchflow(accounts,txs,snapshots,mappings,provider);
- result.transactions=classifyBunq(classifyBankTransactions(result.transactions,decisions,rules),result.accounts,fixed,rules);
- const financial=result.reports.some(r=>r.ok)?prefillFinancialImport(result.transactions.filter(t=>rules.accountRoles[t.accountId]!=='business'),income,fixed,seen,asOf,detected.some(i=>i.isFixed&&!i.isIgnored)):undefined;
+ result.transactions=classifyBankTransactions(result.transactions,decisions,rules);
+ const observed=result.reports.some(r=>r.ok)?addBunqObservedCosts(result.transactions,fixed,rules,seen,asOf):{fixedCosts:fixed,seen};
+ result.transactions=classifyBunq(result.transactions,result.accounts,observed.fixedCosts,rules,decisions);
+ const financial=result.reports.some(r=>r.ok)?prefillFinancialImport(result.transactions.filter(t=>rules.accountRoles[t.accountId]!=='business'),income,observed.fixedCosts,observed.seen,asOf,detected.some(i=>i.isFixed&&!i.isIgnored)):undefined;
  // An explicitly linked personal salary may arrive on a business-designated bank account.
  // Respect that opt-in link without auto-importing other business income into Personal.
  if(financial){
