@@ -41,8 +41,9 @@ export async function syncBankAccount(email:string,apiKey:string,scanId:string=c
    const baseMessage=failure||(!current.length?'Geen rekeningen gekoppeld. Open Bank om rekeningen te verbinden.':failed?`Banksynchronisatie gedeeltelijk of niet geslaagd (${ok} van ${current.length} rekeningen). Eerdere gegevens van mislukte rekeningen zijn behouden. ${processed.result.reports.filter(r=>!r.ok).map(r=>r.message).join(' ')}`:`${ok} rekeningen opgehaald en verwerkt. Er zijn ${processed.result.reports.reduce((n,r)=>n+r.added,0)} nieuwe geboekte transacties. Lunch Flow kan achterlopen op de bank.`);
    const debtMessage=processed.debtPayments?.applied?` ${processed.debtPayments.applied} aflossingen verwerkt in Schulden. Het banksaldo is niet nogmaals verlaagd.`:'';
    const questions=processed.debtPayments?.questions.length??0;
-   const message=baseMessage+debtMessage+(questions?` ${questions} betalingen vragen controle bij Schulden.`:'');
-   const scan:BankScan={id:scanId,at:now.toISOString(),ok,failed:failure?Math.max(1,failed):failed,added:processed.result.reports.reduce((n,r)=>n+r.added,0),updatedIncome:processed.financial?.updatedIncome??0,message};
+   const message=baseMessage+debtMessage+(questions?` ${questions} betalingen vragen controle bij Fundament → Betalingen controleren.`:'');
+   const priorScan=state[scanKey]?JSON.parse(state[scanKey]) as BankScan:null;
+   const scan:BankScan={lastSuccessfulAt:!failure&&!failed&&ok>0?now.toISOString():priorScan?.lastSuccessfulAt??(priorScan&&priorScan.ok>0&&!priorScan.failed?priorScan.at:undefined),updatedTransactions:processed.result.reports.reduce((n,r)=>n+r.updated,0),id:scanId,at:now.toISOString(),ok,failed:failure?Math.max(1,failed):failed,added:processed.result.reports.reduce((n,r)=>n+r.added,0),updatedIncome:processed.financial?.updatedIncome??0,message};
    const next={...processed.state,[scanKey]:JSON.stringify(scan)};
    if(await setCloudSnapshot(email,encryptCloudPayload(JSON.stringify(next)),record?.revision??null))return scan;
   }

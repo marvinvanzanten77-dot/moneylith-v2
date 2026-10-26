@@ -24,3 +24,14 @@ export function saveCloudRecovery(previous: CloudState, legacy: string | null): 
     };
   });
 }
+
+/** Export a recovery without replacing the active administration. */
+export function readCloudRecovery():Promise<{state:CloudState;savedAt:string}|null>{
+ return new Promise((resolve,reject)=>{
+  const request=indexedDB.open('moneylith-cloud-recovery',1);
+  request.onupgradeneeded=()=>request.result.createObjectStore('snapshots');
+  request.onerror=()=>reject(Error('Herstelkopie niet bereikbaar.'));
+  request.onblocked=()=>reject(Error('Sluit andere Moneylith-tabbladen en probeer opnieuw.'));
+  request.onsuccess=()=>{const db=request.result;const tx=db.transaction('snapshots','readonly');const get=tx.objectStore('snapshots').get('latest');get.onsuccess=()=>resolve(get.result??null);get.onerror=()=>reject(Error('Herstelkopie niet bereikbaar.'));tx.oncomplete=()=>db.close();tx.onabort=()=>{db.close();reject(Error('Lezen van herstelkopie afgebroken.'));};};
+ });
+}

@@ -1,3 +1,4 @@
+import {readCloudRecovery} from '../storage/cloudRecovery';
 import {disableDevicePush} from '../pwa/PushSettings';
 import { useEffect, useState } from "react";
 import { cloudRequest, loadCloudVersion, saveCloudChanges, stopCloudSync } from "../storage/cloudSync";
@@ -33,6 +34,7 @@ export function CloudAccountCard({ preferredAuthMode = null }: { preferredAuthMo
       <div className="mt-3 flex flex-wrap gap-2">
         <Button disabled={busy} onClick={() => void run(async () => { await saveCloudChanges(); setStatus("Lokale wijzigingen gecontroleerd voor opslag. Zie de opslagstatus bovenaan voor eventuele conflicten."); })}>Nu opslaan</Button>
         <Button disabled={busy} onClick={() => void run(loadCloudVersion)}>Cloudversie laden</Button>
+        <Button disabled={busy} onClick={()=>void run(async()=>{const recovery=await readCloudRecovery();if(!recovery)throw Error('Er is op dit apparaat nog geen herstelkopie.');const url=URL.createObjectURL(new Blob([JSON.stringify(recovery)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='moneylith-lokale-herstelkopie.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Herstelkopie gedownload. De huidige administratie is niet gewijzigd.');})}>Herstelkopie downloaden</Button>
         <Button disabled={busy} onClick={() => void run(async () => {
           try { await saveCloudChanges(); } catch { /* Local data and sync metadata remain available after logout. */ }
           await disableDevicePush();

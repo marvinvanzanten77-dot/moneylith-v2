@@ -1,3 +1,4 @@
+import {CalculationDetails} from './CalculationDetails';
 import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "../utils/format";
 import { numberInputValue, parseNumberInput } from "../utils/numberInput";
@@ -411,6 +412,7 @@ export const SchuldenkaartCard = ({
         })}
       </div>
 
+      <CalculationDetails><p>Openstaand: {formatCurrency(totalSaldo)}. Dit is de som van de ingevoerde schuldsaldi. De maandlast van {formatCurrency(totalMinLasten)} telt uitsluitend de ingevulde aflossingsafspraken op.</p><ul className="list-disc pl-5">{items.map(d=><li key={d.id}>{d.naam}: {formatCurrency(d.saldo)} openstaand · {(d.minimaleMaandlast??0)>0?formatCurrency(d.minimaleMaandlast!)+" per maand":"geen maandelijkse regeling vastgelegd"}</li>)}</ul><p>Een schuld zonder regeling blijft openstaan. Extra aflossen is een eigen keuze; vrijgevallen termijnen worden niet automatisch doorgeschoven. Het banksaldo wordt bij het verwerken van een aflossing niet opnieuw verlaagd.</p></CalculationDetails>
       <div className="rounded-lg bg-white/80 p-3 text-xs text-slate-800 shadow-inner">
         <div className="flex items-center justify-between">
           <span>Totaal openstaand</span>

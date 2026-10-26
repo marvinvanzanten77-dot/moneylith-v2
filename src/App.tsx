@@ -1,6 +1,7 @@
+import {PaymentReview} from './components/PaymentReview';
+import {persistClassificationReview,classificationAuditKey,correctClassification,undoClassification,type ClassificationAudit} from './bank/classificationAudit';
 import {periodPaidKey,type PeriodPaid} from "./bank/periodReconciliation";
-import {findBankReversals} from "./bank/periodReconciliation";
-import {confirmDebtAllocation,emptyDebtLedger,debtLedgerKey} from "./bank/debtPayments";
+import {emptyDebtLedger,debtLedgerKey} from "./bank/debtPayments";
 import {PeriodFoundation} from "./components/PeriodFoundation";
 import {DebtPaymentsPanel} from "./components/DebtPaymentsPanel";
 import {costForMonth} from "./logic/monthlyCosts";
@@ -245,6 +246,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assets, setAssets] = useLocalStorage<AssetItem[]>("moneylith.personal.assets", []);
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
+  const [classificationHistory,setClassificationHistory]=useLocalStorage<ClassificationAudit[]>(classificationAuditKey,[]);
   const [periodPaid,setPeriodPaid]=useLocalStorage<PeriodPaid>(periodPaidKey,{});
   const [projectionDebtLedger]=useLocalStorage(debtLedgerKey,emptyDebtLedger());
   const [bankRules, setBankRules] = useLocalStorage<BankRuleSettings>("moneylith.personal.bankRules.v1", emptyBankRules);
@@ -1919,18 +1921,14 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
             </p>
           </div>
         )}
-        {!isBusinessVariant && bankPendingQuestions > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-900">
-          <p>{bankPendingQuestions} aankoopgroepen uit deze maand wachten op jouw uitleg. Help ze bij Patronen in het juiste potje te plaatsen. Vaste lasten blijven in dit overzicht.</p>
-          <button type="button" className="mt-2 rounded-lg bg-amber-500 px-3 py-2 font-semibold" onClick={() => setCurrentStep("afschriften")}>Betalingen benoemen</button>
-        </div>}
-        {!isBusinessVariant && <PeriodFoundation paid={periodPaid} setPaid={setPeriodPaid} income={incomeItems} fixed={fixedCostManualItems} detected={mergedFixedCostItems} debts={debts} transactions={classifiedBankTransactions} rules={bankRules} asOf={projectionDate} onFixedChange={setFixedCostManualItems} onDebtPayment={(transactionId,debtId,cents)=>{
-          const tx=transactions.find(t=>t.id===transactionId);if(!tx||bankRules.accountRoles[tx.accountId]==='business')throw Error('Geen persoonlijke bankbetaling gevonden.');
-          const reversals=findBankReversals(transactions);if(reversals.reversedDebits.has(tx.id)||reversals.uncertainDebits.has(tx.id))throw Error('Deze betaling is mogelijk teruggeboekt; controleer eerst de bankhistorie.');
-          const ledger=JSON.parse(localStorage.getItem(debtLedgerKey)??JSON.stringify(emptyDebtLedger()));
-          const next=confirmDebtAllocation(debts,tx,ledger,debtId,cents);
-          persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);
-          setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
-        }}/>}
+        {!isBusinessVariant && <PaymentReview debts={debts} fixed={fixedCostManualItems} transactions={classifiedBankTransactions} ledger={projectionDebtLedger} businessIds={Object.entries(bankRules.accountRoles).filter(([,r])=>r==='business').map(([id])=>id)} asOf={projectionDate} onSave={next=>{
+          persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
+        }} categoryUndoAvailable={classificationHistory.some(a=>!a.undoneAt)} onCategory={(id,label,future)=>{
+          const tx=classifiedBankTransactions.find(t=>t.id===id);if(!tx)throw Error('Betaling niet gevonden.');
+          const next=correctClassification(tx,label,future,bankPatternDecisions,classificationHistory);
+          persistClassificationReview(localStorage,next);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);
+        }} onUndoCategory={()=>{const next=undoClassification(bankPatternDecisions,classificationHistory,transactions);persistClassificationReview(localStorage,next);if(next.transactions)setTransactions(next.transactions);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);}}/>}
+        {!isBusinessVariant && <PeriodFoundation paid={periodPaid} setPaid={setPeriodPaid} income={incomeItems} fixed={fixedCostManualItems} detected={mergedFixedCostItems} debts={debts} transactions={classifiedBankTransactions} rules={bankRules} asOf={projectionDate}/>}
         {!isBusinessVariant && <FixedCostsList scope="work" items={fixedCostManualItems} onItemsChange={setFixedCostManualItems} heading="Abonnementskosten" subheading="Werktools en losse credits" addLabel="+ Overig abonnement" emptyLabel="Voeg een abonnement of losse aankoop toe en vul zelf het maandbedrag in." totalLabel="Ingevuld voor deze maand" />}
         <details open={isBusinessVariant || undefined} className="space-y-4"><summary className="cursor-pointer font-semibold">Inschattingen en vaste gegevens bewerken</summary>
         <IncomeList

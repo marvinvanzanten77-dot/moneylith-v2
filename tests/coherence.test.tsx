@@ -1,0 +1,93 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {confirmPaymentDistribution,undoPaymentDistribution} from '../src/bank/paymentReview';
+import {emptyDebtLedger,reconcileDebtPayments} from '../src/bank/debtPayments';
+import {makePeriodPlan,reconcilePeriod} from '../src/bank/periodReconciliation';
+import {spendingRows,spendingAboveBudgets,spendingSummary} from '../src/bank/spending';
+import {emptyBankRules} from '../src/bank/classificationRules';
+import {correctClassification,undoClassification} from '../src/bank/classificationAudit';
+import {classifyBankTransactions} from '../src/bank/patterns';
+import {personalInput} from '../src/projection/adapters';
+import {emptyOptions} from '../src/projection/engine';
+import type {MoneylithTransaction} from '../src/types';
+const tx=(id:string,date:string,amount:number,category='Boodschappen'):MoneylithTransaction=>({id,date,amount,currency:'EUR',provider:'lunchflow',accountId:'p',counterparty:'Test winkel',description:'Fictieve betaling',category});
+test('salary budgets, pots and forecast count across month boundary once and retain monthly unknowns',()=>{
+ const fixed=[{id:'food',naam:'Boodschappen',bedrag:100,dagVanMaand:0,amountEntered:true,budgetCategory:'Boodschappen',budgetSince:'2026-10',paymentRoute:'bank' as const}];
+ const transactions=[tx('before','2026-10-22',-80),tx('a','2026-10-23',-60),tx('b','2026-11-01',-50),tx('next','2026-11-23',-10)];
+ const rows=spendingRows(transactions,emptyBankRules,fixed);
+ const pots=spendingSummary(spendingAboveBudgets(rows,fixed,'salary'),'2026-10','2026-11-22','salary');
+ assert.equal(pots.totalCents,1000);assert.equal(pots.count,1);
+ const report=reconcilePeriod('2026-10','2026-11-22',makePeriodPlan([],fixed,[],[],'2026-11-22'),true,transactions,emptyDebtLedger(),emptyBankRules);
+ assert.equal(report.rows[0].actual,11000);
+ const projected=personalInput({fixedCosts:fixed,transactions},emptyOptions(),'2026-11-22');assert.equal(projected.commitments?.[0].remaining,0);
+ const variable={...fixed[0],monthlyVariable:true,monthlyAmounts:{'2026-10':null,'2026-11':0}};
+ assert.equal(spendingSummary(spendingAboveBudgets(rows,[variable],'salary'),'2026-10','2026-11-22','salary').totalCents,11000);
+ assert.equal(spendingSummary(spendingAboveBudgets(rows,[variable],'salary'),'2026-11','2026-11-23','salary').totalCents,1000);
+});
+test('split bank payment updates debt, fixed actuals, remaining forecast and pots without changing bank transaction',()=>{
+ const debts=[{id:'d',naam:'Test schuld',openBedrag:200,saldo:200,minBetaling:100}];
+ const fixed=[{id:'phone',naam:'Telefoon',bedrag:50,dagVanMaand:28,paymentRoute:'bank' as const}];
+ const transactions=[tx('combined','2026-10-24',-180)],before=JSON.stringify(transactions);
+ const next=confirmPaymentDistribution(debts,fixed,transactions,emptyDebtLedger(),'combined',[{debtId:'d',cents:10000}],[{fixedId:'phone',cents:5000}],'2026-10-26');
+ assert.equal(next.debts[0].saldo,100);
+ const report=reconcilePeriod('2026-10','2026-10-26',makePeriodPlan([],fixed,[],next.debts,'2026-10-26'),true,transactions,next.ledger,emptyBankRules);
+ assert.equal(report.rows.find(r=>r.id==='fixed:phone')?.actual,5000);
+ const forecast=personalInput({fixedCosts:fixed,debts:next.debts,transactions,debtPayments:next.ledger},emptyOptions(),'2026-10-26');
+ assert.equal(forecast.commitments?.find(r=>r.label==='Telefoon')?.remaining,0);
+ assert.equal(spendingRows(transactions,emptyBankRules,fixed,next.ledger)[0].cents,3000);
+ assert.equal(reconcileDebtPayments(next.debts,transactions,next.ledger,'2026-10-26').applied,0);
+ assert.throws(()=>confirmPaymentDistribution(next.debts,fixed,transactions,next.ledger,'combined',[{debtId:'d',cents:10000}],[],'2026-10-26'));
+ assert.equal(JSON.stringify(transactions),before);
+});
+test('late invoice is allocated to its chosen period, not the next bill; explicit undo preserves history',()=>{
+ const fixed=[{id:'phone',naam:'Telefoon',bedrag:144.95,dagVanMaand:19,paymentRoute:'card' as const}];
+ const transactions=[tx('old','2026-10-24',-94.49)];
+ const next=confirmPaymentDistribution([],fixed,transactions,emptyDebtLedger(),'old',[],[{fixedId:'phone',cents:9449,period:'2026-09'}],'2026-10-26');
+ const plan=makePeriodPlan([],fixed,[],[],'2026-10-26');
+ assert.equal(reconcilePeriod('2026-10','2026-10-26',plan,true,transactions,next.ledger,emptyBankRules).rows[0].actual,null);
+ assert.equal(reconcilePeriod('2026-09','2026-10-26',plan,true,transactions,next.ledger,emptyBankRules).rows[0].actual,9449);
+ const undone=undoPaymentDistribution([],next.ledger,next.ledger.history![0].id);
+ assert.equal(undone.ledger.entries.length,0);assert.ok(undone.ledger.history![0].undoneAt);
+ assert.equal(reconcileDebtPayments([],transactions,undone.ledger,'2026-10-26').applied,0);
+});
+test('undo refuses later debt edits and reversing payments cannot be confirmed',()=>{
+ const debts=[{id:'d',naam:'Test',openBedrag:200,saldo:200,minBetaling:100}],transactions=[tx('one','2026-10-24',-100)];
+ const next=confirmPaymentDistribution(debts,[],transactions,emptyDebtLedger(),'one',[{debtId:'d',cents:10000}],[],'2026-10-26');
+ assert.throws(()=>undoPaymentDistribution([{...next.debts[0],saldo:50}],next.ledger,next.ledger.history![0].id));
+ assert.deepEqual(undoPaymentDistribution(next.debts,next.ledger,next.ledger.history![0].id).debts,debts);
+ const reversed=[...transactions,{...tx('refund','2026-10-25',100),description:'Terugboeking incasso'}];
+ assert.throws(()=>confirmPaymentDistribution(debts,[],reversed,emptyDebtLedger(),'one',[{debtId:'d',cents:10000}],[],'2026-10-26'));
+ assert.throws(()=>confirmPaymentDistribution(debts,[],transactions,emptyDebtLedger(),'one',[{debtId:'d',cents:10000}],[],'2026-10-26',['p']));
+});
+test('classification correction explicitly separates one payment from future matching and is reversible',()=>{
+ const transactions=[tx('one','2026-10-24',-20,''),tx('two','2026-10-25',-20,'')];
+ const one=correctClassification(transactions[0],'Kleding',false,{},[]);
+ assert.equal(classifyBankTransactions(transactions,one.decisions)[0].category,'Kleding');
+ assert.notEqual(classifyBankTransactions(transactions,one.decisions)[1].category,'Kleding');
+ const future=correctClassification(transactions[1],'Gezondheid en welzijn',true,one.decisions,one.history);
+ const classified=classifyBankTransactions(transactions,future.decisions);
+ assert.equal(classified[0].category,'Kleding');assert.equal(classified[1].category,'Gezondheid en welzijn');
+ const undo=undoClassification(future.decisions,future.history);
+ assert.deepEqual(undo.decisions,one.decisions);assert.ok(undo.history[1].undoneAt);
+ assert.notEqual(classifyBankTransactions(classified,undo.decisions)[1].category,'Gezondheid en welzijn');
+});
+test('automatic reference-based repayment records undo history and does not reapply after reversal by user',()=>{
+ const debt={id:'d',naam:'Test',openBedrag:200,saldo:200,minBetaling:100,bankRepayment:{enabled:true,counterparty:'Test winkel',reference:'Dossier TEST1234',fromDate:'2026-10-23'}};
+ const transaction={...tx('automatic','2026-10-24',-100),description:'Dossier TEST1234'};
+ const next=reconcileDebtPayments([debt],[transaction],emptyDebtLedger(),'2026-10-26');assert.equal(next.applied,1);assert.equal(next.ledger.history?.length,1);
+ const undone=undoPaymentDistribution(next.debts,next.ledger,next.ledger.history![0].id);assert.equal(undone.debts[0].saldo,200);
+ assert.equal(reconcileDebtPayments(undone.debts,[transaction],undone.ledger,'2026-10-26').applied,0);
+});
+test('default zero is unknown for income and fixed costs; explicit zero is valid',()=>{
+ const row={id:'x',naam:'Test',bedrag:0,dagVanMaand:28};
+ const unknown=makePeriodPlan([row],[row],[],[],'2026-10-26');assert.ok(unknown.rows.every(r=>r.expected===null));
+ const known=makePeriodPlan([{...row,amountEntered:true}],[{...row,amountEntered:true}],[],[],'2026-10-26');assert.ok(known.rows.every(r=>r.expected===0));
+});
+test('undo after bank sync restores the previous manual category, not an empty or guessed category',()=>{
+ const original=tx('manual','2026-10-24',-20,'Mijn eigen categorie');
+ const correction=correctClassification(original,'Kleding',false,{},[]);
+ const synced=classifyBankTransactions([original],correction.decisions);
+ const undo=undoClassification(correction.decisions,correction.history,synced);
+ assert.equal(classifyBankTransactions(undo.transactions!,undo.decisions)[0].category,'Mijn eigen categorie');
+ assert.throws(()=>undoClassification(correction.decisions,correction.history,[{...synced[0],category:'Later handmatig gewijzigd'}]));
+});

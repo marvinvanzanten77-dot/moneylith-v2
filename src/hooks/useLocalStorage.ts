@@ -37,14 +37,16 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: Up
     } catch {
       /* ignore equality check errors */
     }
-    setValue(valueToStore);
     try {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        window.dispatchEvent(new Event("moneylith:local-change"));
       }
     } catch {
-      // ignore write errors
+      window.dispatchEvent(new CustomEvent("moneylith:storage-error",{detail:"Opslaan op dit apparaat is mislukt. De wijziging is niet opgeslagen; de eerdere gegevens zijn behouden. Maak eerst ruimte vrij."}));
+      return;
     }
+    setValue(valueToStore);
   };
 
   return [value, setStoredValue];

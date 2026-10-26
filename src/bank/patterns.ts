@@ -81,14 +81,15 @@ export function classifyBankTransactions(transactions: MoneylithTransaction[], d
     const rule = matchingBankRule(original, settings);
     const grouped = rule ? { ...original, bankRuleId: rule.id, bankRuleLabel: rule.label } : original;
     // Previously saved merchant decisions and explicit group corrections outrank automatic rules.
-    const decision = decisions[patternKey(original)] ?? decisions[patternKey(grouped)];
+    const individual=decisions['transaction:'+tx.id];
+    const decision = individual ?? decisions[patternKey(original)] ?? decisions[patternKey(grouped)];
     const chosen = decision ?? rule;
     if (!chosen) {
-      if (!tx.bankRuleId) return tx;
+      if (!tx.bankRuleId&&!tx.bankPatternCategory) return tx;
       return { ...original, category: tx.category === tx.bankPatternCategory ? undefined : tx.category,
         bankPatternCategory: undefined, bankPatternKind: undefined };
     }
-    const managed = !tx.category || tx.category === tx.bankPatternCategory;
+    const managed = !!individual || !tx.category || tx.category === tx.bankPatternCategory;
     const category = decision?.kind === "transfer" ? "Eigen overboeking" : chosen.label;
     return { ...(decision && decisions[patternKey(original)] ? original : grouped), category: managed ? category : tx.category,
       bankPatternCategory: managed ? category : tx.bankPatternCategory, bankPatternKind: chosen.kind };

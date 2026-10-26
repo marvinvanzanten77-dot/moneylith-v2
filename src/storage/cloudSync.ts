@@ -2,10 +2,11 @@ import {packCloudRequest,unpackCloudResponse,cloudEncoding} from './cloudTranspo
 import {mergeCloudVersions} from './mergeCloud';
 import { collectCloudState, restoreCloudState, validateCloudState, type CloudState } from "./cloudState";
 const metaKey = "moneylith.cloud.sync.v1";
-type Meta = { email: string; revision: string | null; hash: string };
+type Meta = { email: string; revision: string | null; hash: string; savedAt?:string };
 let session: Meta | null = null;
 let saving = false;
 let baseState: CloudState = {};
+let loadedAt:string|null=null;
 export const cloudHeaders = { "Content-Type": "application/json", "X-Moneylith-Cloud": "1" };
 export async function cloudRequest(action: string, method = "GET", body?: unknown) {
   const response = await fetch(`/api/cloud?action=${action}`, {
@@ -22,6 +23,7 @@ async function fingerprint(state: CloudState) {
   return Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, "0")).join("");
 }
 function remember(meta: Meta) {
+  try{const prior=JSON.parse(localStorage.getItem(metaKey)??'null');if(!meta.savedAt&&prior?.email===meta.email)meta={...meta,savedAt:prior.savedAt};}catch{/* invalid metadata does not change financial data */}
   localStorage.setItem(metaKey, JSON.stringify(meta));
   session = meta;
 }
@@ -51,6 +53,7 @@ export async function startCloudSync() {
         throw Error("Dit apparaat en de cloud bevatten verschillende wijzigingen. Kies bij Instellingen ‘Cloudversie laden’; je lokale versie wordt eerst bewaard. Er is niets overschreven.");
       if (!localChanged) {
         await restoreCloudState(localStorage, remote.state);
+        loadedAt=new Date().toISOString();
         remember({ email: auth.email, revision: remote.revision, hash: remoteHash });
         return true;
       }
@@ -82,7 +85,7 @@ export async function saveCloudChanges() {
     }
     if (session !== current) return false;
     baseState = state;
-    remember({ ...current, revision: result.revision, hash });
+    remember({ ...current, revision: result.revision, hash, savedAt:new Date().toISOString() });
     window.dispatchEvent(new Event("moneylith:cloud-saved"));
     return true;
   } finally { saving = false; }
@@ -93,6 +96,7 @@ export async function loadCloudVersion() {
   const remote = await cloudRequest("snapshot");
   if (!validateCloudState(remote.state)) throw Error("Er is nog geen cloudadministratie.");
   await restoreCloudState(localStorage, remote.state);
+  loadedAt=new Date().toISOString();
   remember({ email: auth.email, revision: remote.revision, hash: await fingerprint(remote.state) });
   window.location.reload();
 }
@@ -126,6 +130,7 @@ export async function refreshCloudChanges(){
     const local=collectCloudState(localStorage);
     const merged=mergeCloudVersions(baseState,local,remote.state);
     await restoreCloudState(localStorage,merged);
+    loadedAt=new Date().toISOString();
     baseState=remote.state;
     remember({...current,revision:remote.revision,hash:remoteHash});
     window.dispatchEvent(new Event('moneylith:cloud-restored'));
@@ -145,4 +150,10 @@ export async function runBankScan(){
   await prepareCloudReload();
   window.dispatchEvent(new Event('moneylith:cloud-saved'));
   return data.scan as import('../bank/processSync').BankScan;
+}
+
+/** Derive pending status from the same snapshot used for saving, never from a timer alone. */
+export async function cloudSyncStatus(){
+ const current=session;
+ return {connected:!!current,saving,lastSavedAt:current?.savedAt??null,loadedAt,pending:current?await fingerprint(collectCloudState(localStorage))!==current.hash:false};
 }

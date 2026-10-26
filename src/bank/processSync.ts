@@ -7,7 +7,7 @@ import {emptyBankRules,validateBankRules} from './classificationRules.js';
 import type {LunchSnapshot} from './lunchflowTypes.js';
 import type {CloudState} from '../storage/cloudState.js';
 import type {MoneylithAccount,MoneylithTransaction,IncomeItem,FixedCostManualItem,FixedCostItem} from '../types.js';
-export type BankScan={id:string;at:string;ok:number;failed:number;added:number;updatedIncome:number;message:string};
+export type BankScan={lastSuccessfulAt?:string;updatedTransactions?:number;id:string;at:string;ok:number;failed:number;added:number;updatedIncome:number;message:string};
 const read=<T>(state:CloudState,key:string,fallback:T):T=>state[key]?JSON.parse(state[key]) as T:fallback;
 /** One transformation for browser imports and server scans. Existing manual values and business books are preserved. */
 export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappings:LunchMapping[],asOf:string){

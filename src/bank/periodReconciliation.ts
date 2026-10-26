@@ -23,12 +23,12 @@ export function periodBounds(period:string){
 }
 export function makePeriodPlan(income:IncomeItem[],fixed:FixedCostManualItem[],detected:FixedCostItem[],debts:SchuldItem[],asOf:string):PeriodPlan{
  const period=salaryPeriod(asOf), active=detected.filter(i=>i.isFixed&&!i.isIgnored);
- const rows:PeriodRow[]=income.map(i=>({id:'income:'+i.id,label:i.naam,kind:'income',expected:i.amountEntered===false?null:cents(i.bedrag),evidence:i.bankEvidence}));
+ const rows:PeriodRow[]=income.map(i=>({id:'income:'+i.id,label:i.naam,kind:'income',expected:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),evidence:i.bankEvidence}));
  for(const raw of fixed.filter(i=>!active.length||i.paymentRoute||i.budgetCategory)){
   const month=raw.dagVanMaand>0&&raw.dagVanMaand<23?periodBounds(period).end.slice(0,7):period;
   if(!costPlannedInMonth(raw,month))continue;
   const i=costForMonth(raw,month);
-  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.amountEntered===false?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
+  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
  }
  for(const i of active)rows.push({id:'detected:'+i.id,label:i.customLabel||i.descriptionPattern,kind:'fixed',expected:cents(i.customMonthlyAmount??i.estimatedMonthlyAmount),party:i.descriptionPattern});
  for(const d of debts)rows.push({id:'debt:'+d.id,label:d.naam,kind:'debt',expected:(d.saldo??d.openBedrag)===0?0:cents(d.minimaleMaandlast??d.minBetaling)??0});
@@ -56,13 +56,13 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
  const {reversedDebits,credits,uncertainDebits}=findBankReversals(all);
  for(const id of credits)reversals.add(id);
  const ledgerTx=new Map(ledger.entries.map(e=>[e.transactionId,e]));
- for(const t of booked){
+ for(const t of all.filter(t=>booked.includes(t)||[...(ledgerTx.get(t.id)?.allocations??[]),...(ledgerTx.get(t.id)?.fixedAllocations??[])].some(a=>a.period===period))){
   if(reversals.has(t.id))continue;
   const payment=ledgerTx.get(t.id);
   if(payment){
    assigned.add(t.id);
-   for(const a of payment.allocations){const id='debt:'+a.debtId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
-   for(const a of payment.fixedAllocations??[]){const id='fixed:'+a.fixedId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
+   for(const a of payment.allocations){if((a.period??salaryPeriod(payment.date))!==period)continue;const id='debt:'+a.debtId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
+   for(const a of payment.fixedAllocations??[]){if((a.period??salaryPeriod(payment.date))!==period)continue;const id='fixed:'+a.fixedId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
    continue;
   }
   if(['transfer','financing','ignore'].includes(t.bankPatternKind??''))continue;

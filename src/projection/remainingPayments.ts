@@ -1,5 +1,5 @@
 import type {MoneylithSnapshotDomain} from '../core/moneylithSnapshot.js';
-import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithTransaction} from '../types.js';
+import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithTransaction,MoneylithAccount} from '../types.js';
 import {makePeriodPlan,reconcilePeriod,salaryPeriod,periodBounds} from '../bank/periodReconciliation.js';
 import {emptyBankRules,validateBankRules} from '../bank/classificationRules.js';
 import {emptyDebtLedger,validateDebtLedger} from '../bank/debtPayments.js';
@@ -34,7 +34,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    while(start<=horizon){
     const p=salaryPeriod(start),end=periodBounds(p).end;
     const resolved=costForMonth(raw,p);
-    const budget=resolved.amountEntered===false||!Number.isFinite(resolved.bedrag)?null:Math.round(resolved.bedrag*100);
+    const budget=resolved.amountEntered===false||(resolved.bedrag===0&&resolved.amountEntered!==true)||!Number.isFinite(resolved.bedrag)?null:Math.round(resolved.bedrag*100);
     const remaining=budget===null?null:Math.max(0,budget-(p===period?(row.actual??0):0));
     const days=Math.round((Date.parse(end)-Date.parse(start))/86400000)+1;
     for(let n=0;n<days&&addDays(start,n)<=horizon;n++)input.events.push({id:id+':budget:'+addDays(start,n),label:row.label+' — resterend budget',date:addDays(start,n),amount:remaining===null?null:-(Math.floor(remaining/days)+(n<remaining%days?1:0)),source:'fixed',basis:'assumption'});
@@ -43,8 +43,12 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    const left=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
    const elapsed=Math.round((Date.parse(input.asOf)-Date.parse(bounds.start))/86400000)+1;
    const duration=Math.round((Date.parse(bounds.end)-Date.parse(bounds.start))/86400000)+1;
-   const pace=row.actual!==null&&elapsed>=7?Math.round(row.actual/elapsed*duration):null;
-   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining:left,date:bounds.end,note:pace!==null&&row.expected!==null&&pace>row.expected?`Bij hetzelfde uitgaventempo ongeveer ${euro(pace-row.expected)} boven budget; dit is een aanname en nog niet extra afgetrokken.`:'Resterend budget gelijkmatig verdeeld tot de 22ste; aankoopdagen zijn aannames.'});
+   const txs=list<MoneylithTransaction>(data.transactions).filter(t=>t.provider==='lunchflow'&&t.date<=input.asOf&&rules.accountRoles[t.accountId]!=='business');
+   const accountIds=list<MoneylithAccount>(data.accounts).filter(a=>a.active&&a.bankProvider==='lunchflow'&&rules.accountRoles[a.id]!=='business').map(a=>a.id);
+   const covered=accountIds.length>0&&accountIds.every(id=>txs.some(t=>t.accountId===id&&t.date<=bounds.start));
+   const samples=row.transactionIds.length;
+   const pace=covered&&samples>=3&&row.actual!==null&&elapsed>=7?Math.round(row.actual/elapsed*duration):null;
+   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining:left,date:bounds.end,note:pace!==null&&row.expected!==null&&pace>row.expected?`Indicatie op ${samples} betalingen over ${elapsed} dagen vanaf ${bounds.start}; bankhistorie kan onvolledig zijn. Bij hetzelfde uitgaventempo ongeveer ${euro(pace-row.expected)} boven budget; dit is een aanname en nog niet extra afgetrokken.`:`Resterend budget gelijkmatig verdeeld tot de 22ste; aankoopdagen zijn aannames. ${pace===null?'Nog onvoldoende periodehistorie voor een tempo-inschatting.':`Tempo-indicatie op ${samples} betalingen over ${elapsed} dagen; geen garantie voor de rest van de periode.`}`});
    continue;
   }
   // Only this salary period is reconciled. Later periods keep their configured amounts.

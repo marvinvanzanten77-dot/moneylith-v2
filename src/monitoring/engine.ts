@@ -1,3 +1,7 @@
+import {personalInput} from '../projection/adapters.js';
+import {project,emptyOptions} from '../projection/engine.js';
+import {salaryPeriod,periodBounds} from '../bank/periodReconciliation.js';
+import {costForMonth} from '../logic/monthlyCosts.js';
 import {debtLedgerKey,emptyDebtLedger,reconcileDebtPayments} from '../bank/debtPayments.js';
 import {choiceLimitsKey, validateChoiceLimits, choiceProfile} from '../bank/choiceGuidance.js';
 import type { FixedCostManualItem, MoneylithAccount, MoneylithTransaction } from '../types';
@@ -23,7 +27,7 @@ const euros=(cents:number)=>new Intl.NumberFormat('nl-NL',{style:'currency',curr
 function read<T>(state:CloudState,key:string,fallback:T):T { return state[key] ? JSON.parse(state[key]) as T : fallback; }
 /** Read only the personal snapshot. No descriptions/account identifiers are retained in notifications. */
 export function evaluateMonitoring(state:CloudState, preferences:Preferences, now:Date) {
-  const asOf=amsterdamDate(now),month=asOf.slice(0,7);
+  const asOf=amsterdamDate(now),month=salaryPeriod(asOf);
   const rules=read(state,'moneylith.personal.bankRules.v1',emptyBankRules);
   const transactions=read<MoneylithTransaction[]>(state,'moneylith.personal.transactions',[]);
   const fixed=read<FixedCostManualItem[]>(state,'moneylith.personal.fixedCosts',[]);
@@ -45,8 +49,8 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   const ids=new Set(selected.map(a=>a.id));
   const storedLimits=read<unknown>(state,choiceLimitsKey,{});
   const limits=validateChoiceLimits(storedLimits)?storedLimits:{};
-  const rows=spendingRows(transactions.filter(t=>ids.has(t.accountId)),rules,fixed);
-  const summary=spendingSummary(rows,month,asOf);
+  const rows=spendingRows(transactions.filter(t=>ids.has(t.accountId)),rules,fixed,read(state,debtLedgerKey,emptyDebtLedger()));
+  const summary=spendingSummary(rows,month,asOf,"salary");
   const add=(kind:Signal['kind'],label:string,title:string,message:string,observedCents:number,referenceCents:number|null,phase='')=>{
     if(!label.trim()||label.length>150||!Number.isSafeInteger(observedCents)||preferences.mutedLabels.includes(label))return;
     signals.push({id:`personal:${month}:${kind}:${encodeURIComponent(label)}${phase?":"+phase:""}`,scope:'personal',kind,month,label,title,message,observedCents,referenceCents});
@@ -58,21 +62,25 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
       else if(limit>0&&pot.cents>=Math.ceil(limit*.8))add('budget',pot.label,`${pot.label}: je keuzegrens komt in zicht`,`${euros(pot.cents)} van ${euros(limit)} gebruikt. Binnen deze grens blijft ${euros(limit-pot.cents)} over; dit is geen bevestiging dat het betaalbaar is.`,pot.cents,limit,'near');
       continue;
     }
-    const budgets=fixed.filter(f=>f.budgetCategory===pot.label&&f.paymentRoute!=='withheld'&&f.amountEntered!==false&&Number.isFinite(f.bedrag)&&f.bedrag>=0&&f.budgetSince&&f.budgetSince<=month);
+    const budgets=fixed.filter(f=>f.budgetCategory===pot.label&&f.paymentRoute!=='withheld'&&f.budgetSince&&f.budgetSince<=month);
     if(budgets.length>1)continue; // An ambiguous budget is not a reliable comparison.
     if(budgets.length===1){
-      const budget=Math.round(budgets[0].bedrag*100);
-      if(pot.cents>budget)add('budget',pot.label,`${pot.label}: boven je maandbudget`,`${euros(pot.cents)} aan waargenomen aankopen bij een budget van ${euros(budget)}. Wil je voor de rest van de maand een kleine keuze maken die ruimte geeft?`,pot.cents,budget);
-      else if(budget>0&&pot.cents>=Math.ceil(budget*0.8))add('budget',pot.label,`${pot.label}: je budget komt in zicht`,`${euros(pot.cents)} van je maandbudget van ${euros(budget)} is gebruikt. Er blijft ${euros(budget-pot.cents)} binnen dit budget. Kies zelf waar je op wilt letten.`,pot.cents,budget);
+      const resolved=costForMonth(budgets[0],month);if(resolved.amountEntered===false||(resolved.bedrag===0&&resolved.amountEntered!==true)||!Number.isFinite(resolved.bedrag)||resolved.bedrag<0)continue;
+      const budget=Math.round(resolved.bedrag*100);
+      if(pot.cents>budget)add('budget',pot.label,`${pot.label}: boven je salarisperiodebudget`,`${euros(pot.cents)} aan waargenomen aankopen bij een budget van ${euros(budget)}. Wil je voor de rest van de salarisperiode een kleine keuze maken die ruimte geeft?`,pot.cents,budget);
+      else if(budget>0&&pot.cents>=Math.ceil(budget*0.8))add('budget',pot.label,`${pot.label}: je budget komt in zicht`,`${euros(pot.cents)} van je salarisperiodebudget van ${euros(budget)} is gebruikt. Er blijft ${euros(budget-pot.cents)} binnen dit budget. Kies zelf waar je op wilt letten.`,pot.cents,budget);
       continue;
     }
-    const previousCount=rows.filter(r=>r.label===pot.label&&r.date.startsWith(summary.previousMonth)&&Number(r.date.slice(8))<=summary.elapsedDay).length;
+    const previousCount=rows.filter(r=>r.label===pot.label&&salaryPeriod(r.date)===summary.previousMonth&&Math.round((Date.parse(r.date)-Date.parse(periodBounds(summary.previousMonth).start))/86400000)<summary.elapsedDay).length;
     if(pot.count<3||previousCount<3||pot.previousCents===null)continue;
     if(pot.cents-pot.previousCents>=2500 && pot.cents>=pot.previousCents*1.5)
-      add('pace',pot.label,`${pot.label}: meer uitgegeven dan vorige maand`,`${euros(pot.cents)} waargenomen, tegenover ${euros(pot.previousCents)} vorige maand tot en met dag ${summary.elapsedDay}. Wil je bekijken welke aankopen je belangrijk vindt?`,pot.cents,pot.previousCents);
+      add('pace',pot.label,`${pot.label}: meer uitgegeven dan vorige salarisperiode`,`${euros(pot.cents)} waargenomen, tegenover ${euros(pot.previousCents)} vorige salarisperiode tot en met dag ${summary.elapsedDay}. Wil je bekijken welke aankopen je belangrijk vindt?`,pot.cents,pot.previousCents);
     else if(summary.elapsedDay>=21&&pot.previousCents-pot.cents>=2500&&pot.cents<=pot.previousCents*0.8)
-      add('progress',pot.label,`${pot.label}: een moment om bij stil te staan`,`${euros(pot.cents)} waargenomen, tegenover ${euros(pot.previousCents)} vorige maand tot en met dag ${summary.elapsedDay}. Als dit past bij jouw keuzes, mag je daar even bij stilstaan. Dit is nog geen vastgestelde besparing.`,pot.cents,pot.previousCents);
+      add('progress',pot.label,`${pot.label}: een moment om bij stil te staan`,`${euros(pot.cents)} waargenomen, tegenover ${euros(pot.previousCents)} vorige salarisperiode tot en met dag ${summary.elapsedDay}. Als dit past bij jouw keuzes, mag je daar even bij stilstaan. Dit is nog geen vastgestelde besparing.`,pot.cents,pot.previousCents);
   }
+  const base=personalInput({income:read(state,'moneylith.personal.income',[]),fixedCosts:fixed,detectedFixedCosts:read(state,'fixed-cost-items',[]),debts:read(state,'moneylith.personal.debts',[]),accounts,transactions,inputReviews:read(state,'moneylith.personal.inputReviews.v1',{}),bankRules:rules,debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:read(state,'moneylith.personal.periodPaid.v1',{})},emptyOptions(),asOf);
+  const forecast=project(base);
+  if(forecast.complete){const tight=forecast.timeline.slice(0,30).reduce<{date:string;available:number|null}|null>((low,p)=>p.available!==null&&(!low||p.available<low.available!)?p:low,null);if(tight?.available!==null&&tight?.available!==undefined&&tight.available<0)add('pace','Vooruitblik','Je verwachte ruimte vraagt aandacht',`Op ${tight.date} is de berekende ruimte ${euros(tight.available)}. Bekijk welke komende betaling de meeste invloed heeft. Dit gebruikt de opgeslagen basis zonder tijdelijke scenario’s of extra reserveringen; het is geen garantie.`,tight.available,0,'pressure');}
   if(summary.unknownCount>=3)add('classification','Nog in te delen','Maak je inzicht een stukje completer',`${summary.unknownCount} aankopen zijn nog niet ingedeeld. Je kunt ze bij Patronen samen indelen; zo worden volgende signalen gerichter.`,summary.unknownCents,null);
   return {signals,fetchedAt,status:'Gecontroleerd op opgeslagen bankgegevens. Historie en indeling kunnen onvolledig zijn; terugbetalingen zijn niet verrekend.'};
 }

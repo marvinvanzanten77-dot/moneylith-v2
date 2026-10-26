@@ -4,7 +4,7 @@ import { ChatRequestGuard } from "../ai/conversation";
 import type { SpendingRow } from "../bank/spending";
 import { Button, SurfaceCard } from "./WorkspaceUI";
 import { TurnstileWidget } from "./TurnstileWidget";
-export function SpendingCoach({ rows, month, available, limits = {}, purpose = "spending-coach", scope = "personal" }: { rows: SpendingRow[]; month: string; available: boolean; limits?: ChoiceLimits; purpose?: "spending-coach" | "income-ideas"; scope?: "personal" | "business-real" }) {
+export function SpendingCoach({ rows, month, available, limits = {}, purpose = "spending-coach", scope = "personal", periodBasis="calendar" }: { periodBasis?:"calendar"|"salary"; rows: SpendingRow[]; month: string; available: boolean; limits?: ChoiceLimits; purpose?: "spending-coach" | "income-ideas"; scope?: "personal" | "business-real" }) {
   const incomeIdeas = purpose === "income-ideas";
   const [content, setContent] = useState(""), [error, setError] = useState(""), [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function SpendingCoach({ rows, month, available, limits = {}, purpose = "
     const request = guard.current.start(); setLoading(true); setError("");
     try {
       const response = await fetch("/api/moneylith/analyse", { method: "POST", headers: { "Content-Type": "application/json" }, signal: request.signal,
-        body: JSON.stringify({ scope, purpose, context: incomeIdeas ? {month} : { month, rows, limits }, turnstileToken: token ?? undefined }) });
+        body: JSON.stringify({ scope, purpose, context: incomeIdeas ? {month} : { month, rows, limits, periodBasis }, turnstileToken: token ?? undefined }) });
       const result = await response.json();
       if (!response.ok || result.scope !== scope || typeof result.content !== "string" || !result.content.trim()) throw Error(result.error || "De AI is nu niet bereikbaar. Je gegevens blijven beschikbaar.");
       if (request.current()) setContent(result.content);

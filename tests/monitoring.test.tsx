@@ -13,7 +13,7 @@ const tx=(id:string,amount=-40,category:string|null='Boodschappen',date='2026-10
 function fixture(rows:MoneylithTransaction[]=[tx('one'),tx('two'),tx('three')]):CloudState{return {
  'moneylith.personal.transactions':JSON.stringify(rows),
  'moneylith.personal.accounts':JSON.stringify([{id:'private',active:true,bankProvider:'lunchflow',bankLastSync:now.toISOString()}]),
- 'moneylith.personal.fixedCosts':JSON.stringify([{id:'budget',naam:'Boodschappen',bedrag:100,amountEntered:true,budgetCategory:'Boodschappen',budgetSince:'2026-10'}]),
+ 'moneylith.personal.fixedCosts':JSON.stringify([{id:'budget',naam:'Boodschappen',bedrag:100,amountEntered:true,budgetCategory:'Boodschappen',budgetSince:'2026-09'}]),
  'moneylith.personal.bankRules.v1':JSON.stringify({rules:[],accountRoles:{private:'personal',business:'business'}}),
  'moneylith.business.real.v1':JSON.stringify({secret:'BUSINESS SECRET'}),
 };}
@@ -29,7 +29,7 @@ test('business, fixed costs, loans, topups, future transactions and duplicate id
  assert.equal(evaluateMonitoring(fixture(rows),prefs,now).signals.length,0);
 });
 test('missing, ambiguous and unentered budgets do not become zero; explicit zero is a valid budget',()=>{
- const state=fixture([tx('a',-10)]);const base={id:'b',naam:'Food',budgetCategory:'Boodschappen',budgetSince:'2026-10'};
+ const state=fixture([tx('a',-10)]);const base={id:'b',naam:'Food',budgetCategory:'Boodschappen',budgetSince:'2026-09'};
  for(const items of [[base],[{...base,bedrag:0,amountEntered:false}],[{...base,bedrag:0},{...base,id:'c',bedrag:0}]]){
  state['moneylith.personal.fixedCosts']=JSON.stringify(items);assert.equal(evaluateMonitoring(state,prefs,now).signals.length,0);}
  state['moneylith.personal.fixedCosts']=JSON.stringify([{...base,bedrag:0,amountEntered:true}]);assert.equal(evaluateMonitoring(state,prefs,now).signals[0].referenceCents,0);
@@ -43,7 +43,7 @@ test('stale or missing bank fetch timestamps and paused monitoring suppress new 
 });
 test('pace compares matching elapsed dates with enough observations, never annualizes missing data',()=>{
  const rows=[1,2,3].flatMap(n=>[tx('c'+n,-30,'Koffie'),tx('p'+n,-10,'Koffie','2026-09-10')]);
- rows.push(tx('late',-1000,'Koffie','2026-09-30'));
+ rows.push(tx('late',-1000,'Koffie','2026-09-22'));
  const r=evaluateMonitoring(fixture(rows),prefs,now);assert.equal(r.signals[0].kind,'pace');assert.equal(r.signals[0].referenceCents,3000);
  assert.equal(evaluateMonitoring(fixture(rows.filter(r=>r.id!=='p3')),prefs,now).signals.length,0);
  const positive=evaluateMonitoring(fixture([1,2,3].flatMap(n=>[tx('c'+n,-10,'Koffie'),tx('p'+n,-30,'Koffie','2026-09-10')])),prefs,now);
