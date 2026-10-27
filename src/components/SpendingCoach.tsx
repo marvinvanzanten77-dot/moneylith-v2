@@ -24,13 +24,6 @@ export function SpendingCoach({ rows, month, available, limits = {}, purpose = "
     } catch(e) { if (request.current()) setError(e instanceof Error ? e.message : "De AI is nu niet bereikbaar. Probeer het later opnieuw."); }
     finally { if (request.current()) { setLoading(false); setToken(null); } }
   };
-  const latestAsk = useRef(ask);
-  latestAsk.current = ask;
-  useEffect(() => {
-    if (!available || !optional) return;
-    const timer = setTimeout(() => void latestAsk.current(), 400);
-    return () => { clearTimeout(timer); guard.current.cancel(); };
-  }, [available, optional]);
   return <SurfaceCard role="region" aria-label={incomeIdeas ? "AI-ideeën voor extra inkomsten" : "AI-bespaartips"} className="space-y-3 border border-purple-200">
     <p className="text-xs font-semibold uppercase tracking-widest text-purple-700">Een kleine stap vooruit</p>
     <h3 className="text-lg font-semibold">{incomeIdeas ? "Een volgende stap naar extra inkomsten" : "Ruimte voor wat jij belangrijk vindt"}</h3>

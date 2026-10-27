@@ -1,3 +1,7 @@
+import {periodRoom,reviewedPeriodForecast} from "./logic/periodRoom";
+import {makePeriodPlan,reconcilePeriod,salaryPeriod} from "./bank/periodReconciliation";
+import {PersonalOverview} from "./components/PersonalOverview";
+import {PersonalNavigation,PersonalSubnavigation,dailyPages} from "./components/PersonalNavigation";
 import {BunqCard} from './components/BunqCard';
 import {PaymentReview} from './components/PaymentReview';
 import {persistClassificationReview,classificationAuditKey,correctClassification,undoClassification,type ClassificationAudit} from './bank/classificationAudit';
@@ -23,8 +27,7 @@ import { NavigationHint } from "./components/NavigationHint";
 import { PageIntro } from "./components/PageIntro";
 import { toDebtCardItems, fromDebtCardItems } from "./logic/debtRecords";
 import { ApplicationLayout, ModeBanner } from "./components/ApplicationLayout";
-import { readWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
-import { NavigationStep } from "./components/NavigationStep";
+import { readPersonalWorkspaceStep, rememberWorkspaceStep } from "./components/workspaceNavigation";
 import { InputReview } from "./components/InputReview";
 import { formatCurrency } from "./utils/format";
 import { reviewSection, reviewBankIncome, manualReviewRows, missingInputs, foundationStatus, type InputReviews, type ReviewKey } from "./logic/inputReadiness";
@@ -229,7 +232,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   );
   const [storageMode, setStorageMode] = useLocalStorage<"local" | "cloud">("moneylith.storage.mode", "local");
   const [settingsAuthMode, setSettingsAuthMode] = useState<"login" | "register" | null>(null);
-  const [currentStep, setCurrentStep] = useState<StepKey>(() => readWorkspaceStep() as StepKey);
+  const [currentStep, setCurrentStep] = useState<StepKey>(() => readPersonalWorkspaceStep() as StepKey);
   const [mode, setMode] = useState<Mode>("persoonlijk");
   const [unlockedSteps, setUnlockedSteps] = useState<StepKey[]>([
     ...personalTabs.map((t) => t.key),
@@ -1393,7 +1396,10 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const bankPendingQuestions = personalBankGroups.filter(g => g.transactions.some(t => unknownPurchaseIds.has(t.id))).length;
   const personalProjection = useMemo(() => personalInput(moneylithSnapshot.personal, projectionOptions, projectionDate), [moneylithSnapshot.personal, projectionOptions, projectionDate]);
   useEffect(() => { setProjectionOptions(p => p.confirmOpening ? {...p, confirmOpening:false} : p); }, [accounts, projectionDate]);
+  const personalPeriodReport = reconcilePeriod(salaryPeriod(projectionDate),projectionDate,makePeriodPlan(incomeItems,fixedCostManualItems,mergedFixedCostItems,debts,projectionDate),true,classifiedBankTransactions,projectionDebtLedger,bankRules,periodPaid[salaryPeriod(projectionDate)]);
   const personalSections = inputSections("personal");
+  const personalPeriodForecast=reviewedPeriodForecast(personalPeriodReport,{income:personalSections.income.ready,fixed:personalSections.fixed.ready});
+  const personalPeriodRoom=periodRoom(personalPeriodForecast);
   const businessSections = inputSections("business");
   // Invalidate receipts even when the relevant form is not currently mounted.
   useEffect(() => {
@@ -1776,7 +1782,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
 
   useEffect(() => {
     const activeIds = activeTabs.map((t) => t.key);
-    if (!activeIds.includes(currentStep)) {
+    if (!["overview","transactions"].includes(currentStep) && !activeIds.includes(currentStep)) {
       setCurrentStep(activeIds[0] ?? "intent");
     }
   }, [mode, activeTabs, currentStep]);
@@ -1786,7 +1792,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const handleStepClick = (step: StepKey) => {
     const unlocked =
       unlockedSteps.includes(step) || unlockedSteps.includes(normalizeStep(step));
-    if (unlocked) {
+    if (unlocked || mode === "persoonlijk") {
       setCurrentStep(step);
     }
   };
@@ -1809,6 +1815,14 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   // Ontvangt: netIncome, manualFixedCosts (useLocalStorage), fixedCosts (afgeleid in App), IncomeList/FixedCostsList sommen
   // Schrijft: setNetIncome, setManualFixedCosts (persist)
   // Gebruikt totals: netFree (quickSummary.free), fixedCosts
+  const renderPaymentReview = () => (<PaymentReview debts={debts} fixed={fixedCostManualItems} transactions={classifiedBankTransactions} ledger={projectionDebtLedger} businessIds={Object.entries(bankRules.accountRoles).filter(([,r])=>r==='business').map(([id])=>id)} asOf={projectionDate} onSave={next=>{
+          persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
+        }} categoryUndoAvailable={classificationHistory.some(a=>!a.undoneAt)} onCategory={(id,label,future)=>{
+          const tx=classifiedBankTransactions.find(t=>t.id===id);if(!tx)throw Error('Betaling niet gevonden.');
+          const next=correctClassification(tx,label,future,bankPatternDecisions,classificationHistory);
+          persistClassificationReview(localStorage,next);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);
+        }} onUndoCategory={()=>{const next=undoClassification(bankPatternDecisions,classificationHistory,transactions);persistClassificationReview(localStorage,next);if(next.transactions)setTransactions(next.transactions);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);}}/>);
+
   const renderFundament = (variant: "personal" | "business" = "personal", businessMode?: "cashflow" | "fundament") => {
     const isBusinessVariant = variant === "business";
     const incomeItemsSource = isBusinessVariant ? incomeItemsBusiness : incomeItems;
@@ -1922,15 +1936,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
             </p>
           </div>
         )}
-        {!isBusinessVariant && <PaymentReview debts={debts} fixed={fixedCostManualItems} transactions={classifiedBankTransactions} ledger={projectionDebtLedger} businessIds={Object.entries(bankRules.accountRoles).filter(([,r])=>r==='business').map(([id])=>id)} asOf={projectionDate} onSave={next=>{
-          persistLunchflow(localStorage,{accounts,transactions,reports:[]},undefined,next);setDebts(next.debts);window.dispatchEvent(new Event('moneylith:cloud-restored'));
-        }} categoryUndoAvailable={classificationHistory.some(a=>!a.undoneAt)} onCategory={(id,label,future)=>{
-          const tx=classifiedBankTransactions.find(t=>t.id===id);if(!tx)throw Error('Betaling niet gevonden.');
-          const next=correctClassification(tx,label,future,bankPatternDecisions,classificationHistory);
-          persistClassificationReview(localStorage,next);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);
-        }} onUndoCategory={()=>{const next=undoClassification(bankPatternDecisions,classificationHistory,transactions);persistClassificationReview(localStorage,next);if(next.transactions)setTransactions(next.transactions);setBankPatternDecisions(next.decisions);setClassificationHistory(next.history);}}/>}
-        {!isBusinessVariant && <PeriodFoundation paid={periodPaid} setPaid={setPeriodPaid} income={incomeItems} fixed={fixedCostManualItems} detected={mergedFixedCostItems} debts={debts} transactions={classifiedBankTransactions} rules={bankRules} asOf={projectionDate}/>}
-        {!isBusinessVariant && <FixedCostsList scope="work" items={fixedCostManualItems} onItemsChange={setFixedCostManualItems} heading="Abonnementskosten" subheading="Werktools en losse credits" addLabel="+ Overig abonnement" emptyLabel="Voeg een abonnement of losse aankoop toe en vul zelf het maandbedrag in." totalLabel="Ingevuld voor deze maand" />}
+        {!isBusinessVariant && <details><summary className="cursor-pointer font-semibold">Betalingen controleren en verdelen</summary>{renderPaymentReview()}</details>}
+        {!isBusinessVariant && <PeriodFoundation readiness={{income:personalSections.income.ready,fixed:personalSections.fixed.ready}} ready={personalSections.income.ready && personalSections.fixed.ready} paid={periodPaid} setPaid={setPeriodPaid} income={incomeItems} fixed={fixedCostManualItems} detected={mergedFixedCostItems} debts={debts} transactions={classifiedBankTransactions} rules={bankRules} asOf={projectionDate}/>}
+        {!isBusinessVariant && <details><summary className="cursor-pointer font-semibold">Abonnementskosten bekijken en bijwerken</summary><FixedCostsList scope="work" items={fixedCostManualItems} onItemsChange={setFixedCostManualItems} heading="Abonnementskosten" subheading="Werktools en losse credits" addLabel="+ Overig abonnement" emptyLabel="Voeg een abonnement of losse aankoop toe en vul zelf het maandbedrag in." totalLabel="Ingevuld voor deze maand" /></details>}
         <details open={isBusinessVariant || undefined} className="space-y-4"><summary className="cursor-pointer font-semibold">Inschattingen en vaste gegevens bewerken</summary>
         <IncomeList
           confirmed={sections.income.ready}
@@ -2030,8 +2038,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     return (
       <div className="space-y-4">
         <StepVooruitblik input={personalProjection} options={projectionOptions} onOptions={setProjectionOptions} scenario={projectionScenario} onScenario={setProjectionScenario} />
-        <p className="text-sm text-slate-300">Controleer inkomen en vaste lasten bij Fundament en saldi bij Rekeningen. Bevestig hieronder dat je schuldenoverzicht compleet is.</p>
-        {renderInputReview(variant, "debts")}
+        <details className="rounded-xl border border-white/20 p-3"><summary className="cursor-pointer text-sm">Volledigheid van je schuldenoverzicht controleren</summary><p className="my-2 text-sm text-slate-300">Deze controle gaat over je volledige schuldenlijst. Een schuld zonder aflossingsafspraak maakt geen nieuwe betaling aan. Ontbrekende informatie voor de gekozen prognose staat hierboven.</p>{renderInputReview(variant, "debts")}</details>
       </div>
     );
   };
@@ -2054,6 +2061,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
 
     return (
       <StepVermogen
+        financialReady={(isBusinessVariant ? businessSections : personalSections).fixed.ready}
         financialSnapshot={isBusinessVariant ? undefined : financialSnapshot}
         assets={assetsSource}
         onAssetsChange={setAssetsFn}
@@ -2082,6 +2090,9 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
 
     return (
       <><StepSchulden
+        periodRoomCents={isBusinessVariant ? undefined : personalPeriodRoom}
+        periodCapacityCents={isBusinessVariant ? undefined : personalPeriodForecast.income === null || personalPeriodForecast.fixed === null ? null : personalPeriodForecast.income-personalPeriodForecast.fixed}
+        financialReady={isBusinessVariant ? businessSections.income.ready && businessSections.fixed.ready : personalPeriodRoom !== null && personalSections.income.ready && personalSections.fixed.ready}
         financialSnapshot={isBusinessVariant ? undefined : financialSnapshot}
         debts={isBusinessVariant ? businessDebtCards : personalDebtCards}
         onDebtsChange={items => setDebtsFn(fromDebtCardItems(items))}
@@ -2094,7 +2105,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         futureIncomes={futureIncomesForMode}
         debtsUiState={uiState}
         onDebtsUiStateChange={setUiState}
-      />{!isBusinessVariant&&<DebtPaymentsPanel debts={debts} transactions={transactions}/> }</>
+      />{!isBusinessVariant&&<details className="rounded-xl border border-white/20 p-4 text-sm"><summary className="cursor-pointer font-semibold">Bronregels voor de perioderuimte</summary><p className="my-2">Salarisperiode {personalPeriodReport.start} t/m {personalPeriodReport.end}. Dezelfde bijgestelde verwachting als Planning: inkomen min lasten min aflossingen. Dit is geen banksaldo of besteedbaar bedrag. Inhoudingen worden niet opnieuw afgetrokken; budgetten tellen eenmaal mee.</p><ul className="space-y-2">{personalPeriodReport.rows.map(r=><li key={r.id}>{r.label} · {r.kind==='income'?'inkomen':r.kind==='debt'?'aflossing':'last / budget'} · bijgestelde verwachting {formatCurrency(r.forecast===null?null:r.forecast/100)} · herkend betaald/ontvangen {formatCurrency(r.actual===null?null:r.actual/100)} · {r.status}</li>)}</ul><p className="mt-2">Bij ontbrekende bedragen of een ongecontroleerde basis blijft de totale ruimte onbekend. Overige aankopen zijn niet automatisch alle toekomstige uitgaven.</p></details>}{!isBusinessVariant&&<DebtPaymentsPanel debts={debts} transactions={transactions}/> }</>
     );
   };
 
@@ -2128,8 +2139,8 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     const debtLabels = (isBusinessVariant ? debtsBusiness : debts).map((d) => d.naam).filter(Boolean);
     const excludeLabels = [...debtLabels, "schuld", "schulden", "lening", "lease"];
 
-    if (!isBusinessVariant && (compactMode || accountsSource.some(a => (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')) || transactionsSource.some(t => (t.provider === 'lunchflow' || t.provider === 'bunq')))) {
-      return <BankSpendingOverview projection={personalProjection} asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
+    if (!isBusinessVariant && (currentStep === "transactions" || compactMode || accountsSource.some(a => (a.bankProvider === 'lunchflow' || a.bankProvider === 'bunq')) || transactionsSource.some(t => (t.provider === 'lunchflow' || t.provider === 'bunq')))) {
+      return <BankSpendingOverview transactionsOnly={currentStep === "transactions"} projection={personalProjection} asOf={projectionDate} accounts={accountsSource} transactions={classifiedBankTransactions} income={incomeItems} fixedCosts={fixedCostManualItems} onFixedCostsChange={setFixedCostManualItems}
         rules={bankRules} onRulesChange={rules => {
           const nextTransactions = classifyBankTransactions(transactions, bankPatternDecisions, rules);
           persistLunchflow(window.localStorage, { accounts, transactions: nextTransactions, reports: [] }, { income: incomeItems, fixedCosts: fixedCostManualItems, seen: bankImportSeen, rules });
@@ -2206,6 +2217,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const renderContent = () => {
     const normalizedStep = normalizeStep(currentStep);
     const isBusinessView = mode === "zakelijk";
+    if (normalizedStep === "overview") return <PersonalOverview input={personalProjection} bank={mobileBankBalance(accounts,bankRules)} accounts={accounts.filter(a=>a.active&&bankRules.accountRoles[a.id]!=="business")} onNavigate={handleStepClick}/>;
     if (normalizedStep === "intent") return renderIntent("personal");
     if (normalizedStep === "strategie") return renderIntent("business");
     if (normalizedStep === "fundament") return renderFundament("personal");
@@ -2243,6 +2255,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     );
     if (normalizedStep === "inbox") return null; // Shared layout renders the single notification inbox.
     if (normalizedStep === "biz-inbox") return renderInbox("business");
+    if (normalizedStep === "transactions") return <><details><summary className="cursor-pointer font-semibold">Betaalverdelingen, periodekoppeling en correcties</summary>{renderPaymentReview()}</details>{renderAfschriften("personal")}</>;
     if (normalizedStep === "afschriften") return renderAfschriften("personal");
     if (normalizedStep === "biz-afschriften") return renderAfschriften("business");
     if (normalizedStep === "vermogen") return renderVermogen("personal");
@@ -2388,38 +2401,10 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
       onBusiness={() => onOpenBusiness?.()}
       onSettings={() => { setSettingsAuthMode(null); setCurrentStep("settings"); }}
       onLogin={() => { setStorageMode("cloud"); setSettingsAuthMode("login"); setCurrentStep("settings"); }}
-      step={activeTabs.find((s) => s.key === currentStep)?.label}
-      navigation={<>{activeTabs.map((step) => {
-              const unlocked =
-                unlockedSteps.includes(step.key) || unlockedSteps.includes(normalizeStep(step.key));
-              const isBackup = normalizeStep(step.key) === "backup";
-              const { active, label } = getStepStatus(step.key);
-              return (
-                <NavigationStep
-                  key={step.key}
-                  type="button"
-                  disabled={!unlocked}
-                  onClick={() => handleStepClick(step.key)}
-                  onMouseEnter={(e) => {
-                    if (!helpMode) return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const norm = normalizeStep(step.key);
-                    setHelpTooltip({
-                      label: step.label,
-                      desc: helpCopy[norm] || step.desc,
-                      x: rect.right + 8,
-                      y: rect.top,
-                    });
-                  }}
-                  onMouseLeave={() => setHelpTooltip(null)}
-                  backup={isBackup}
-                  label={step.label}
-                  status={unlocked ? label : "Nog te doen"}
-                  description={step.desc}
-                  active={active}
-                />
-      );
-    })}</>}
+      step={dailyPages.find(p=>p.steps.includes(currentStep))?.label ?? activeTabs.find((s) => s.key === currentStep)?.label}
+      navigation={<PersonalNavigation step={currentStep} onNavigate={handleStepClick}/>}
+      dailyNavigation={dailyPages.map(p=>({key:p.key,label:p.label,onSelect:()=>handleStepClick(p.key),active:p.steps.includes(currentStep)}))}
+      overview={<PersonalOverview input={personalProjection} bank={mobileBankBalance(accounts,bankRules)} accounts={accounts.filter(a=>a.active&&bankRules.accountRoles[a.id]!=="business")} onNavigate={handleStepClick}/>}
       banner={<ModeBanner mode="personal" visible={showModeBanner} onHide={() => setShowModeBanner(false)} />}
       guide={<AiAssistantCard scope="personal" projectionOptions={projectionOptions} projectionScenario={projectionScenario} userIntent={userIntent} readiness={personalSections} appSnapshot={moneylithSnapshot} />}
       overlays={<>      <NavigationHint hint={helpMode ? helpTooltip : null}/>
@@ -2528,7 +2513,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
 
 </>}
     >
-      {renderContent()}
+      <PersonalSubnavigation step={currentStep} onNavigate={handleStepClick}/>{renderContent()}
     </ApplicationLayout>
   );
 };

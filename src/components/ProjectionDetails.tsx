@@ -181,7 +181,7 @@ export function ProjectionDetails({
             </label>
             <p className="text-xs text-slate-500">Budgetten voor tanken en boodschappen uit Fundament zijn al meegenomen. Vul hier alleen aanvullende uitgaven in om dubbel tellen te voorkomen. Laat je dit leeg, dan neemt de basisverwachting geen extra uitgavenbudget mee.</p>
             <label className="block text-sm">
-              Reeds gereserveerd binnen je saldi (€; optioneel)
+              Reeds gereserveerd binnen je saldi (€; 0 als er geen reservering is)
               <Input
                 inputMode="decimal"
                 value={
@@ -199,7 +199,7 @@ export function ProjectionDetails({
                 }}
               />
             </label>
-            <p className="text-xs text-slate-500">Zonder ingevulde reservering wordt niets extra apart gehouden in de berekening. Dit betekent niet dat al het getoonde geld vrij besteedbaar is.</p>
+            <p className="text-xs text-slate-500">Zonder ingevulde reservering blijft besteedbaarheid onbekend. Vul alleen 0 in wanneer je bevestigt dat er niets apart staat. Het berekende banksaldo is een andere waarde.</p>
             <label className="flex gap-2 text-sm">
               <Input
                 type="checkbox"

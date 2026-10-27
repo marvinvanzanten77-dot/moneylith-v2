@@ -80,7 +80,7 @@ test("decision and financial updates roll back together on storage failure and n
 });
 test("connected patterns render direct bank insights and questions without an upload requirement", () => {
   const html = renderToStaticMarkup(<BankPatterns asOf={asOf} accounts={[]} transactions={input()} income={[]} fixedCosts={[]} decisions={{}} onDecide={() => {}} onBank={() => {}} />);
-  assert.match(html, /Patronen uit je rekeningen/);
+  assert.match(html, /Transacties en herkenning/);
   assert.match(html, /Wat is dit/);
   assert.ok(!html.includes('type="file"'));
   assert.ok(!html.includes("Analyseer met AI"));

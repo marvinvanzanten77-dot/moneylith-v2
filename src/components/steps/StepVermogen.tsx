@@ -23,6 +23,7 @@ interface StepVermogenProps {
   onAssetsChange: (items: AssetItem[]) => void;
   onAssetSummary?: (summary: AssetSummary) => void;
   financialSnapshot?: FinancialSnapshot | null;
+  financialReady?: boolean;
   variant?: "personal" | "business";
   readOnly?: boolean;
   mode?: SnapshotMode;
@@ -33,6 +34,7 @@ export function StepVermogen({
   onAssetsChange,
   onAssetSummary,
   financialSnapshot,
+  financialReady = false,
   variant = "personal",
   readOnly = false,
   mode = "personal",
@@ -58,7 +60,7 @@ export function StepVermogen({
 
   const monthlyFixedCosts = financialSnapshot?.fixedCostsTotal?.value ?? 0;
   const runwayMonths =
-    monthlyFixedCosts > 0 ? (summary.liquidAssets ?? summary.totalAssets) / monthlyFixedCosts : null;
+    financialReady && assets.length > 0 && monthlyFixedCosts > 0 ? (summary.liquidAssets ?? summary.totalAssets) / monthlyFixedCosts : null;
 
   let bufferStatusLabel = "Onbekend";
   if (runwayMonths != null) {
@@ -118,7 +120,7 @@ export function StepVermogen({
             />
 
             <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner mt-3">
-              <p>Totaal vermogen: {formatCurrency(summary.totalAssets)}</p>
+              <p>Totaal vermogen: {assets.length ? formatCurrency(summary.totalAssets) : "Nog niet ingevuld"}</p>
               <p>Aantal posten: {summary.assetsCount}</p>
               {runwayMonths != null ? (
                 <p>Dekt ongeveer: {Math.floor(runwayMonths)} maanden vaste lasten</p>
@@ -139,7 +141,7 @@ export function StepVermogen({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-400">{isBusiness ? "Totaal zakelijk kapitaal" : "Totaal vermogen"}</span>
-                <span className="font-medium text-slate-50">{formatCurrency(summary.totalAssets)}</span>
+                <span className="font-medium text-slate-50">{assets.length ? formatCurrency(summary.totalAssets) : "Nog niet ingevuld"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Runway / buffer</span>
@@ -154,7 +156,7 @@ export function StepVermogen({
               <div className="flex justify-between">
                 <span className="text-slate-400">Liquide vermogen</span>
                 <span className="font-medium text-slate-50">
-                  {formatCurrency(summary.liquidAssets ?? 0)}
+                  {assets.length ? formatCurrency(summary.liquidAssets ?? 0) : "Nog niet ingevuld"}
                 </span>
               </div>
             </div>

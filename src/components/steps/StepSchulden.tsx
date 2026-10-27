@@ -65,6 +65,9 @@ interface StepSchuldenProps {
 
 
   financialSnapshot?: FinancialSnapshot | null;
+  financialReady?: boolean;
+  periodRoomCents?: number|null;
+  periodCapacityCents?: number|null;
 
 
   debtSummary?: { totalDebt: number; totalMinPayment: number; debtCount: number };
@@ -105,6 +108,9 @@ export function StepSchulden({
 
 
   financialSnapshot,
+  financialReady = false,
+  periodRoomCents,
+  periodCapacityCents,
 
 
   debtSummary,
@@ -200,20 +206,20 @@ export function StepSchulden({
       title: "Snowball: klein naar groot aflossen",
       summary: "Begin met de kleinste schuld en werk naar de grootste toe. Snelle successen houden je gemotiveerd.",
       pros: ["Snelle successen verhogen motivatie", "Eenvoudig te volgen plan", "Meer overzicht"],
-      cons: ["Kan duurder zijn door rente op grote schulden", "Niet altijd financieel optimaal"],
+      cons: ["Rente en bijkomende kosten zijn niet doorgerekend"],
     },
     {
       key: "balanced",
       title: "Balanced: mix van klein en groot",
-      summary: "Combineer het aflossen van kleine en grote schulden om motivatie en kostenbesparing te balanceren.",
-      pros: ["Balans tussen motivatie en kostenbesparing", "Flexibel en aanpasbaar", "Minder snel uitschieters"],
+      summary: "Geef de hoogste afgesproken maandlast voorrang, daarna de grootste hoofdsom. Rente is niet doorgerekend.",
+      pros: ["Volgorde op basis van afgesproken maandlast", "Flexibel en aanpasbaar", "Minder snel uitschieters"],
       cons: ["Iets complexer om te plannen", "Minder snelle successen dan snowball"],
     },
     {
       key: "avalanche",
-      title: "Avalanche: groot naar klein aflossen",
-      summary: "Begin met de grootste schuld om rente te besparen en sneller schuldenvrij te zijn.",
-      pros: ["Bespaart rente en kosten", "Snelle vermindering totale schuld", "Financieel meest efficiënt"],
+      title: "Grootste hoofdsom eerst",
+      summary: "Begin met de grootste hoofdsom. Rente en incassokosten zijn niet in deze vergelijking verwerkt.",
+      pros: ["Grootste hoofdsom eerst", "Geen berekend rentevoordeel"],
       cons: ["Minder snelle successen, kan demotiverend zijn", "Complexer om vol te houden"],
     },
     {
@@ -228,7 +234,7 @@ export function StepSchulden({
   const mergeWithBaseStrategies = (incoming: StrategyCard[]) => {
     const byKey = new Map<string, StrategyCard>();
     baseStrategies.forEach((s) => byKey.set(s.key, s));
-    incoming.forEach((s) => byKey.set(s.key, s));
+    incoming.forEach((s) => { const base=baseStrategies.find(b=>b.key===s.key); byKey.set(s.key, base ? {...s,title:base.title,summary:base.summary,pros:base.pros,cons:base.cons} : s); });
     return Array.from(byKey.values());
   };
 
@@ -240,7 +246,6 @@ export function StepSchulden({
 
   const [proposalEditMode, setProposalEditMode] = useState(false);
 
-  const didHydrateStrategy = useRef(false);
 
   const didApplyFullpayOverrides = useRef(false);
 
@@ -288,11 +293,12 @@ export function StepSchulden({
   );
 
   const capacityAggressive = useMemo(() => {
+    if(periodCapacityCents !== undefined) return periodCapacityCents === null ? 0 : periodCapacityCents/100;
     const income = snapshot?.totalIncome?.value ?? 0;
     const fixed = snapshot?.fixedCostsTotal?.value ?? 0;
     const raw = income - fixed;
     return Number.isFinite(raw) ? raw : netFree;
-  }, [snapshot?.totalIncome?.value, snapshot?.fixedCostsTotal?.value, netFree]);
+  }, [snapshot?.totalIncome?.value, snapshot?.fixedCostsTotal?.value, netFree, periodCapacityCents]);
 
   const capacityRealistic = useMemo(() => {
     const raw = capacityAggressive - patternSpend;
@@ -426,7 +432,7 @@ export function StepSchulden({
 
   const totalMinPerMonth = simulation.monthlyPressureNow;
 
-  const freeAfterDebt = capacityForView - totalMinPerMonth;
+  const freeAfterDebt = periodRoomCents === undefined ? capacityForView - totalMinPerMonth : periodRoomCents === null ? null : periodRoomCents/100;
   const displayMonthsToClear = monthsToClear;
 
 
@@ -450,7 +456,7 @@ export function StepSchulden({
   const pressureLine =
 
 
-    totalDebt > 0 && totalMinPayment > 0
+    totalDebt > 0 && totalMinPayment > 0 && monthsToClear !== null
 
 
       ? `Bij dit tempo: ${monthsToClear} maanden tot schuldenvrij`
@@ -465,7 +471,7 @@ export function StepSchulden({
   const psychologicalLine =
 
 
-    totalDebt > 0 && totalMinPayment > 0
+    totalDebt > 0 && totalMinPayment > 0 && monthsToClear !== null
 
 
       ? `Bij dit tempo blijft deze schuld je nog ${monthsToClear ?? "?"} maanden volgen.`
@@ -827,6 +833,7 @@ export function StepSchulden({
 
 
   const runAiStrategies = async () => {
+    if(!financialReady){setAiError("Vul eerst de ontbrekende planning aan; aflosruimte is nog onbekend.");return;}
 
     if (isReadOnly) return;
 
@@ -850,7 +857,7 @@ export function StepSchulden({
 
 
     const system =
-      "Moneylith schuldenanalyse. Geef exact 4 strategieën: snowball (klein->groot), balanced (mix), avalanche (groot->klein), fullpay (volledige schuld per maand, groot->klein).";
+      "Moneylith schuldenanalyse. Geef exact 4 strategieën: snowball (klein->groot), balanced (mix), avalanche (interne sleutel: grootste hoofdsom eerst, GEEN renteoptimalisatie), fullpay (volledige schuld per maand, groot->klein).";
 
     const debtsList = debts
 
@@ -1039,6 +1046,7 @@ export function StepSchulden({
 
 
   const applyStrategyToDebts = (strategy: StrategyCard) => {
+    if(!financialReady){setAiError("Aflosruimte is nog onbekend. Er wordt geen voorstel berekend.");return;}
 
     if (isReadOnly) return;
 
@@ -1162,7 +1170,7 @@ export function StepSchulden({
 
           monthsToClear,
 
-          note: `Gelijkmatig tempo: ${formatCurrency(minPayment)} p/m, klaar in ${monthsToClear ?? "?"} maanden.`,
+          note: `Gelijkmatig tempo: ${formatCurrency(minPayment)} p/m, ${monthsToClear === null ? "totale aflosduur onbekend" : `klaar in ${monthsToClear} maanden`}.`,
 
           strategyKey: "steady",
 
@@ -1224,7 +1232,7 @@ export function StepSchulden({
 
             strategy.key === "snowball" ? "kleinere" : strategy.key === "avalanche" ? "grotere" : "een mix van"
 
-          } schulden. Bij Æ’,Âª${minPayment} p/m is deze schuld in ${monthsToClear ?? "?"} maand(en) klaar.`,
+          } schulden. Bij ${formatCurrency(minPayment, true)} p/m: ${monthsToClear === null ? "aflosduur onbekend" : `${monthsToClear} maand(en), zonder rente en extra kosten`}.`,
 
           strategyKey: strategy.key,
 
@@ -1312,16 +1320,6 @@ export function StepSchulden({
 
 
 
-
-  useEffect(() => {
-    if (didHydrateStrategy.current) return;
-    if (!selectedStrategy) return;
-    if (Object.keys(strategyProposals).length > 0) return;
-    const strategy = mergedStrategies.find((item) => item.key === selectedStrategy);
-    if (!strategy) return;
-    didHydrateStrategy.current = true;
-    applyStrategyToDebts(strategy);
-  }, [selectedStrategy, mergedStrategies, strategyProposals]);
 
   useEffect(() => {
     if (selectedStrategy !== "fullpay") {
@@ -1432,7 +1430,7 @@ export function StepSchulden({
 
     if (proposalEditMode) {
       setProposalEditMode(false);
-      runAiStrategies();
+      // New AI analysis remains an explicit separate action.
     }
   };
 
@@ -1871,7 +1869,7 @@ export function StepSchulden({
                     <span>Vrije ruimte na schulden</span>
 
 
-                    <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+                    <span className="font-semibold">{financialReady ? formatCurrency(freeAfterDebt, true) : "Nog niet betrouwbaar vast te stellen"}</span>
 
 
                   </div>
@@ -2068,7 +2066,7 @@ export function StepSchulden({
                 <span>Vrije ruimte na schulden</span>
 
 
-                <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+                <span className="font-semibold">{financialReady ? formatCurrency(freeAfterDebt, true) : "Nog niet betrouwbaar vast te stellen"}</span>
 
 
               </div>
@@ -2120,7 +2118,7 @@ export function StepSchulden({
                 <h3 className="text-lg font-semibold">AI-analyse</h3>
 
                 <p className="text-xs text-slate-400">
-                  Genereer 4 strategieën (snowball, balanced, avalanche, fullpay) en kies er één. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
+                  Genereer 4 strategieën (snowball, balanced, avalanche, fullpay) en kies er één. Rentevoordeel is niet berekend. AI leest je ingevulde schulden mee, vult alleen aan en laat jouw invoer staan.
                 </p>
 
                 <p className="text-[11px] text-slate-500">Stap 1: Analyseer schulden · Stap 2: Kies strategie · Stap 3: Bekijk ingevulde lijst.</p>
@@ -2133,7 +2131,7 @@ export function StepSchulden({
                     <li>(Optioneel) Vul patronen/variabele uitgaven in als je realistischer wilt rekenen.</li>
                   </ul>
                   <p className="mt-2 text-[10px] text-amber-300">
-                    Geen data ingevuld? Dan gebruiken we een minimale maandlast en kan de analyse minder realistisch zijn.
+                    Bij onvolledige planning blijft aflosruimte onbekend. Vul de ontbrekende gegevens aan voordat je een nieuw voorstel laat berekenen. Bestaande afspraken blijven staan.
                   </p>
                 </div>
 
@@ -2179,7 +2177,7 @@ export function StepSchulden({
 
                   onClick={runAiStrategies}
 
-                  disabled={aiLoading}
+                  disabled={aiLoading || !financialReady}
 
                   className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
 
@@ -2233,6 +2231,7 @@ export function StepSchulden({
                     type="button"
 
                     onClick={() => applyStrategyToDebts(s)}
+                    disabled={!financialReady}
 
                     className={`rounded-xl border p-3 text-left text-xs transition ${
                       selectedStrategy === s.key
@@ -2313,8 +2312,8 @@ export function StepSchulden({
                 <span className="font-semibold">{formatCurrency(totalMinPerMonth)}</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span>Vrij na schulden</span>
-                <span className="font-semibold">{formatCurrency(freeAfterDebt)}</span>
+                <span>Perioderuimte na aflossingen</span>
+                <span className="font-semibold">{financialReady ? formatCurrency(freeAfterDebt, true) : "Nog niet betrouwbaar vast te stellen"}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tijd tot nul (simulatie)</span>

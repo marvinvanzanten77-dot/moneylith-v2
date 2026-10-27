@@ -215,7 +215,7 @@ export const VermogenCard = ({ items: externalItems, onItemsChange, onSummaryCha
 
       <div className="rounded-lg bg-white/80 p-3 text-sm text-slate-800 shadow-inner">
         <p>
-          Totaal openstaand:{" "}
+          Totaal geregistreerd vermogen:{" "}
           <span className="font-semibold">
             {formatCurrency(summary.totalAssets)}
           </span>

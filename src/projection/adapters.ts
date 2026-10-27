@@ -80,7 +80,7 @@ export function personalInput(
     scope: "personal",
     asOf,
     opening: null,
-    reserve: options.reservedNow ?? 0,
+    reserve: options.reservedNow ?? null,
     events: [],
     debts: {},
     missing: [],
@@ -133,7 +133,7 @@ export function personalInput(
   if (!checks.fixed.ready) input.missing.push("Vaste lasten nog controleren");
   if (!checks.debts.valid || (!debts.length && !checks.debts.ready)) input.missing.push("Schulden nog controleren");
   if (bankIncome) input.assumptions.push("Inkomen volgt de gekoppelde bankontvangst; herhaling is een verwachting, geen gegarandeerd salaris.");
-  if (options.reservedNow == null) input.assumptions.push("Geen reserveringen opgegeven: de basisverwachting trekt geen extra reservering af. Dit bevestigt niet dat er geen reserveringen zijn.");
+  if (options.reservedNow == null) input.assumptions.push("Reserveringen zijn onbekend. De banksaldoprojectie en besteedbaarheid zijn verschillende waarden; bevestig nul wanneer er geen reserveringen zijn.");
   if (options.variableMonthly === null) input.assumptions.push("Geen aanvullend uitgavenbudget opgegeven: alleen de bekende lasten en budgetten zijn meegenomen. Overige uitgaven kunnen de ruimte verlagen.");
   const accounts = rows(data.accounts).filter((r) => r.active === true && (!validateBankRules(data.bankRules) || data.bankRules.accountRoles[String(r.id)] !== "business"));
   if (!accounts.length || accounts.some((r) => amount((r.bankProvider === 'lunchflow' || r.bankProvider === 'bunq') ? r.bankBalance : r.startBalance) === null))

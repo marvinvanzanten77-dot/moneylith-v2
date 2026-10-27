@@ -1,10 +1,10 @@
-import {BankBalanceSync} from "./BankBalanceSync";
+import {GuideDialog} from "./GuideDialog";
 import {UpdateApp} from '../pwa/UpdateApp';
 import { MobileLayout } from "../mobile/MobileLayout";
 import { useCompactMode } from "../mobile/useCompactMode";
 import type { MobileData } from "../mobile/MobileOverview";
 import { NotificationCenter } from "./NotificationCenter";
-import { useLayoutEffect, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { CookieBanner } from "./CookieBanner";
 import { AnalyticsGate } from "./AnalyticsGate";
 
@@ -23,10 +23,13 @@ export type ApplicationLayoutProps = {
   overlays?: ReactNode;
   guideTitle?: string;
   mobile?: MobileData;
+  overview?: ReactNode;
+  dailyNavigation?: Array<{key:string;label:string;onSelect:()=>void;active:boolean}>;
 };
 export function ApplicationLayout(props: ApplicationLayoutProps) {
   const {mode,onPersonal,onBusiness,onSettings,onLogin,navigation,step,banner,guide,children,overlays,guideTitle = "AI gids"}=props;
   const [compact,setCompact]=useCompactMode();
+  const [showGuide,setShowGuide]=useState(false);
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [mode, step]);
@@ -37,15 +40,15 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
       data-app-layout
       className="min-h-screen text-slate-50 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950"
     >
-      <button className="m-3 rounded-lg border border-white/30 px-3 py-2 text-sm" onClick={()=>setCompact(true)}>Compacte appweergave</button>
-      <div className="grid min-h-screen grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)_320px]">
+
+      <div className={`grid min-h-screen grid-cols-1 gap-4 ${mode === "personal" ? "lg:grid-cols-[220px_minmax(0,1fr)] max-w-screen-xl mx-auto" : "lg:grid-cols-[220px_minmax(0,1fr)_320px]"}`}>
         <aside
           data-app-sidebar
           className="px-4 py-6 backdrop-blur border-r border-white/10 bg-white/10"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
-              Pad
+              Moneylith
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -90,7 +93,7 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
               </button>
             ))}
           </div>
-          <div className="mb-4"><UpdateApp/></div>
+          <details className="mb-4 text-sm"><summary className="cursor-pointer">App en weergave</summary><UpdateApp/><button className="m-3 rounded-lg border border-white/30 px-3 py-2 text-sm" onClick={()=>setCompact(true)}>Compacte appweergave</button></details>
           <nav aria-label="Onderdelen" className="space-y-2">
             {navigation}
           </nav>
@@ -105,19 +108,19 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
                 Moneylith / Finance OS
               </p>
               <h1 className="text-2xl font-semibold text-white">
-                Finance Planner
+                Financieel overzicht
               </h1>
             </div>
             <div className="rounded-full px-3 py-1 text-xs bg-amber-500/20 text-amber-100">
-              Stap: {step}
+              {step}
             </div>
           </div>
-          {mode === "personal" && <BankBalanceSync bank={props.mobile?.bank}/>}
-          <NotificationCenter key={mode} mode={mode} onLogin={onLogin} expanded={mode==='personal'&&step==='Inbox'?true:undefined} hideTrigger={mode==='personal'&&step==='Inbox'}/>
-          {banner}
+          <div className="mb-3 flex flex-wrap items-start gap-3">{mode === "personal" && <button className="mb-4 rounded-lg border border-white/30 px-4 py-2" aria-expanded={showGuide} onClick={()=>setShowGuide(v=>!v)}>{showGuide ? "Sluit AI-hulp" : "Vraag AI om hulp"}</button>}
+          <NotificationCenter key={mode} mode={mode} onLogin={onLogin} expanded={mode==='personal'&&step==='Inbox'?true:undefined} hideTrigger={mode==='personal'&&step==='Inbox'}/></div>
+          {mode === "personal" ? <details className="mb-4 text-xs text-slate-300"><summary className="cursor-pointer">Over de persoonlijke modus</summary>{banner}</details> : banner}
           <div className="space-y-4">{children}</div>
         </section>
-        <aside
+        {mode === "personal" ? (showGuide ? <GuideDialog onClose={()=>setShowGuide(false)}>{guide}</GuideDialog> : null) : <aside
           data-app-guide
           className="border-l border-white/10 bg-white/10 px-4 py-6 backdrop-blur lg:sticky lg:top-4 lg:h-fit"
         >
@@ -125,7 +128,7 @@ export function ApplicationLayout(props: ApplicationLayoutProps) {
             {guideTitle}
           </h2>
           {guide}
-        </aside>
+        </aside>}
       </div>
       {overlays}
       <footer className="mt-6 border-t border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-200 flex flex-wrap gap-3 justify-center">

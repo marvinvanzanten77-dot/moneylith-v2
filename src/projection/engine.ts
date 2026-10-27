@@ -263,7 +263,7 @@ export function project(input: Input, scenario: Scenario | null = null) {
         canProject && bank !== null && reserve !== null ? bank - reserve : null,
     });
   }
-  const horizons = [7, 30, 90, 365].map((day) => ({ day, ...days[day - 1] }));
+  const horizons = [7, 30, 90, 365].map((day) => ({ day, ...days[day - 1], missing: missingThrough(input, addDays(input.asOf, day), events) }));
   const relevant = days.slice(0, 90);
   const lowest = relevant.every((d) => d.available !== null)
     ? relevant.reduce((a, b) => (b.available! < a.available! ? b : a))
@@ -333,4 +333,14 @@ export function compare(input: Input, scenario: Scenario | null) {
           : alternative.horizons[i].available! - p.available,
     })),
   };
+}
+
+/** Missing facts relevant through an inclusive date; never treat unknown as a zero. */
+export function missingThrough(input: Input, through: string, events = input.events): string[] {
+  const missing = [...input.missing];
+  if(input.opening === null) missing.push("Huidig rekeningsaldo ontbreekt of is niet bevestigd");
+  if(input.reserve === null) missing.push("Huidige reserveringen niet ingevuld (bevestig nul als er geen zijn)");
+  for(const e of events) if((e.date === null || e.date > input.asOf && e.date <= through) && (e.amount === null || e.date === null && e.amount !== 0))
+    missing.push(`${e.label}: ${e.amount === null ? "bedrag onbekend" : "betaaldatum onbekend"}`);
+  return [...new Set(missing)];
 }

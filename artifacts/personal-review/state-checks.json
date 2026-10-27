@@ -1,0 +1,22 @@
+[
+  {
+    "mobile": false,
+    "filled": false,
+    "passed": true
+  },
+  {
+    "mobile": false,
+    "filled": true,
+    "passed": true
+  },
+  {
+    "mobile": true,
+    "filled": false,
+    "passed": true
+  },
+  {
+    "mobile": true,
+    "filled": true,
+    "passed": true
+  }
+]

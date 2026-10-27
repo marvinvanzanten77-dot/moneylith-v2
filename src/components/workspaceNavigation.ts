@@ -18,7 +18,7 @@ export function readWorkspaceStep() {
   try {
     const saved = sessionStorage.getItem(key);
     return (
-      Object.values(workspaceStepMap).find((step) => step === saved) ?? "intent"
+      [...Object.values(workspaceStepMap), "overview", "transactions"].find((step) => step === saved) ?? "intent"
     );
   } catch {
     return "intent";
@@ -38,4 +38,10 @@ export function readBusinessStep(): keyof typeof workspaceStepMap {
       (key) => workspaceStepMap[key] === saved,
     ) ?? "intent"
   );
+}
+
+/** Daily Personal landing page; existing remembered links remain valid. */
+export function readPersonalWorkspaceStep() {
+  try { return sessionStorage.getItem(key) ? readWorkspaceStep() : "overview"; }
+  catch { return "overview"; }
 }

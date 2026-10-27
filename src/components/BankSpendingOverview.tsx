@@ -45,7 +45,7 @@ function ClassificationModule({ props, groups, labels, onClose }: { props: BankP
     {advanced && <div className="mt-4"><BankPatterns {...props} /></div>}
   </dialog>;
 }
-export function BankSpendingOverview(props: BankPatternsProps & {projection?: ProjectionInput}) {
+export function BankSpendingOverview(props: BankPatternsProps & {projection?: ProjectionInput; transactionsOnly?: boolean}) {
   const asOf = props.asOf ?? new Date().toISOString().slice(0,10);
   const [month, setMonth] = useState(salaryPeriod(asOf)), [classifying, setClassifying] = useState(false);
   const [ledger]=useLocalStorage<DebtLedger>(debtLedgerKey,emptyDebtLedger());
@@ -66,6 +66,7 @@ export function BankSpendingOverview(props: BankPatternsProps & {projection?: Pr
   const rows = useMemo(() => spendingRows(props.transactions, props.rules ?? emptyBankRules, props.fixedCosts,ledger), [props.transactions, props.rules, props.fixedCosts,ledger]);
   const visibleRows = useMemo(() => spendingAboveBudgets(rows, props.fixedCosts,"salary"), [rows, props.fixedCosts]);
   const summary = useMemo(() => spendingSummary(visibleRows, month, asOf,"salary"), [visibleRows, month, asOf]);
+  const gross = spendingSummary(rows, month, asOf,"salary");
   const hasBudget = props.fixedCosts.some(i => i.budgetCategory && i.budgetSince && i.budgetSince <= month);
   const allCovered = hasBudget && rows.some(r => salaryPeriod(r.date)===month) && summary.totalCents === null;
   const unknownIds = new Set(rows.filter(r => salaryPeriod(r.date)===month && !r.label).map(r => r.id));
@@ -74,6 +75,7 @@ export function BankSpendingOverview(props: BankPatternsProps & {projection?: Pr
   const coachRows = visibleRows.filter(r => salaryPeriod(r.date)===month || salaryPeriod(r.date)===summary.previousMonth);
   const coachKey = JSON.stringify([month, coachRows, limits]);
   const chart = [...summary.pots.map((p,i) => ({naam:p.label,bedrag:p.cents/100,color:potColors[i % potColors.length]})), ...(summary.unknownCents ? [{naam:"Nog in te delen",bedrag:summary.unknownCents/100,color:"#94a3b8"}] : [])];
+  if(props.transactionsOnly) return <BankPatterns {...props}/>;
   return <div className="space-y-5" data-spending-overview>
     <SurfaceCard className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-widest text-purple-700">Patronen</p><h2 className="mt-1 text-2xl font-semibold">Je uitgaven in potjes</h2><p className="mt-2 max-w-lg text-sm text-slate-600">Je dagelijkse en terugkerende aankopen, overzichtelijk in potjes. Bij een bevestigd maandbudget zie je hier alleen het bedrag boven dat budget.</p></div><label className="text-sm">Salarisperiode<Select aria-label="Salarisperiode potjes" value={month} onChange={e => setMonth(e.target.value)}>{months.map(m => <option key={m} value={m}>{periodBounds(m).start} t/m {periodBounds(m).end}</option>)}</Select></label></div>
@@ -84,6 +86,7 @@ export function BankSpendingOverview(props: BankPatternsProps & {projection?: Pr
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 p-4"><p className="max-w-sm text-sm">{summary.unknownCount ? "Help de herkenning een stapje verder. Eén aankoop tegelijk, op jouw tempo." : "Een indeling klopt niet helemaal? Je kunt die altijd aanpassen."}</p><Button variant="primary" onClick={() => setClassifying(true)}>Help met indelen{unknownGroups.length ? ` (${unknownGroups.length})` : ""}</Button></div>
       <p className="text-xs text-slate-500">Dit overzicht gebruikt je opgehaalde privé-aankopen. Vaste lasten, interne overboekingen, creditcard-top-ups, geleend geld en zakelijke rekeningtransacties tellen hier niet mee. Bevestigde maandbudgetten staan bij Fundament; het gedekte deel blijft buiten deze potjes. Er kunnen transacties ontbreken. Terugbetalingen zijn niet verrekend.</p>
     </SurfaceCard>
+    <p className="text-sm text-slate-300">Waargenomen aankopen vóór budgetdekking: {gross.totalCents === null ? "Nog onbekend" : euro(gross.totalCents)}. Dit zijn bruto aankopen; terugbetalingen zijn niet verrekend. Herkenning op winkelnaam of bedrag is een aanname, geen bewijs van wat je kocht.</p>
     <PurchaseBudgets props={props} rows={rows} month={month} asOf={asOf} />
     <section aria-label="Je uitgavenpotjes" className="grid gap-4 sm:grid-cols-2">
       {summary.pots.map((p,i) => <SurfaceCard key={p.label} className="space-y-3"><div className="flex items-start justify-between gap-3"><h3 className="flex items-center gap-2 break-words font-semibold"><span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor:potColors[i % potColors.length]}} />{p.label}</h3><span className="shrink-0 text-xs text-slate-500">{p.count}×</span></div><p className="text-2xl font-semibold">{euro(p.cents)}</p><div className="h-2 overflow-hidden rounded-full bg-purple-100"><div className="h-full rounded-full bg-purple-500" style={{width:`${p.share*100}%`, backgroundColor:potColors[i % potColors.length]}} /></div><p className="text-xs text-slate-600">{Math.round(p.share*100)}% van de aankopen in dit overzicht</p><p className="text-xs text-slate-500">{p.previousCents === null ? "Nog geen vergelijkbare waarneming uit de vorige salarisperiode." : `Vorige salarisperiode${summary.elapsedDay < 31 ? ` t/m dag ${summary.elapsedDay}` : ""}: ${euro(p.previousCents)} aan aankopen.`}</p><ChoiceGuidance pot={p} limits={limits} onSave={saveLimit} room={room} current={month===salaryPeriod(asOf)}/></SurfaceCard>)}

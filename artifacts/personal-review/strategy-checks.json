@@ -1,0 +1,6 @@
+{
+  "rememberedStrategyDoesNotGenerateProposals": true,
+  "unknownCapacityBlocksNewAnalysis": true,
+  "legacyInterestClaimNotDisplayed": true,
+  "noAutomaticAiCalls": true
+}

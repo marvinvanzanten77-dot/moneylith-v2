@@ -97,6 +97,7 @@ export function GoalWorkspace({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState("");
   const form = useRef<HTMLFormElement>(null);
+  const editor = useRef<HTMLDetailsElement>(null);
   const reset = () => {
     setDraft(blankGoalDraft());
     setExpanded(null);
@@ -113,6 +114,7 @@ export function GoalWorkspace({
     setError("");
   };
   const focusForm = () => {
+    if(editor.current) editor.current.open=true;
     form.current?.scrollIntoView({ block: "center", behavior: "smooth" });
     form.current?.querySelector("input")?.focus({ preventScroll: true });
   };
@@ -159,7 +161,7 @@ export function GoalWorkspace({
             </div>
             {!goals.length && (
               <p className="text-sm text-slate-300">
-                Zonder doel ontbreekt richting.
+                Nog geen doelen ingevuld. Een doel is geen betaling of reservering.
               </p>
             )}
             <div className="space-y-3">
@@ -272,7 +274,7 @@ export function GoalWorkspace({
             </div>
           </div>
         </div>
-        <form
+        <details ref={editor}><summary className="cursor-pointer py-3 font-semibold">Doel toevoegen of bewerken</summary><form
           ref={form}
           className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-200"
           onSubmit={(e) => {
@@ -435,7 +437,7 @@ export function GoalWorkspace({
               )}
             </div>
           </div>
-        </form>
+        </form></details>
       </div>
     </div>
   );

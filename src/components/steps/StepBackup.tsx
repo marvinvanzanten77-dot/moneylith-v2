@@ -12,7 +12,7 @@ export function StepBackup({ onboardingMode = null, storageMode = "local" }: Ste
       <div className="mb-2 space-y-2">
         <h1 className="text-2xl font-semibold text-slate-50">Backup</h1>
         <p className="text-sm text-slate-300">
-          Je data staat lokaal in je browser. Maak hier een JSON-backup die je veilig kunt bewaren.
+          Deze backup bevat de administratie die nu in je browser is geladen. Bewaar het JSON-bestand veilig. Bij ingeschakelde cloudopslag wordt dezelfde administratie ook met je ingelogde account gesynchroniseerd; controleer de laatste opslagstatus bij Instellingen.
         </p>
       </div>
       <div className="max-w-xl">

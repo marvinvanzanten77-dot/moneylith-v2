@@ -4,7 +4,7 @@ import {makePeriodPlan,reconcilePeriod,salaryPeriod,periodBounds} from '../bank/
 import {emptyBankRules,validateBankRules} from '../bank/classificationRules.js';
 import {emptyDebtLedger,validateDebtLedger} from '../bank/debtPayments.js';
 import {costForMonth} from '../logic/monthlyCosts.js';
-import {addDays,type Input,type Options} from './engine.js';
+import {addDays,monthlyDates,type Input,type Options} from './engine.js';
 const list=<T>(v:unknown):T[]=>Array.isArray(v)?v.filter(x=>x&&typeof x==='object'):[];
 const euro=(c:number)=>new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(c/100);
 /** Reconcile commitments against booked evidence; never change source data or bank balances. */
@@ -24,7 +24,23 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
   const debt=row.kind==='debt'?list<SchuldItem>(data.debts).find(d=>'debt:'+d.id===row.id):undefined;
   if(row.kind==='debt'&&(!debt||debt.firstPaymentDate!==undefined||debt.remainingPayments!==undefined||!row.expected))continue;
   const raw=fixed.find(f=>'fixed:'+f.id===row.id);
-  if(raw?.bankObservedOnly){input.assumptions.push(row.label+': alleen betaalde kosten bekend; toekomstige bedragen zijn nog niet ingepland.');continue;}
+  if(raw?.bankObservedOnly){
+   input.assumptions.push(row.label+': alleen betaalde kosten bekend; toekomstige bedragen zijn nog niet ingepland.');
+   // A dated unknown affects only horizons reaching that date. Credits are one-off purchases.
+   if(raw.costKind!=='credits') {
+    let nextDate:string|null=null;
+    if(Number.isInteger(raw.dagVanMaand)&&raw.dagVanMaand>=1&&raw.dagVanMaand<=31){
+      const dueMonth=raw.dagVanMaand>=23?bounds.start.slice(0,7):bounds.end.slice(0,7);
+      const lastDay=new Date(Date.UTC(Number(dueMonth.slice(0,4)),Number(dueMonth.slice(5,7)),0)).getUTCDate();
+      const due=dueMonth+'-'+String(Math.min(raw.dagVanMaand,lastDay)).padStart(2,'0');
+      // An elapsed date is not proof of payment. An unpaid/uncertain overdue cost has no reliable date.
+      nextDate=due>input.asOf?due:row.actual!==null&&!row.reversed?monthlyDates(input.asOf,raw.dagVanMaand)[0]??null:null;
+    }
+    input.events.push({id:row.id+':unknown-future',label:row.label+' — toekomstige kosten',date:nextDate??null,amount:null,source:'fixed',basis:'assumption'});
+    input.commitments.push({label:row.label,expected:null,paid:row.actual,remaining:null,date:nextDate??null,note:'Toekomstig bedrag onbekend; alleen een opgegeven betaaldag wordt gebruikt. Een eerdere betaling bewijst geen volgende betaling.'});
+   }
+   continue;
+  }
   const id=row.id.startsWith('detected:')?'fixed:'+row.id.slice(9):row.id;
   if(row.route==='withheld')continue;
   const matches=(event:Input['events'][number])=>event.id===id||event.id.startsWith(id+':');

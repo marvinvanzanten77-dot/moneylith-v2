@@ -561,18 +561,22 @@ test("known debt principal is not reported as unknown when its monthly repayment
   assert.equal(data.debts[0].saldo,150.85);
 });
 
-test("bank evidence and fresh balances allow a base projection without optional budgets", () => {
+test("bank evidence and fresh balances allow cash projection; spendable requires confirmed reserves", () => {
   const data={income:[{id:"i",naam:"Salary",bedrag:2000,amountEntered:true,dagVanMaand:23,bankEvidence:{transactionIds:["t"],through:"2026-10-23"}}],transactions:[{id:"t",provider:"lunchflow",currency:"EUR",amount:2000,date:"2026-10-23"}],accounts:[{id:"a",active:true,bankProvider:"lunchflow",currency:"EUR",bankBalance:2100,bankBalanceFetchedAt:"2026-10-25T09:00:00Z"}],fixedCosts:[],debts:[{id:"d",naam:"Debt without arrangement",saldo:500,minBetaling:0}],inputReviews:{fixed:reviewSection("fixed","Vaste lasten",[],{}).signature}};
   const options={...emptyOptions(),monthlyDay:23};
   const before=JSON.stringify(data);
   const input=personalInput(data,options,"2026-10-25");
   const result=project(input);
-  assert.equal(result.complete,true);
-  assert.equal(result.horizons[0].available,210000);
-  assert.equal(result.horizons[1].available,410000);
-  assert.equal(result.horizons[2].available,810000);
+  assert.equal(result.complete,false);
+  assert.equal(result.horizons[0].available,null);
+  const confirmed = project(personalInput(data,{...options,reservedNow:0},"2026-10-25"));
+  assert.equal(confirmed.complete,true);
+  assert.equal(result.horizons[0].cash,210000);
+  assert.equal(confirmed.horizons[0].available,210000);
+  assert.equal(result.horizons[1].cash,410000);
+  assert.equal(result.horizons[2].cash,810000);
   assert.equal(input.debts.d,50000);
-  assert.ok(input.assumptions.some(a=>a.includes("Geen reserveringen")));
+  assert.ok(input.assumptions.some(a=>a.includes("Reserveringen zijn onbekend")));
   assert.ok(!input.events.some(e=>e.id.startsWith("variable")));
   assert.equal(JSON.stringify(data),before);
   for(const stamp of ["2026-10-24T09:00:00Z","invalid"]){

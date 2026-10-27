@@ -80,7 +80,13 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   }
   const base=personalInput({income:read(state,'moneylith.personal.income',[]),fixedCosts:fixed,detectedFixedCosts:read(state,'fixed-cost-items',[]),debts:read(state,'moneylith.personal.debts',[]),accounts,transactions,inputReviews:read(state,'moneylith.personal.inputReviews.v1',{}),bankRules:rules,debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:read(state,'moneylith.personal.periodPaid.v1',{})},emptyOptions(),asOf);
   const forecast=project(base);
-  if(forecast.complete){const tight=forecast.timeline.slice(0,30).reduce<{date:string;available:number|null}|null>((low,p)=>p.available!==null&&(!low||p.available<low.available!)?p:low,null);if(tight?.available!==null&&tight?.available!==undefined&&tight.available<0)add('pace','Vooruitblik','Je verwachte ruimte vraagt aandacht',`Op ${tight.date} is de berekende ruimte ${euros(tight.available)}. Bekijk welke komende betaling de meeste invloed heeft. Dit gebruikt de opgeslagen basis zonder tijdelijke scenario’s of extra reserveringen; het is geen garantie.`,tight.available,0,'pressure');}
+  // Cash pressure does not require a reserve estimate: reserves are not bank withdrawals.
+  // Unknown cash obligations still prevent an exact cash forecast.
+  const cashDays=forecast.timeline.slice(0,30);
+  if(cashDays.every(d=>d.cash!==null)){
+    const tight=cashDays.reduce((a,b)=>b.cash!<a.cash!?b:a);
+    if(tight.cash!<0)add('pace','Vooruitblik','Je verwachte banksaldo vraagt aandacht',`Op ${tight.date} is het berekende banksaldo ${euros(tight.cash!)}. Bekijk welke komende betaling de meeste invloed heeft. Dit is een voorwaardelijke banksaldoverwachting, geen besteedbaar bedrag. Reserveringen zijn onbekend; tijdelijke scenario’s zijn niet meegenomen.`,tight.cash!,0,'pressure');
+  }
   if(summary.unknownCount>=3)add('classification','Nog in te delen','Maak je inzicht een stukje completer',`${summary.unknownCount} aankopen zijn nog niet ingedeeld. Je kunt ze bij Patronen samen indelen; zo worden volgende signalen gerichter.`,summary.unknownCents,null);
   return {signals,fetchedAt,status:'Gecontroleerd op opgeslagen bankgegevens. Historie en indeling kunnen onvolledig zijn; terugbetalingen zijn niet verrekend.'};
 }

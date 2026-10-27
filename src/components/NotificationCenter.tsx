@@ -1,3 +1,4 @@
+import {groupNotices} from "../monitoring/groupNotices";
 import {BankScanButton} from '../pwa/BankScanButton';
 import {PushSettings} from '../pwa/PushSettings';
 import {useEffect,useRef,useState} from 'react';
@@ -65,12 +66,12 @@ export function NotificationCenter({mode,onLogin,hideTrigger=false,expanded,onOp
           <div className="rounded-xl bg-slate-50 p-3 text-sm"><p>{data.status}</p><p className="mt-1 text-xs text-slate-600">Gegevens opgehaald: {date(data.sourceFetchedAt)} · controle: {date(data.checkedAt)}. Ophalen bij Lunch Flow garandeert geen nieuwe verversing bij de bank.</p></div>
           <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:!data.preferences.enabled,mutedLabels:data.preferences.mutedLabels})}>{data.preferences.enabled?'Monitoring pauzeren':'Monitoring hervatten'}</Button><Button disabled={busy} onClick={()=>void refresh()}>Meldingen verversen</Button></div>
           {!visible.some(n=>n.active)&&<p className="text-sm">Er zijn nu geen nieuwe signalen. Dat betekent niet dat alle uitgaven bekend of gecontroleerd zijn.</p>}
-          {listed.slice(0,limit).map(n=><article key={n.id} className="space-y-2 rounded-xl border border-slate-200 p-3">
+          {groupNotices(listed).slice(0,limit).map(group=><details key={group.key} className="rounded-xl border border-slate-200 p-3"><summary className="cursor-pointer font-semibold">{group.label} · {group.notices.length} {group.notices.length===1?"signaal":"signalen"}</summary><p className="my-2 text-xs text-slate-500">Signalen met dezelfde oorzaak en periode. Bedragen kunnen overlappen en worden niet opgeteld.</p>{group.notices.map(n=><article key={n.id} className="space-y-2 rounded-xl border border-slate-200 p-3">
             <p className="text-xs text-slate-500">{n.month} · {!n.active?'Niet meer actueel':n.readAt?'Gelezen':'Nieuw'}</p><h3 className="font-semibold">{n.title}</h3><p className="text-sm">{n.message}</p>
             <div className="flex flex-wrap gap-2">{!n.readAt&&<Button disabled={busy} onClick={()=>void refresh({action:'read',id:n.id})}>Gelezen</Button>}<Button disabled={busy} onClick={()=>void refresh({action:'dismiss',id:n.id})}>Afhandelen</Button>{n.kind!=='sync'&&n.kind!=='fuel'&&n.kind!=='debt'&&<Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:data.preferences.enabled,mutedLabels:[...data.preferences.mutedLabels,n.label]})}>Minder over dit potje</Button>}</div>
             {n.active&&n.kind!=='sync'&&n.kind!=='fuel'&&n.kind!=='debt'&&data.preferences.enabled&&<NoticeAdvice key={n.id+n.updatedAt} notice={n}/>}
-          </article>)}
-          <div className="flex flex-wrap gap-2">{listed.length>limit&&<Button onClick={()=>setLimit(v=>v+10)}>Meer meldingen</Button>}{visible.some(n=>!n.active)&&<Button onClick={()=>setHistory(v=>!v)}>{history?'Alleen actuele signalen':'Eerdere signalen bekijken'}</Button>}</div>
+          </article>)}</details>)}
+          <div className="flex flex-wrap gap-2">{groupNotices(listed).length>limit&&<Button onClick={()=>setLimit(v=>v+10)}>Meer meldingen</Button>}{visible.some(n=>!n.active)&&<Button onClick={()=>setHistory(v=>!v)}>{history?'Alleen actuele signalen':'Eerdere signalen bekijken'}</Button>}</div>
           {!!data.preferences.mutedLabels.length&&<details><summary className="cursor-pointer text-sm">Gedempte potjes ({data.preferences.mutedLabels.length})</summary><div className="mt-2 space-y-2">{data.preferences.mutedLabels.map(label=><div key={label} className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{label}</span><Button disabled={busy} onClick={()=>void refresh({action:'preferences',enabled:data.preferences.enabled,mutedLabels:data.preferences.mutedLabels.filter(l=>l!==label)})}>Weer melden</Button></div>)}</div></details>}
         </>}
       </>}

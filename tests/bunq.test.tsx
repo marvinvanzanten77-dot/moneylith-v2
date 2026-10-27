@@ -90,7 +90,7 @@ test('bunq billing is a cost, supplier variants match, manual forecasts survive 
  assert.equal(report.rows.find(r=>r.label==='GitHub')?.actual,276);assert.equal(report.rows.find(r=>r.label==='GitHub')?.expected,null);
  assert.equal(report.rows[0].actual,14495);
  const input=personalInput({fixedCosts:costs.fixedCosts,transactions:classified,bankRules:rules},emptyOptions(),'2026-10-26');
- assert.ok(!input.events.some(e=>e.id.includes('bunq-observed:')));assert.ok(input.assumptions.some(s=>s.includes('GitHub')));
+ assert.ok(input.events.some(e=>e.id.includes('bunq-observed:') && e.amount === null));assert.ok(!input.events.some(e=>e.id.includes('bunq-observed:') && e.amount !== null));assert.ok(input.assumptions.some(s=>s.includes('GitHub')));
  assert.equal(manualReviewRows(costs.fixedCosts).length,1);
  assert.equal(addBunqObservedCosts(classified,costs.fixedCosts,rules,costs.seen,'2026-10-26').fixedCosts.length,4);
  assert.equal(addBunqObservedCosts(classified,fixed,rules,costs.seen,'2026-10-26').fixedCosts.length,1,'deleted suggestions stay deleted');

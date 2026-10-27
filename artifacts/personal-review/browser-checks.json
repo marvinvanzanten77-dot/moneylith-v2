@@ -1,0 +1,40 @@
+[
+  {
+    "viewport": "desktop",
+    "passed": [
+      "overview",
+      "account/direction/search filters",
+      "clean descriptions",
+      "planning unknown amounts",
+      "debts unknown capacity",
+      "empty assets",
+      "goals form on demand",
+      "scenario controls collapsed",
+      "AI on demand",
+      "account edit/save/reload",
+      "navigation/reload",
+      "no page overflow",
+      "no automatic AI or bank calls"
+    ],
+    "errors": []
+  },
+  {
+    "viewport": "mobile",
+    "passed": [
+      "overview",
+      "account/direction/search filters",
+      "clean descriptions",
+      "planning unknown amounts",
+      "debts unknown capacity",
+      "empty assets",
+      "goals form on demand",
+      "scenario controls collapsed",
+      "AI on demand",
+      "account edit/save/reload",
+      "navigation/reload",
+      "no page overflow",
+      "no automatic AI or bank calls"
+    ],
+    "errors": []
+  }
+]

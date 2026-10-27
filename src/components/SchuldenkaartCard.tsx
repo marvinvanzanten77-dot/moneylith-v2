@@ -340,7 +340,7 @@ export const SchuldenkaartCard = ({
                       </label>
                     ) : null}
                     <label className="flex flex-col gap-1 md:col-span-2">
-                      <span className="text-[11px] font-semibold text-slate-600">Opmerking</span>
+                      <span className="text-[11px] font-semibold text-slate-600">Eigen notitie (geen betaalbewijs; betaalhistorie is leidend)</span>
                       <textarea
                         className="rounded-md border border-slate-300 px-2 py-1.5 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
                         value={item.gebruikerOpmerking ?? ""}

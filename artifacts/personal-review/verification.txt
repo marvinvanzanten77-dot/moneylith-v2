@@ -1,0 +1,21 @@
+Moneylith Personal — lokale verificatie
+2026-10-27T16:05:03.241006+00:00
+
+Baseline: 59ee5e3fc1a8d9d4e58293116b3a3467aa817d40
+Branch: personal/reliability-review
+
+npm test: 274 tests, 274 geslaagd, 0 mislukt, 0 overgeslagen.
+npm run build: geslaagd, inclusief tsc --noEmit (strict: true) en Vite productiebuild.
+Instellingen en dependency-lockfile niet versoepeld of gewijzigd.
+git diff --check: geslaagd.
+
+Browser: desktop 1440x1000 en mobiel 390x844; zie browser-checks.json, state-checks.json en strategy-checks.json.
+Preview HTTP 200; POST /api/cloud HTTP 503 (bewust geblokkeerd).
+Alle previewgegevens zijn fictief, browserprofielen geïsoleerd.
+
+Public: 7305e06, werkmap schoon.
+Oorspronkelijke Personal-werkmap: alleen bestaande .vscode/settings.json-wijziging.
+Geen productiegegevens gewijzigd; geen bank/cloud/AI live-test uitgevoerd.
+Verificatie uitgevoerd vóór commit/push naar personal/reliability-review. Geen productiepublicatie uitgevoerd.
+
+Buildwaarschuwingen: bestaande chunks boven 500 kB; verouderde Browserslist-data.

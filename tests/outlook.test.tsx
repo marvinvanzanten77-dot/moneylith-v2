@@ -31,9 +31,9 @@ test('existing custom scenario stays the shared base and source facts never chan
  const r=outlook(input(),{amount:20000,date:'2026-10-23',monthly:false},{amount:50000,date:'2026-10-23',monthly:false},{kind:'purchase',amount:10000,date:'2026-10-24'});
  assert.equal(r.current.horizons[0].available,280000);assert.equal(r.best!.horizons[0].available,300000);assert.equal(r.worst!.horizons[0].available,230000);
 });
-test('overview offers three outcomes and leaves detailed functionality collapsed',()=>{
+test('overview leads with the baseline; scenario controls and details are on demand',()=>{
  const html=renderToStaticMarkup(<ProjectionView input={input()} options={emptyOptions()} onOptions={()=>{}} scenario={null} onScenario={()=>{}}/>);
- assert.match(html,/data-outlook/);assert.match(html,/Best case/);assert.match(html,/Worst case/);assert.match(html,/Stel hieronder in/);assert.match(html,/<svg/);assert.match(html,/<details[^>]*><summary[^>]*>Basis aanvullen/);
+ assert.match(html,/data-outlook/);assert.match(html,/Best case/);assert.match(html,/Worst case/);assert.doesNotMatch(html,/Stel hieronder in/);assert.match(html,/Scenario’s en extra inkomsten onderzoeken/);assert.match(html,/<svg/);assert.match(html,/<details[^>]*><summary[^>]*>Basis aanvullen/);
  const unknown=renderToStaticMarkup(<ProjectionView input={{...input(),opening:null}} options={emptyOptions()} onOptions={()=>{}} scenario={null} onScenario={()=>{}}/>);
  assert.match(unknown,/Je vooruitblik heeft nog een basis nodig/);assert.doesNotMatch(unknown,/<svg/);
 });

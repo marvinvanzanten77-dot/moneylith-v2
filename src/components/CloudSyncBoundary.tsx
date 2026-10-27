@@ -62,8 +62,10 @@ export function CloudSyncBoundary({ children }: { children: ReactNode }) {
   }, [retry]);
   if (!ready) return <div className="p-6 text-slate-100" role="status">Je administratie laden…</div>;
   return <>
+    {(status||sync?.connected)&&<details open={error || undefined} className="bg-slate-900 text-slate-200"><summary className="cursor-pointer px-4 py-2 text-xs">{error ? "Opslag vraagt aandacht" : "Account en opslagstatus"}</summary>
     {status && <div data-cloud-status role={error ? "alert" : "status"} className={`px-4 py-2 text-sm ${error ? "bg-amber-100 text-amber-950" : "bg-slate-800 text-slate-100"}`}>{status}{error&&<button className="ml-3 underline" onClick={()=>{startup=undefined;setRetry(n=>n+1);}}>Verbinding opnieuw proberen</button>}</div>}
     {sync?.connected&&<div className="flex flex-wrap gap-x-4 gap-y-1 bg-slate-800 px-4 pb-2 text-xs text-slate-200" data-sync-detail><span>{sync.saving?'Bezig met opslaan':sync.pending?'Lokale wijzigingen wachten op cloudopslag':'Geen lokale wijzigingen in wachtrij'}</span><span>Laatste cloudopslag op dit apparaat: {sync.lastSavedAt?new Date(sync.lastSavedAt).toLocaleString('nl-NL'):'nog geen nieuwe opslag deze sessie'}</span>{sync.loadedAt&&<span>Cloudgegevens geladen: {new Date(sync.loadedAt).toLocaleString('nl-NL')}</span>}</div>}
+    </details>}
     {children}
   </>;
 }

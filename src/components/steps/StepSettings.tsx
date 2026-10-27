@@ -50,7 +50,7 @@ export function StepSettings({
           >
             <p className="text-sm font-semibold text-slate-900">Local-first</p>
             <p className="text-xs text-slate-600">
-              Data blijft lokaal in je browser (standaard).
+              Wijzigingen blijven in deze browser; automatische cloudopslag staat uit. Een bestaande banksessie wordt hiermee niet uitgelogd.
             </p>
           </button>
           <button
@@ -69,7 +69,7 @@ export function StepSettings({
             <p className="text-xs text-slate-600">
               {business
                 ? "Nog niet beschikbaar voor Zakelijk."
-                : "Login + versleutelde snapshot synchronisatie."}
+                : "Na inloggen wordt je administratie versleuteld met je account gesynchroniseerd. De browser bewaart ook een lokale kopie."}
             </p>
           </button>
         </div>

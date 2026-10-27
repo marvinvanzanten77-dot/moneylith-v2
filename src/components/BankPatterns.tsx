@@ -1,3 +1,4 @@
+import {bankText} from "../utils/bankText";
 import { BankRuleSettings } from "./BankRuleSettings";
 import { accountRoleLabel, emptyBankRules, type BankRuleSettings as RuleSettings } from "../bank/classificationRules";
 import { useMemo, useState } from "react";
@@ -70,7 +71,7 @@ function PatternEditor({ pattern, decisions, income, fixedCosts, onDecide }: Pic
       <p className="font-semibold">Onderliggende transacties ({pattern.transactions.length})</p>
       {pattern.transactions.slice().reverse().slice(0, limit).map(tx => <div key={tx.id} className="rounded-lg bg-slate-50 p-3">
         <div className="flex flex-wrap justify-between gap-2"><span>{tx.date}</span><strong>{formatCurrency(tx.amount)}</strong></div>
-        <p className="mt-1 break-words">{tx.description || "Geen omschrijving"}</p>
+        <p className="mt-1 break-words">{bankText(tx.description || "Geen omschrijving")}</p>
         {tx.category && <p className="text-xs text-slate-600">Categorie: {tx.category}</p>}
       </div>)}
       {limit < pattern.transactions.length && <Button onClick={() => setLimit(n => n + 20)}>Meer transacties tonen</Button>}
@@ -80,21 +81,25 @@ function PatternEditor({ pattern, decisions, income, fixedCosts, onDecide }: Pic
 export function BankPatterns(props: BankPatternsProps) {
   const [notice, setNotice] = useState("");
   const [days, setDays] = useState(365), [account, setAccount] = useState(""), [search, setSearch] = useState("");
+  const [direction,setDirection]=useState("all"), [kindFilter,setKindFilter]=useState("all");
   const [filter, setFilter] = useState("all"), [limit, setLimit] = useState(20), [selected, setSelected] = useState<string | null>(null);
   const now = new Date();
   const asOf = props.asOf ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const groups = useMemo(() => indexBankPatterns(props.transactions, asOf, days), [props.transactions, asOf, days]);
   const questions = groups.filter(g => g.active && g.transactions.length >= 2 && !props.decisions[g.key] && !g.transactions.every(t => t.bankRuleId));
-  const visible = groups.filter(g => (!account || g.accountId === account) &&
+  const groupKind=(g:BankPattern)=>{const saved=props.decisions[g.key]?.kind;if(saved)return saved;const values=[...new Set(g.transactions.map(t=>t.bankPatternKind??"unknown"))];return values.length===1?values[0]:"mixed";};
+  const visible = groups.filter(g => (!account || g.accountId === account) && (direction === "all" || (direction === "in" ? g.incoming : !g.incoming)) && (kindFilter === "all" || groupKind(g) === kindFilter) &&
     `${g.label} ${props.decisions[g.key]?.label ?? ""} ${g.transactions.map(t => t.description).join(" ")}`.toLowerCase().includes(search.toLowerCase()) &&
     (filter === "all" || (filter === "questions" && questions.includes(g)) || (filter === "repeating" && g.transactions.length >= 2) || (filter === "classified" && (props.decisions[g.key] || g.transactions.every(t => t.bankRuleId)))));
   return <div className="space-y-4" data-bank-patterns>
     <SurfaceCard className="space-y-3">
-      <h2 className="text-lg font-semibold">Patronen uit je rekeningen</h2>
+      <h2 className="text-lg font-semibold">Transacties en herkenning</h2>
       <p className="text-sm">Analyse van de opgehaalde banktransacties, zonder afschriften te uploaden. Ook wisselende bedragen, onregelmatige herhalingen en bijschrijvingen blijven zichtbaar. Voor nieuwe bankgegevens gebruik je Synchroniseren.</p>
-      <p className="text-sm font-semibold">{groups.reduce((n, g) => n + g.transactions.length, 0)} transacties · {groups.length} {groups.length === 1 ? "groep" : "groepen"} · {questions.length} herhalingen om te benoemen</p>
+      <p className="text-sm font-semibold">{visible.reduce((n, g) => n + g.transactions.length, 0)} transacties in deze selectie · {visible.length} {visible.length === 1 ? "groep" : "groepen"} · {visible.filter(g=>questions.includes(g)).length} herhalingen om te benoemen</p>
       <Button onClick={props.onBank}>Naar bankkoppeling</Button>
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">Soort<Select value={kindFilter} onChange={e=>{setKindFilter(e.target.value);setLimit(20);}}><option value="all">Alle soorten</option>{Object.entries(kinds).map(([key,label])=><option key={key} value={key}>{label}</option>)}<option value="unknown">Nog onbekend</option><option value="mixed">Gemengde indeling</option></Select></label>
+        <label className="text-sm">Richting<Select value={direction} onChange={e=>{setDirection(e.target.value);setLimit(20);}}><option value="all">Alle richtingen</option><option value="in">Bijschrijvingen</option><option value="out">Afschrijvingen</option></Select></label>
         <label className="text-sm">Periode<Select value={days} onChange={e => { setDays(Number(e.target.value)); setLimit(20); setSelected(null); }}>
           <option value={90}>Laatste 90 dagen</option><option value={180}>Laatste 180 dagen</option><option value={365}>Laatste jaar</option><option value={730}>Laatste twee jaar</option>
         </Select></label>
@@ -113,7 +118,7 @@ export function BankPatterns(props: BankPatternsProps) {
     {!visible.length && <SurfaceCard>{groups.length ? "Geen groepen voor deze selectie. Kies ‘Alle transactiegroepen’ om je overige betalingen te bekijken." : "Nog geen banktransacties in deze periode. Synchroniseer je rekeningen of kies een langere periode."}</SurfaceCard>}
     {visible.slice(0, limit).map(g => <SurfaceCard key={g.key} className="space-y-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0"><h3 className="break-words font-semibold">{props.decisions[g.key]?.label ?? g.label}</h3>
+        <div className="min-w-0"><h3 className="break-words font-semibold">{bankText(props.decisions[g.key]?.label ?? g.label)}</h3>
           <p className="text-xs text-slate-600">{props.accounts.find(a => a.id === g.accountId)?.name ?? "Rekening"} · {accountRoleLabel(props.accounts.find(a => a.id === g.accountId), props.rules ?? emptyBankRules)} · {g.incoming ? "Bijschrijvingen" : "Afschrijvingen"} · {g.transactions.length} transacties</p></div>
         <Button aria-expanded={selected === g.key} onClick={() => setSelected(k => k === g.key ? null : g.key)}>{selected === g.key ? "Sluiten" : props.decisions[g.key] ? "Bekijk keuze en transacties" : "Wat is dit?"}</Button>
       </div>

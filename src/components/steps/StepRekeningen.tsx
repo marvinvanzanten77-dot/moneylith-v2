@@ -128,7 +128,7 @@ export function StepRekeningen({
         )}
       </div>
 
-      <AccountsWorkspace
+      <AccountsWorkspace editingKey={editingId}
         list={
           <div className="card-shell p-5 text-slate-900">
             <div className="mb-3 flex items-center justify-between text-slate-900">

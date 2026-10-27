@@ -95,7 +95,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   const confirmed=Number.isSafeInteger(manual[r.id])&&manual[r.id]>=0?manual[r.id]:null;
   const actual=uncertain?null:ids.length?(amounts.get(r.id)??0):confirmed??(r.kind==='debt'&&hasSavedPlan&&r.expected===0?0:null);
   const expected=hasSavedPlan?r.expected:null;
-  const forecast=r.route==='withheld'?0:closed?actual:(r.budget||r.kind==='fixed')?(expected===null?actual:Math.max(expected,actual??0)):actual!==null&&!isReversed?actual:expected;
+  const forecast=r.route==='withheld'?0:closed?actual:(r.budget||r.kind==='fixed')?(expected===null?null:Math.max(expected,actual??0)):actual!==null&&!isReversed?actual:expected;
   const status=uncertain?'Mogelijke terugboeking — controleren':r.route==='withheld'?'Al ingehouden; geen tweede afschrijving':isReversed?'Teruggeboekt — controleren':ids.length?'Via bank herkend':confirmed!==null?'Zelf bevestigd':r.kind==='debt'&&expected===0?'Geen aflossing ingepland':r.route==='card'?'Bunq/card: betaling nog bevestigen':r.route==='cash'?'Contant: betaling nog bevestigen':closed?'Geen betaling herkend':'Nog verwacht / niet herkend';
   return {...r,expected,actual,forecast,difference:actual!==null&&expected!==null?actual-expected:null,status,transactionIds:ids,reversed:isReversed};
  });
