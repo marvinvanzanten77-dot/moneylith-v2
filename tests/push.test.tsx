@@ -79,5 +79,5 @@ test('service worker shows generic text and opens only the fixed personal notifi
  assert.doesNotMatch(JSON.stringify(shown),/Private|€100|evil/);assert.equal(shown.options.tag,'moneylith-monitoring');
  assert.ok(fs.existsSync('public'+shown.options.icon));
  handlers.get('notificationclick')!({notification:{close:()=>{closed=true;},data:{url:'https://evil.test'}},waitUntil});await task;
- assert.equal(closed,true);assert.equal(opened,'/?app=1&view=notifications#persoonlijk');
+ assert.equal(closed,true);assert.equal(opened,'/prive?app=1&view=notifications#persoonlijk');
 });

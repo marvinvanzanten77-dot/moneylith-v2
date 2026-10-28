@@ -1,13 +1,15 @@
 import { registerAppWorker } from "./pwa/register";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./WorkspaceApp";
+import { lazy, Suspense } from "react";
+import { PersonalAccess } from "./components/PersonalAccess";
+const App = lazy(() => import("./WorkspaceApp"));
 import "./index.css";
 import { CloudSyncBoundary } from "./components/CloudSyncBoundary";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <CloudSyncBoundary><App /></CloudSyncBoundary>
+    <PersonalAccess><CloudSyncBoundary><Suspense fallback={<p>Je persoonlijke administratie laden…</p>}><App /></Suspense></CloudSyncBoundary></PersonalAccess>
   </React.StrictMode>
 );
 

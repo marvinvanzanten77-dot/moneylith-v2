@@ -22,7 +22,7 @@ test('business view uses its own input, and missing dates do not masquerade as n
  const html=renderToStaticMarkup(<MobileOverview input={business} onNavigate={()=>{}}/>);assert.match(html,/200,00/);assert.doesNotMatch(html,/Test inkomen/);assert.match(html,/betaaldatum/);assert.match(html,/Bankstatus/);
 });
 test('PWA manifest, icon sizes and hosting routes provide a standalone scoped app',()=>{
- const manifest=JSON.parse(fs.readFileSync('public/manifest.webmanifest','utf8'));assert.equal(manifest.display,'standalone');assert.equal(manifest.start_url,'/?app=1');assert.equal(manifest.scope,'/');
+ const manifest=JSON.parse(fs.readFileSync('public/manifest.webmanifest','utf8'));assert.equal(manifest.display,'standalone');assert.equal(manifest.start_url,'/prive?app=1');assert.equal(manifest.scope,'/');
  for(const icon of manifest.icons){const bytes=fs.readFileSync('public'+icon.src);const n=Number(icon.sizes.split('x')[0]);assert.equal(bytes.readUInt32BE(16),n);assert.equal(bytes.readUInt32BE(20),n);}
  const host=JSON.parse(fs.readFileSync('vercel.json','utf8'));const rewrite=new RegExp('^'+host.rewrites.at(-1).source+'$');for(const route of ['/sw.js','/manifest.webmanifest','/offline.html','/icons/moneylith-192.png','/api/cloud'])assert.equal(rewrite.test(route),false);
  assert.match(fs.readFileSync('index.html','utf8'),/rel="manifest"/);

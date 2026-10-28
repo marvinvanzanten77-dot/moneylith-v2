@@ -35,7 +35,7 @@ export default function WorkspaceApp() {
     }
   }, [enteredWorkspace]);
   useEffect(() => {
-    if (window.location.pathname !== "/") return;
+    if (!["/", "/prive", "/prive/"].includes(window.location.pathname)) return;
     if (window.location.hash === "#zakelijk-demo")
       history.replaceState(null, "", window.location.pathname + window.location.search + "#zakelijk");
     // Remember direct hash links as well as button navigation, without touching user records.
@@ -67,7 +67,7 @@ export default function WorkspaceApp() {
     return () => window.removeEventListener("hashchange", changed);
   }, []);
   const openBusiness = () => select("real");
-  if (window.location.pathname !== "/" || mode === "personal")
+  if (!["/", "/prive", "/prive/"].includes(window.location.pathname) || mode === "personal")
     return (
       <PersonalApp
         onOpenBusiness={openBusiness}

@@ -7,6 +7,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ command }) => ({
+  base: command === "build" ? "/prive/" : "/",
   plugins: [
     react(),
     {name: 'moneylith-app-version', generateBundle(){

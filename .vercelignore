@@ -1,0 +1,5 @@
+.env*
+.bunq/
+node_modules/
+artifacts/
+.git/

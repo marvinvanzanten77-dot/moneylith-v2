@@ -2,9 +2,26 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "moneylith.nl" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "moneylith.nl"
+        }
+      ],
       "destination": "https://www.moneylith.nl/:path*",
       "permanent": true
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "app",
+          "value": "1"
+        }
+      ],
+      "destination": "/prive?app=1",
+      "permanent": false
     },
     {
       "source": "/:path+/",
@@ -13,43 +30,118 @@
     }
   ],
   "headers": [
-    { "source": "/app-version.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
+    {
+      "source": "/app-version.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache" },
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
       "headers": [
-        { "key": "Content-Type", "value": "application/manifest+json" },
-        { "key": "Cache-Control", "value": "no-cache" }
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
         {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src *; frame-src 'self' https://challenges.cloudflare.com https://vercel.live"
+        }
+      ]
+    },
+    {
+      "source": "/prive/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     }
   ],
   "rewrites": [
     {
-      "source": "/(privacy|disclaimer|terms|cookies|status)",
+      "source": "/prive/assets/:path*",
+      "destination": "/assets/:path*"
+    },
+    {
+      "source": "/prive/(manifest.webmanifest|app-version.json|sw.js|offline.html)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/prive/icons/:path*",
+      "destination": "/icons/:path*"
+    },
+    {
+      "source": "/prive/logo/:path*",
+      "destination": "/logo/:path*"
+    },
+    {
+      "source": "/prive",
       "destination": "/index.html"
     },
     {
-      "source": "/((?!app-version\\.json|manifest\\.webmanifest|sw\\.js|offline\\.html|icons|api|_next|assets|static|logo|robots\\.txt|sitemap\\.xml|@vite|@react-refresh|@id|@fs|src|node_modules).*)",
+      "source": "/prive/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "https://moneylith-public.vercel.app/assets/:path*"
+    },
+    {
+      "source": "/",
+      "destination": "https://moneylith-public.vercel.app/"
+    },
+    {
+      "source": "/(privacy|disclaimer|terms|cookies|status|about)",
+      "destination": "https://moneylith-public.vercel.app/$1"
     }
   ],
-  "crons": [{ "path": "/api/monitoring-cron", "schedule": "0 7,12,18 * * *" }]
+  "crons": [
+    {
+      "path": "/api/monitoring-cron",
+      "schedule": "0 7,12,18 * * *"
+    }
+  ]
 }
