@@ -7,7 +7,7 @@ test('public home and assets resolve to Public while private workspace uses its 
   assert.equal(destination('/'), 'https://moneylith-public.vercel.app/');
   assert.equal(destination('/assets/:path*'), 'https://moneylith-public.vercel.app/assets/:path*');
   assert.equal(destination('/prive/assets/:path*'), '/assets/:path*');
-  assert.equal(destination('/prive'), '/index.html');
+  assert.equal(destination('/prive'), '/personal.html');
   assert(!config.rewrites.some((r: {source: string, destination: string}) => r.source.startsWith('/api') && r.destination.startsWith('https:')));
 });
 test('installed app identity and push registration survive while opening the private path', () => {

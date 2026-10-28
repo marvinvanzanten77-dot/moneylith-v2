@@ -10,6 +10,10 @@ export default defineConfig(({ command }) => ({
   base: command === "build" ? "/prive/" : "/",
   plugins: [
     react(),
+    {name: "personal-entrypoint", enforce: "post", generateBundle(_options, bundle){
+      const entry = bundle["index.html"];
+      if(entry){ entry.fileName = "personal.html"; bundle["personal.html"] = entry; delete bundle["index.html"]; }
+    }},
     {name: 'moneylith-app-version', generateBundle(){
       this.emitFile({type: 'asset', fileName: 'app-version.json', source: JSON.stringify({version: randomUUID()})});
     }},
