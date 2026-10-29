@@ -36,3 +36,14 @@
 @media(max-width:650px){.ml-chat-popup{right:16px;bottom:82px}.ml-chat-launcher{right:16px}.personal-footer{padding-bottom:90px}}
 
 .ml-document-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font:12px/1.6 system-ui}.ml-agent input[type=file]{display:block;max-width:100%;font-size:12px;margin-top:8px}
+
+/* The same navigation stays visible above every private page. */
+.ml-topnav{display:flex;align-items:center;gap:5px;padding:7px;margin:0 0 24px;background:#fffdfaab;border:1px solid #fffefa85;border-radius:17px}
+.ml-topnav button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:47px;padding:10px 12px;border:0;border-radius:11px;background:transparent;color:#667067;font-size:13px;white-space:nowrap;transition:background .15s,color .15s}
+.ml-topnav svg{width:19px;height:19px;flex-shrink:0}
+.ml-topnav button:hover{background:#eaf0e6;color:#315d49}
+.ml-topnav button[aria-current=page],.ml-topnav button[aria-expanded=true]{background:#416c55;color:#fff}
+.ml-topnav button:focus-visible{outline:3px solid #8ca17e;outline-offset:2px}
+.ml-cannabis,.nw-emblem.ml-cannabis{background:#e7eddf;color:#657b45}.ml-coffee,.nw-emblem.ml-coffee{background:#f5eadd;color:#a37549}.ml-fuel,.nw-emblem.ml-fuel{background:#e7efff;color:#466fa8}.ml-cart,.nw-emblem.ml-cart{background:#eaf3df;color:#527c39}.ml-gift,.nw-emblem.ml-gift{background:#f7e9ed;color:#ad667e}.ml-ticket,.nw-emblem.ml-ticket{background:#eee9f7;color:#8a70ad}.ml-sparkles,.nw-emblem.ml-sparkles{background:#e3f0ee;color:#5e9188}.ml-grid,.nw-emblem.ml-grid{background:#eae8e4;color:#74776c}.ml-question,.nw-emblem.ml-question{background:#f6efdf;color:#a18248}
+@media(max-width:1050px){.ml-topnav button{flex-direction:column;gap:5px;padding:9px 6px;font-size:12px}}
+@media(max-width:650px){.ml-topnav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:6px;margin-bottom:18px;border-radius:16px}.ml-topnav button{font-size:11px;min-height:58px;padding:7px 2px;gap:5px}.ml-topnav svg{width:19px;height:19px}}

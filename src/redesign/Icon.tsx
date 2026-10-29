@@ -1,5 +1,14 @@
-export type IconName = 'dining' | 'shirt' | 'document' | 'wallet' | 'calendar' | 'target' | 'chart' | 'bank' | 'leaf' | 'layers' | 'house' | 'bolt' | 'heart' | 'subscription' | 'bag' | 'car' | 'more' | 'chevron' | 'refresh' | 'user' | 'menu' | 'close' | 'info';
+export type IconName = 'cannabis' | 'coffee' | 'fuel' | 'cart' | 'gift' | 'ticket' | 'sparkles' | 'grid' | 'question' | 'dining' | 'shirt' | 'document' | 'wallet' | 'calendar' | 'target' | 'chart' | 'bank' | 'leaf' | 'layers' | 'house' | 'bolt' | 'heart' | 'subscription' | 'bag' | 'car' | 'more' | 'chevron' | 'refresh' | 'user' | 'menu' | 'close' | 'info';
 const paths: Record<IconName, string> = {
+  cannabis: 'M12 22v-6M12 17C8 17 4 14 3 10l6 3C6 9 7 6 7 5l4 7c-1-5 0-8 1-10 1 2 2 5 1 10l4-7c0 1 1 4-2 8l6-3c-1 4-5 7-9 7Z',
+  coffee: 'M4 8h12v7a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8ZM16 9h2a3 3 0 0 1 0 6h-2M3 22h15M7 2v3M12 2v3',
+  fuel: 'M4 21V4h10v17M2 21h14M4 11h10M17 4l3 3v11a2 2 0 0 1-4 0v-5h-2M18 5v4h2',
+  cart: 'M2 3h3l3 13h11l3-10H6M9 20h.01M18 20h.01',
+  gift: 'M3 8h18v4H3V8ZM5 12v9h14v-9M12 8v13M12 8C3 8 5 1 9 3l3 5ZM12 8c9 0 7-7 3-5l-3 5Z',
+  ticket: 'M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4V5ZM15 5v3M15 11v2M15 16v3',
+  sparkles: 'm10 3 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6ZM19 2v4M17 4h4M20 17v5M17.5 19.5h5',
+  grid: 'M3 3h7v7H3V3ZM14 3h7v7h-7V3ZM3 14h7v7H3v-7ZM14 14h7v7h-7v-7Z',
+  question: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 3M12 17h.01',
   dining: 'M3 2v6c0 4 6 4 6 0V2M6 2v20M18 2c-5 4-5 10 0 10V2ZM18 12v10',
   shirt: 'm8 3-6 4 3 5 3-2v11h8V10l3 2 3-5-6-4c0 5-8 5-8 0Z',
   document: 'M5 2h9l5 5v15H5V2ZM14 2v6h5M9 12h6M9 16h6',
@@ -28,14 +37,22 @@ export function Icon({ name, className = '' }: { name: IconName; className?: str
   return <svg className={className} aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
 }
 export function categoryIcon(label: string): IconName {
-  if (/horeca|restaurant|koffie|snack/i.test(label)) return 'dining';
+  if (/coffeeshop|cofeeshop|cannabis|blow/i.test(label)) return 'cannabis';
+  if (/nog in te delen|onbekend|ongecategoriseerd/i.test(label)) return 'question';
+  if (/koffie|snack|rookwaar|tabak/i.test(label)) return 'coffee';
+  if (/horeca|restaurant|eten en drinken/i.test(label)) return 'dining';
+  if (/verzorging|kapper|cosmetica/i.test(label)) return 'sparkles';
+  if (/cadeau|donatie/i.test(label)) return 'gift';
+  if (/vrije tijd|uitjes|bioscoop|recreatie/i.test(label)) return 'ticket';
+  if (/boodschap/i.test(label)) return 'cart';
+  if (/tank|brandstof|benzine/i.test(label)) return 'fuel';
   if (/kleding|schoen/i.test(label)) return 'shirt';
   if (/belasting|gemeente/i.test(label)) return 'document';
   if (/huur|alvast|hypotheek/i.test(label)) return 'house';
   if (/energie|stroom/i.test(label)) return 'bolt';
-  if (/zorg|sauna|welzijn/i.test(label)) return 'heart';
+  if (/zorg|sauna|welzijn|gezondheid|wellness/i.test(label)) return 'heart';
   if (/abbo|abonne|simyo|telefoon|software|tool/i.test(label)) return 'subscription';
   if (/boodschap|winkel|spullen/i.test(label)) return 'bag';
   if (/tank|auto|vervoer/i.test(label)) return 'car';
-  return 'more';
+  return 'grid';
 }
