@@ -1,3 +1,4 @@
+import {returnedPayments} from '../bank/returnedPayments.js';
 import type {MoneylithSnapshotDomain} from '../core/moneylithSnapshot.js';
 import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithTransaction,MoneylithAccount} from '../types.js';
 import {makePeriodPlan,reconcilePeriod,salaryPeriod,periodBounds} from '../bank/periodReconciliation.js';
@@ -19,6 +20,9 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
  const funding:Record<string,number>={card:0,cash:0};
  for(const move of report.cashMoves)funding[move.label==='Naar bunq'?'card':'cash']+=move.cents;
  for(const row of report.rows)if((row.route==='card'||row.route==='cash')&&!row.transactionIds.length)funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
+ const returned=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf);
+ const pendingReturns=returned.filter(r=>r.status==='pending');
+ const coveredReturns=new Set<string>();
  input.commitments=[];
  for(const row of report.rows.filter(r=>r.kind==='fixed'||r.kind==='debt')){
   const debt=row.kind==='debt'?list<SchuldItem>(data.debts).find(d=>'debt:'+d.id===row.id):undefined;
@@ -79,14 +83,26 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    date=month+'-'+String(Math.min(day,end)).padStart(2,'0');
   }
   let remaining=row.settlesOnPayment&&row.actual!==null&&!row.reversed?0:row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
+  const rowReturns=pendingReturns.filter(r=>r.debitId&&row.transactionIds.includes(r.debitId));
+  if(rowReturns.length){
+   const reopened=rowReturns.reduce((sum,r)=>sum+r.cents,0);
+   remaining=remaining===null?reopened:Math.max(remaining,reopened);
+   rowReturns.forEach(r=>coveredReturns.add(r.id));
+  }
   let funded=0;
-  if((row.route==='cash'||(row.route==='card'&&!list<MoneylithAccount>(data.accounts).some(a=>a.active&&a.bankProvider==='bunq'&&rules.accountRoles[a.id]!=='business')))&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
+  if(!rowReturns.length&&(row.route==='cash'||(row.route==='card'&&!list<MoneylithAccount>(data.accounts).some(a=>a.active&&a.bankProvider==='bunq'&&rules.accountRoles[a.id]!=='business')))&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
   const pending=remaining===null||remaining>0;
   const assumed=pending&&(!date||date<=input.asOf);
   if(assumed)date=addDays(input.asOf,1);
-  const note=funded>0?`${euro(funded)} al naar bunq/contant verplaatst; geen tweede bankuitgave. De betaling van deze post is daarmee niet bewezen. `+(assumed?'Resterende financiering voorlopig morgen gepland.':''):assumed?'Nog niet volledig via betaling herkend; voorlopig morgen ingepland, geen bevestigde incassodatum.':row.reversed?'Teruggeboekt: opnieuw als nog te betalen opgenomen.':'Alleen het nog niet herkende deel wordt verwacht; betaald geldt pas na sync of bevestiging.';
-  if(pending)input.events.push({id:id+':remaining:'+period,label:row.label+' — nog verwacht',date,amount:remaining===null?null:-remaining,source:debt?'debt':'fixed',...(debt?{kind:'repayment' as const,debtId:debt.id}:{}),basis:!assumed&&raw?.monthlyAmounts!==undefined?'input':'assumption'});
+  const note=rowReturns.length?'Teruggedraaide incasso: opnieuw te betalen. De geplande datum is een aanname totdat een nieuwe betaaldatum bekend is.':funded>0?`${euro(funded)} al naar bunq/contant verplaatst; geen tweede bankuitgave. De betaling van deze post is daarmee niet bewezen. `+(assumed?'Resterende financiering voorlopig morgen gepland.':''):assumed?'Nog niet volledig via betaling herkend; voorlopig morgen ingepland, geen bevestigde incassodatum.':row.reversed?'Teruggeboekt: opnieuw als nog te betalen opgenomen.':'Alleen het nog niet herkende deel wordt verwacht; betaald geldt pas na sync of bevestiging.';
+  if(pending)input.events.push({id:id+':remaining:'+period,label:row.label+(rowReturns.length?' — opnieuw te betalen':' — nog verwacht'),date,amount:remaining===null?null:-remaining,source:debt?'debt':'fixed',...(debt?{kind:'repayment' as const,debtId:debt.id}:{}),basis:!assumed&&raw?.monthlyAmounts!==undefined?'input':'assumption'});
   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining,date,note});
  }
+ for(const r of pendingReturns.filter(r=>!coveredReturns.has(r.id))){
+  const date=addDays(input.asOf,1);
+  input.events.push({id:r.id,label:r.label+' — opnieuw te betalen',date,amount:-r.cents,source:'returned-payment',basis:'assumption'});
+  input.commitments.push({label:r.label,expected:r.cents,paid:0,remaining:r.cents,date,note:'Incasso teruggedraaid op '+r.date+'. Voorlopig morgen ingepland; dit is geen aangekondigde incassodatum. Een nieuwe betaling sluit deze post alleen bij een unieke factuurreferentie. Het schuldsaldo is niet automatisch gewijzigd.'});
+ }
+ for(const r of returned.filter(r=>r.status==='review'))input.missing.push(r.label+': terugboeking controleren; oorspronkelijke betaling niet uniek gevonden');
  input.assumptions.push('De huidige salarisperiode loopt van '+bounds.start+' tot '+bounds.end+'. Reeds herkende betalingen zitten in het banksaldo en worden niet opnieuw afgetrokken. Nog niet herkende lasten blijven gepland; een verstreken datum bewijst geen betaling.','Budgetten voor dagelijkse uitgaven gebruiken alleen het resterende bedrag tot de 22ste. Hetzelfde uitgaventempo is een indicatie, geen bewezen extra uitgave. Zonder gekoppelde bunq-rekening blijven bunq-betalingen beperkt zichtbaar. Een top-up of contante opname bewijst geen betaling van een specifieke last. Bij gekoppelde bunq-rekeningen telt de werkelijke aankoop, niet de top-up.');
 }

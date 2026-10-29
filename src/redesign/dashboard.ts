@@ -1,3 +1,4 @@
+import {returnedPayments} from '../bank/returnedPayments';
 import type { CloudState } from '../storage/cloudState';
 import type { MoneylithAccount, MoneylithTransaction, FixedCostManualItem } from '../types';
 import { emptyBankRules, validateBankRules } from '../bank/classificationRules';
@@ -48,7 +49,7 @@ export function presentPersonal(source: Parameters<typeof personalInput>[0], asO
   const knownProtected=knownCommitments.reduce((sum,e)=>sum+Math.abs(e.amount!),input.reserve??0);
   const provisional=view.available===null;
   const available=view.available??(input.opening!==null&&knownCommitments.length>0?input.opening-knownProtected:null);
-  return { input, view, available, provisional, knownPlanned, knownProtected, accounts, bank: mobileBankBalance(accounts, rules), spending,
+  return { returnedPayments:returnedPayments(transactions,rules,asOf), input, view, available, provisional, knownPlanned, knownProtected, accounts, bank: mobileBankBalance(accounts, rules), spending,
     planned, period: periodBounds(salaryPeriod(asOf)),
     protected: input.opening !== null && view.available !== null ? input.opening - view.available : null,
   };
