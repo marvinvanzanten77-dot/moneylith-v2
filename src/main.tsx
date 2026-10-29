@@ -3,8 +3,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { lazy, Suspense } from "react";
 import { PersonalAccess } from "./components/PersonalAccess";
-const App = lazy(() => import("./WorkspaceApp"));
-import "./index.css";
+const App = lazy(() => import("./redesign/PersonalShell"));
+import "./redesign/foundation.css";
 import { CloudSyncBoundary } from "./components/CloudSyncBoundary";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

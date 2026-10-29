@@ -50,7 +50,7 @@ export async function startCloudSync() {
       const localChanged = Object.keys(local).length > 0 &&
         (!previous || previous.email !== auth.email || previous.hash !== hash);
       if (localChanged && (!previous || previous.revision !== remote.revision))
-        throw Error("Dit apparaat en de cloud bevatten verschillende wijzigingen. Kies bij Instellingen ‘Cloudversie laden’; je lokale versie wordt eerst bewaard. Er is niets overschreven.");
+        throw Error("Dit apparaat en de cloud bevatten verschillende wijzigingen. Kies bij je profiel ‘Mijn cloudadministratie laden’; je lokale versie wordt eerst bewaard. Er is niets overschreven.");
       if (!localChanged) {
         await restoreCloudState(localStorage, remote.state);
         loadedAt=new Date().toISOString();
@@ -96,6 +96,8 @@ export async function loadCloudVersion() {
   const remote = await cloudRequest("snapshot");
   if (!validateCloudState(remote.state)) throw Error("Er is nog geen cloudadministratie.");
   await restoreCloudState(localStorage, remote.state);
+  // Explicitly loading the account resumes sync after a previous local-only choice.
+  localStorage.setItem("moneylith.storage.mode", '"cloud"');
   loadedAt=new Date().toISOString();
   remember({ email: auth.email, revision: remote.revision, hash: await fingerprint(remote.state) });
   window.location.reload();

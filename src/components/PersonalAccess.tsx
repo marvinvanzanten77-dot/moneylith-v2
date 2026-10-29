@@ -27,7 +27,7 @@ export function PersonalAccess({ children }: { children: ReactNode }) {
   }, [local]);
   if (checking) return <p className="p-8 text-slate-100" role="status">Persoonlijke toegang controleren…</p>;
   if (allowed) return <>{children}</>;
-  return <main className="min-h-screen bg-slate-950 p-6 text-slate-100"><form className="mx-auto mt-12 max-w-md space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-6" onSubmit={e => {
+  return <main className="ml-access"><form className="ml-access-form" onSubmit={e => {
     e.preventDefault(); setBusy(true); setError('');
     void cloudRequest('login', 'POST', { email, password }).then(() => {
       setPassword(''); window.location.reload();
