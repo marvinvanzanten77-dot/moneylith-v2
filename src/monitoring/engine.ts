@@ -78,7 +78,7 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
     else if(summary.elapsedDay>=21&&pot.previousCents-pot.cents>=2500&&pot.cents<=pot.previousCents*0.8)
       add('progress',pot.label,`${pot.label}: een moment om bij stil te staan`,`${euros(pot.cents)} waargenomen, tegenover ${euros(pot.previousCents)} vorige salarisperiode tot en met dag ${summary.elapsedDay}. Als dit past bij jouw keuzes, mag je daar even bij stilstaan. Dit is nog geen vastgestelde besparing.`,pot.cents,pot.previousCents);
   }
-  const base=personalInput({income:read(state,'moneylith.personal.income',[]),fixedCosts:fixed,detectedFixedCosts:read(state,'fixed-cost-items',[]),debts:read(state,'moneylith.personal.debts',[]),accounts,transactions,inputReviews:read(state,'moneylith.personal.inputReviews.v1',{}),bankRules:rules,debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:read(state,'moneylith.personal.periodPaid.v1',{})},emptyOptions(),asOf);
+  const base=personalInput({income:read(state,'moneylith.personal.income',[]),fixedCosts:fixed,detectedFixedCosts:read(state,'fixed-cost-items',[]),debts:read(state,'moneylith.personal.debts',[]),accounts,transactions,inputReviews:read(state,'moneylith.personal.inputReviews.v1',{}),bankRules:rules,debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:read(state,'moneylith.personal.periodPaid.v1',{}),paymentResolutions:read(state,'moneylith.personal.paymentResolutions',[])},emptyOptions(),asOf);
   const forecast=project(base);
   // Cash pressure does not require a reserve estimate: reserves are not bank withdrawals.
   // Unknown cash obligations still prevent an exact cash forecast.

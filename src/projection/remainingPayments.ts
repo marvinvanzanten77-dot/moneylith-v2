@@ -20,7 +20,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
  const funding:Record<string,number>={card:0,cash:0};
  for(const move of report.cashMoves)funding[move.label==='Naar bunq'?'card':'cash']+=move.cents;
  for(const row of report.rows)if((row.route==='card'||row.route==='cash')&&!row.transactionIds.length)funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
- const returned=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf);
+ const returned=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf,data.paymentResolutions);
  const pendingReturns=returned.filter(r=>r.status==='pending');
  const coveredReturns=new Set<string>();
  input.commitments=[];
@@ -83,7 +83,10 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    date=month+'-'+String(Math.min(day,end)).padStart(2,'0');
   }
   let remaining=row.settlesOnPayment&&row.actual!==null&&!row.reversed?0:row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
-  const rowReturns=pendingReturns.filter(r=>r.debitId&&row.transactionIds.includes(r.debitId));
+  const resolvedReturns=returned.filter(r=>r.debitId&&row.transactionIds.includes(r.debitId)&&(r.status==='repaid'||r.dueMonth));
+  // A resolved/deferred reversal must not also remain as this period's unpaid bill.
+  if(resolvedReturns.length&&remaining!==null)remaining=Math.max(0,remaining-resolvedReturns.reduce((sum,r)=>sum+r.cents,0));
+  const rowReturns=pendingReturns.filter(r=>!r.dueMonth&&r.debitId&&row.transactionIds.includes(r.debitId));
   if(rowReturns.length){
    const reopened=rowReturns.reduce((sum,r)=>sum+r.cents,0);
    remaining=remaining===null?reopened:Math.max(remaining,reopened);
@@ -99,10 +102,11 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
   input.commitments.push({label:row.label,expected:row.expected,paid:row.actual,remaining,date,note});
  }
  for(const r of pendingReturns.filter(r=>!coveredReturns.has(r.id))){
-  const date=addDays(input.asOf,1);
+  let date=r.dueMonth?r.dueMonth+'-'+String(new Date(Date.UTC(Number(r.dueMonth.slice(0,4)),Number(r.dueMonth.slice(5,7)),0)).getUTCDate()):addDays(input.asOf,1);
+  if(date<=input.asOf)date=addDays(input.asOf,1);
   input.events.push({id:r.id,label:r.label+' — opnieuw te betalen',date,amount:-r.cents,source:'returned-payment',basis:'assumption'});
-  input.commitments.push({label:r.label,expected:r.cents,paid:0,remaining:r.cents,date,note:'Incasso teruggedraaid op '+r.date+'. Voorlopig morgen ingepland; dit is geen aangekondigde incassodatum. Een nieuwe betaling sluit deze post alleen bij een unieke factuurreferentie. Het schuldsaldo is niet automatisch gewijzigd.'});
+  input.commitments.push({label:r.label,expected:r.cents,paid:0,remaining:r.cents,date,note:(r.dueMonth?'Betaalmaand bevestigd: '+r.dueMonth+'. Laatste dag van de maand is een planningsaanname, geen afgesproken betaaldatum. ':'')+'Incasso teruggedraaid op '+r.date+'. Voorlopig morgen ingepland; dit is geen aangekondigde incassodatum. Een nieuwe betaling sluit deze post alleen bij een unieke factuurreferentie. Het schuldsaldo is niet automatisch gewijzigd.'});
  }
- for(const r of returned.filter(r=>r.status==='review'))input.missing.push(r.label+': terugboeking controleren; oorspronkelijke betaling niet uniek gevonden');
+ for(const r of returned.filter(r=>r.status==='review'))input.missing.push(r.label+': terugboeking controleren; afhandeling nog niet vastgesteld');
  input.assumptions.push('De huidige salarisperiode loopt van '+bounds.start+' tot '+bounds.end+'. Reeds herkende betalingen zitten in het banksaldo en worden niet opnieuw afgetrokken. Nog niet herkende lasten blijven gepland; een verstreken datum bewijst geen betaling.','Budgetten voor dagelijkse uitgaven gebruiken alleen het resterende bedrag tot de 22ste. Hetzelfde uitgaventempo is een indicatie, geen bewezen extra uitgave. Zonder gekoppelde bunq-rekening blijven bunq-betalingen beperkt zichtbaar. Een top-up of contante opname bewijst geen betaling van een specifieke last. Bij gekoppelde bunq-rekeningen telt de werkelijke aankoop, niet de top-up.');
 }

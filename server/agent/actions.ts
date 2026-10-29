@@ -1,3 +1,6 @@
+import {returnedPayments} from '../../src/bank/returnedPayments.js';
+import {emptyBankRules,validateBankRules} from '../../src/bank/classificationRules.js';
+import {today} from '../../src/projection/engine.js';
 import {correctClassification,classificationAuditKey} from '../../src/bank/classificationAudit.js';
 import type {MoneylithTransaction} from '../../src/types.js';
 import {randomUUID} from 'node:crypto';
@@ -5,6 +8,7 @@ import type {CloudState} from '../../src/storage/cloudState.js';
 import {validDate} from '../../src/projection/engine.js';
 export class AgentInputError extends Error {}
 export const fields={
+ paymentResolutions:['returnedId','status','dueMonth','note'],
  accounts:['name','type','description','startBalance','active'],
  assets:['naam','bedrag','type'],
  futureIncome:['naam','bedrag','datum','opmerking'],
@@ -25,7 +29,7 @@ const money=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1e9&&
 const key=(c:Collection)=>'moneylith.personal.'+c;
 export function records(state:CloudState,c:Collection):Record<string,unknown>[] {const data=JSON.parse(state[key(c)]??'[]');if(!Array.isArray(data))return fail('De opgeslagen lijst is niet leesbaar.');return data;}
 export function receipts(state:CloudState):Receipt[]{const data=JSON.parse(state[journalKey]??'[]');return Array.isArray(data)?data:[];}
-const required:Record<Collection,string[]>={assets:['naam','bedrag'],futureIncome:['naam','bedrag','datum'],accounts:['name','type'],income:['naam','bedrag','dagVanMaand'],fixedCosts:['naam','bedrag','dagVanMaand'],debts:['naam','openBedrag'],goals:['label','type','targetAmount','currentAmount','monthlyContribution'],transactions:[]};
+const required:Record<Collection,string[]>={paymentResolutions:['returnedId','status','note'],assets:['naam','bedrag'],futureIncome:['naam','bedrag','datum'],accounts:['name','type'],income:['naam','bedrag','dagVanMaand'],fixedCosts:['naam','bedrag','dagVanMaand'],debts:['naam','openBedrag'],goals:['label','type','targetAmount','currentAmount','monthlyContribution'],transactions:[]};
 const moneyFields=new Set(['bedrag','startBalance','openBedrag','minBetaling','targetAmount','currentAmount','monthlyContribution']);
 const labels:Record<string,string>={naam:'naam',name:'naam',label:'naam',bedrag:'bedrag',startBalance:'beginsaldo',openBedrag:'openstaand',minBetaling:'maandelijkse aflossing',dagVanMaand:'betaaldag',afschrijfDag:'betaaldag',firstPaymentDate:'eerste betaling',remainingPayments:'resterende termijnen',targetAmount:'doelbedrag',currentAmount:'al opgebouwd',monthlyContribution:'maandinleg',monthlyAmounts:'maandbedragen',payrollDeductions:'looninhoudingen',deadline:'doeldatum',datum:'datum',category:'categorie',notes:'notitie',followLatestBank:'banksalaris volgen',active:'actief'};
 function summary(change:Change){const details=(fields[change.collection] as readonly string[]).filter(k=>change.after[k]!==undefined&&JSON.stringify(change.before?.[k])!==JSON.stringify(change.after[k])&&!['name','naam','label','amountEntered'].includes(k)).map(k=>`${labels[k]??k}: ${moneyFields.has(k)?new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(change.after[k])):typeof change.after[k]==='object'?JSON.stringify(change.after[k]):String(change.after[k])}`).join('; ');return `${change.before?'Bijgewerkt':'Toegevoegd'}: ${String(change.after.naam??change.after.name??change.after.label??'transactienotitie')}${details?' — '+details:''}.`;}
@@ -47,6 +51,17 @@ export function applyEdits(state:CloudState,input:unknown):{state:CloudState;cha
   else if(['firstPaymentDate','deadline','datum'].includes(field)){if(!validDate(v))fail('Gebruik een geldige datum.');}
   else if(['monthlyAmounts','payrollDeductions'].includes(field)){for(const [month,amount]of Object.entries(record(v)))if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||amount!==null&&!money(amount))fail('Ongeldig maandbedrag.');}
   else if(typeof v!=='string'||!v.trim()||v.length>2000)fail('Een tekstveld ontbreekt of is te lang.');
+ }
+ if(c==='paymentResolutions'){
+  const merged={...before,...patch};
+  if(!['paid','open'].includes(String(merged.status))||merged.dueMonth!==undefined&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(merged.dueMonth)))fail('Ongeldige betaalstatus of betaalmaand.');
+  const rawRules=JSON.parse(state['moneylith.personal.bankRules.v1']??'{}');
+  const returns=returnedPayments(JSON.parse(state['moneylith.personal.transactions']??'[]').filter((t:MoneylithTransaction)=>rawRules.accountRoles?.[t.accountId]!=='business'),validateBankRules(rawRules)?rawRules:emptyBankRules,today());
+  const target=returns.find(r=>r.id===merged.returnedId);
+  if(!target)fail('Deze terugboeking bestaat niet in je persoonlijke bankgegevens.');
+  if(rows.some(r=>r.id!==id&&r.returnedId===merged.returnedId))fail('Deze terugboeking heeft al een afhandeling. Wijzig die bestaande regel.');
+  if(before&&patch.returnedId&&patch.returnedId!==before.returnedId)fail('De oorspronkelijke terugboeking mag niet veranderen.');
+  patch.label=target.label;
  }
  if(c==='accounts'){
   if(patch.type&&!['betaalrekening','spaarrekening','contant'].includes(String(patch.type)))fail('Ongeldig rekeningtype.');
@@ -80,7 +95,7 @@ export function applyEdits(state:CloudState,input:unknown):{state:CloudState;cha
  const after:Record<string,unknown>={...(before??(c==='accounts'?{active:true,source:'manual',currency:'EUR'}:c==='goals'?{isActive:true}:{})),...patch,id};
  for(const field of before?[]:required[c])if(after[field]===undefined)fail(`Nog nodig voor ${c}: ${field}.`);
  if(c==='debts'&&after.firstPaymentDate&&after.remainingPayments&&Number(after.minBetaling??after.minimaleMaandlast??0)<=0)fail('Voor een regeling met termijnen is een maandbedrag nodig.');
- if(!before){const name=String(after.naam??after.name??after.label??'').trim().toLowerCase();if(rows.some(r=>String(r.naam??r.name??r.label??'').trim().toLowerCase()===name))fail('Een regel met deze naam bestaat al. Gebruik de bestaande regel.');}
+ if(!before&&c!=='paymentResolutions'){const name=String(after.naam??after.name??after.label??'').trim().toLowerCase();if(rows.some(r=>String(r.naam??r.name??r.label??'').trim().toLowerCase()===name))fail('Een regel met deze naam bestaat al. Gebruik de bestaande regel.');}
  if(before&&JSON.stringify(before)===JSON.stringify(after))continue;
  next[key(c)]=JSON.stringify(before?rows.map(r=>r.id===id?after:r):[...rows,after]);changes.push({collection:c,id,before,after});
  }

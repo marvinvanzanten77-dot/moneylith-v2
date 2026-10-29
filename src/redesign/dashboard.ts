@@ -21,7 +21,7 @@ export function dashboard(state: CloudState, asOf: string, options: Options = em
   return presentPersonal({
     accounts:list<MoneylithAccount>(get('accounts')),transactions:list<MoneylithTransaction>(get('transactions')),fixedCosts:get('fixedCosts'),income:get('income'),
     detectedFixedCosts:read(state,'fixed-cost-items',[]),futureIncome:get('futureIncome'),debts:get('debts'),assets:get('assets'),goals:get('goals'),
-    inputReviews:get('inputReviews.v1',{}),bankRules:get('bankRules.v1',emptyBankRules),debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:get('periodPaid.v1',{}),
+    inputReviews:get('inputReviews.v1',{}),bankRules:get('bankRules.v1',emptyBankRules),debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),periodPaid:get('periodPaid.v1',{}),paymentResolutions:get('paymentResolutions'),
   },asOf,options);
 }
 /** Uses the controller snapshot, including reviewed classifications and merged obligations. */
@@ -49,7 +49,7 @@ export function presentPersonal(source: Parameters<typeof personalInput>[0], asO
   const knownProtected=knownCommitments.reduce((sum,e)=>sum+Math.abs(e.amount!),input.reserve??0);
   const provisional=view.available===null;
   const available=view.available??(input.opening!==null&&knownCommitments.length>0?input.opening-knownProtected:null);
-  return { returnedPayments:returnedPayments(transactions,rules,asOf), input, view, available, provisional, knownPlanned, knownProtected, accounts, bank: mobileBankBalance(accounts, rules), spending,
+  return { returnedPayments:returnedPayments(transactions,rules,asOf,source.paymentResolutions), input, view, available, provisional, knownPlanned, knownProtected, knownCommitments, accounts, bank: mobileBankBalance(accounts, rules), spending,
     planned, period: periodBounds(salaryPeriod(asOf)),
     protected: input.opening !== null && view.available !== null ? input.opening - view.available : null,
   };

@@ -46,3 +46,30 @@ test('known current fixed cost is reopened once, not a duplicate new bill',()=>{
  const events=p.events.filter(e=>e.date&&e.date<'2026-11-23'&&e.amount===-6000);
  assert.equal(events.length,1);assert.match(events[0].label,/opnieuw te betalen/);
 });
+test('card settlement reversals are not unpaid invoices, even for fixed subscriptions',()=>{
+ const card={...debit,description:'SUNO INC.',counterparty:'SUNO INC.',providerData:{paymentSubType:'PAYMENT'}} as MoneylithTransaction;
+ const reversal={...card,id:'rev',amount:60,date:'2026-09-27',providerData:{paymentSubType:'REVERSAL'}} as MoneylithTransaction;
+ assert.deepEqual(returnedPayments([card,reversal,{...card,id:'settled',amount:-60.12,date:'2026-09-27'}],emptyBankRules,asOf),[]);
+});
+test('confirmed repayment and deferred month persist without changing base rent',()=>{
+ const txs=[{...debit,date:'2026-10-24'},{...credit,date:'2026-10-25'}];
+ const data={transactions:txs,fixedCosts:[{id:'sub',naam:'Abonnement',bedrag:60,amountEntered:true,dagVanMaand:24}],paymentResolutions:[{id:'r',returnedId:'returned:c',status:'open',dueMonth:'2026-11',note:'Gebruiker bevestigt uitstel'}]};
+ const before=JSON.stringify(data),p=personalInput(data,emptyOptions(),asOf);
+ assert.equal(p.events.filter(e=>e.date&&e.date<'2026-11-23'&&e.amount===-6000).length,0);
+ assert.equal(p.events.find(e=>e.id==='returned:c')?.date,'2026-11-30');
+ assert.equal(p.events.find(e=>e.id==='returned:c')?.amount,-6000);
+ assert.equal(JSON.stringify(data),before);
+ const paid={...data,paymentResolutions:[{...data.paymentResolutions[0],status:'paid'}]};
+ assert.equal(returnedPayments(txs,emptyBankRules,asOf,paid.paymentResolutions)[0].status,'repaid');
+ assert.equal(personalInput(paid,emptyOptions(),asOf).events.filter(e=>e.date&&e.date<'2026-11-23'&&e.amount===-6000).length,0);
+});
+test('different invoice references disambiguate equal rent amounts',()=>{
+ const rows=returnedPayments([debit,{...debit,id:'d2',description:'Incasso factuurnummer INV99999'},credit],emptyBankRules,asOf);
+ assert.equal(rows[0].debitId,'d');assert.equal(rows[0].status,'pending');
+});
+
+test('generic bank refund is reviewable, never automatically a new outstanding debt',()=>{
+ const txs=[debit,{...credit,description:'Terugboeking op verzoek klant factuur INV12345'}];
+ assert.equal(returnedPayments(txs,emptyBankRules,asOf)[0].status,'review');
+ assert.equal(personalInput({transactions:txs},emptyOptions(),asOf).events.filter(e=>e.source==='returned-payment').length,0);
+});

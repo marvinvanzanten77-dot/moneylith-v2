@@ -22,7 +22,7 @@ export function workspaceModel(state:CloudState,period:string,asOf:string) {
  const report=reconcilePeriod(period,asOf,plan,!closed||!!plans[period],transactions,ledger,rules,stored<PeriodPaid>(state,periodPaidKey,{})[period]);
  const gross=spendingRows(transactions,rules,fixed,ledger).filter(r=>r.date<=asOf);
  const spending=spendingSummary(spendingAboveBudgets(gross,fixed,'salary'),period,asOf,'salary');
- return {returnedPayments:returnedPayments(transactions,rules,closed?bounds.end:asOf),baselinePlan:plans[period],income,fixed,debts,goals,transactions,rules,ledger,report,spending,gross,bounds,closed,estimatedFixed:expectations.data.fixedCosts as FixedCostManualItem[],expectationNotes:expectations.notes,latestPlan:latest};
+ return {returnedPayments:returnedPayments(transactions,rules,closed?bounds.end:asOf,stored(state,'moneylith.personal.paymentResolutions',[])),baselinePlan:plans[period],income,fixed,debts,goals,transactions,rules,ledger,report,spending,gross,bounds,closed,estimatedFixed:expectations.data.fixedCosts as FixedCostManualItem[],expectationNotes:expectations.notes,latestPlan:latest};
 }
 export function moneyInput(raw:string):number {
  if(!/^\d+(?:[.,]\d{1,2})?$/.test(raw.trim()))throw Error('Vul een bedrag in met maximaal twee decimalen.');

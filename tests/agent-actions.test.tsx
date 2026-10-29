@@ -47,3 +47,15 @@ test('partial edits preserve incomplete historical records without inventing mis
  assert.equal(r.changes[0].after.bedrag,2000);
  assert.throws(()=>applyEdits(s,[edit('income',null,{naam:'Nieuw',bedrag:100})]));
 });
+test('payment resolution validates personal bank evidence and supports undo',()=>{
+ const txs=[{id:'d',accountId:'a',provider:'bunq',currency:'EUR',amount:-60,date:'2026-09-25',description:'Incasso factuur INV12345',counterparty:'Testbedrijf'},{id:'c',accountId:'a',provider:'bunq',currency:'EUR',amount:60,date:'2026-09-27',description:'Storno incasso factuur INV12345',counterparty:'Testbedrijf'}];
+ const s={...state,'moneylith.personal.transactions':JSON.stringify(txs)};
+ const r=applyEdits(s,[edit('paymentResolutions',null,{returnedId:'returned:c',status:'paid',note:'Door gebruiker bevestigd'})]);
+ assert.equal(r.changes[0].after.status,'paid');assert.equal(r.state['moneylith.personal.transactions'],s['moneylith.personal.transactions']);
+ const receipt:Receipt={id:'resolution',questionHash:'h',at:'2026-10-29',summary:r.summary,changes:r.changes};
+ assert.deepEqual(JSON.parse(undoReceipt({...r.state,[journalKey]:JSON.stringify([receipt])},receipt.id)['moneylith.personal.paymentResolutions']),[]);
+ assert.throws(()=>applyEdits(s,[edit('paymentResolutions',null,{returnedId:'invented',status:'paid',note:'x'})]));
+ assert.throws(()=>applyEdits({...s,'moneylith.personal.bankRules.v1':JSON.stringify({accountRoles:{a:'business'}})},[edit('paymentResolutions',null,{returnedId:'returned:c',status:'paid',note:'x'})]));
+});
+
+test('agent can read the same derived returned payment index as the dashboard',()=>{const result=readRecords(state,{collection:'returnedPayments'});assert.deepEqual(result.rows,[]);assert.equal(result.total,0);});

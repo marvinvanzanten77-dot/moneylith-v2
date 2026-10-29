@@ -251,6 +251,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
   const [assetsBusiness, setAssetsBusiness] = useLocalStorage<AssetItem[]>("moneylith.business.assets", []);
   const [incomeItems, setIncomeItems] = useLocalStorage<IncomeItem[]>("moneylith.personal.income", []);
   const [classificationHistory,setClassificationHistory]=useLocalStorage<ClassificationAudit[]>(classificationAuditKey,[]);
+  const [paymentResolutions]=useLocalStorage('moneylith.personal.paymentResolutions',[]);
   const [periodPaid,setPeriodPaid]=useLocalStorage<PeriodPaid>(periodPaidKey,{});
   const [projectionDebtLedger]=useLocalStorage(debtLedgerKey,emptyDebtLedger());
   const [bankRules, setBankRules] = useLocalStorage<BankRuleSettings>("moneylith.personal.bankRules.v1", emptyBankRules);
@@ -1334,7 +1335,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
         inbox: inboxItems,
         aiBuckets: aiBucketsStoredPersonal,
         fuelOverrides: fuelOverridesStoredPersonal,
-        bankRules, debtPayments:projectionDebtLedger, periodPaid,
+        bankRules, debtPayments:projectionDebtLedger, periodPaid, paymentResolutions,
       },
       business: {
         accounts: accountsBusiness,
@@ -1372,7 +1373,7 @@ const App = ({ onOpenBusiness, skipOnboarding = false }: { onOpenBusiness?: () =
     fixedCostManualItemsBusiness,
     fuelOverridesStoredBusiness,
     fuelOverridesStoredPersonal,
-    bankRules, projectionDebtLedger, periodPaid, classifiedBankTransactions,
+    bankRules, projectionDebtLedger, periodPaid, paymentResolutions, classifiedBankTransactions,
     goals,
     goalsBusiness,
     inboxItems,

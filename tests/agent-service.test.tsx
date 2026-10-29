@@ -17,6 +17,9 @@ test('authenticated service uses cloud context, stores once, detects concurrent 
   await runPersonalAgent('fixture@example.test',{operation:'undo',receiptId:body.requestId});assert.equal(writes,2);assert.equal(JSON.parse(decryptCloudPayload(stored.encrypted))['moneylith.personal.debts'],initial['moneylith.personal.debts']);
   conflict=true;await assert.rejects(()=>runPersonalAgent('fixture@example.test',{...body,requestId:'fixture-request-0002'},plan),/intussen|tijdens/);assert.equal(writes,2);conflict=false;
   await assert.rejects(()=>runPersonalAgent('fixture@example.test',{...body,requestId:'fixture-request-0003',question:'Wat als ik 50 euro aflos?'},plan),/scenario/i);assert.equal(writes,2);
+  const explanation=await runPersonalAgent('fixture@example.test',{operation:'chat',question:'Leg mijn vrije bestedingsruimte exact uit',requestId:'fixture-explain-0001'},async()=>{throw Error('Explanation must not call model');});assert.equal(explanation.changed,false);assert.match(explanation.content??'',/saldo/);assert.equal(writes,2);
+  const wrong=async()=>({role:'assistant' as const,content:null,refusal:null,tool_calls:[{id:'bad',type:'function' as const,function:{name:'change_records',arguments:JSON.stringify({edits:[{collection:'fixedCosts',id:'suno',changes:{bedrag:0}}]})}}]});
+  await assert.rejects(()=>runPersonalAgent('fixture@example.test',{operation:'chat',question:'Suno is al betaald, werk bij',requestId:'fixture-wrong-0001'},wrong),/vaste maandprijs/);assert.equal(writes,2);
   const journal=JSON.parse(JSON.parse(decryptCloudPayload(stored.encrypted))[journalKey]);assert.equal(journal[0].undone,true);
  }finally{globalThis.fetch=originalFetch;process.env=previous;}
 });

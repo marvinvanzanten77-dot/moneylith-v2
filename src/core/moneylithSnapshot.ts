@@ -23,6 +23,7 @@ export type MoneylithSnapshotDomain = {
   bankRules?: unknown;
   debtPayments?: unknown;
   periodPaid?: unknown;
+  paymentResolutions?: unknown;
 };
 
 export type MoneylithSnapshot = {
@@ -74,6 +75,7 @@ const normalizeDomain = (domain?: MoneylithSnapshotDomain): MoneylithSnapshotDom
   bankRules: asObject(domain?.bankRules),
   debtPayments: asObject(domain?.debtPayments),
   periodPaid: asObject(domain?.periodPaid),
+  paymentResolutions: asArray(domain?.paymentResolutions),
 });
 
 const normalizeMessages = (
