@@ -1,0 +1,11 @@
+# Persoonlijke chat: toetsenbord, geheugen en bijlagen
+
+Enter verstuurt; Shift+Enter maakt een nieuwe regel; IME-compositie verstuurt niet. Gesprekken blijven in de bestaande persoonlijke cloudsnapshot bewaard (maximaal 100 berichten en 100.000 tekens). Alleen de laatste zestien berichten plus maximaal acht relevante oudere berichten gaan direct naar het model, tot 24.000 tekens. Oudere bewaarde berichten zijn via read_history doorzoekbaar. Het geheugen is begrensd, niet onbeperkt.
+
+Bijlagen: PDF, DOCX, TXT, PNG/JPG/WEBP, maximaal 5 MB per bestand en drie tegelijk. PDF leest maximaal tien pagina's, met expliciete melding. Maximaal tien documenten van elk 20.000 tekens en samen 100.000 tekens. Alleen uitgelezen tekst, bestandsnaam, methode en datum blijven bewaard; geen originele bestanden. OCR kan fouten bevatten en de tekst kan vóór verwerking bekeken worden. Verwijderen van een bijlage wist geen eerder daarvan verwerkte financiële gegevens of citaten in het gesprek. Gesprek wissen en bijlagen verwijderen zijn afzonderlijke acties.
+
+OCR gebruikt de bestaande Tesseract-implementatie met een eigen worker en zelf gehoste WASM-code. Taaldata worden op de eerste keer extern gedownload; documentinhoud wordt lokaal herkend. PDF en Word worden eveneens lokaal gelezen. Tekst gaat via de bestaande versleutelde cloudadministratie naar de afgeschermde assistent. Alleen relevante bijlagen gaan direct mee; overige blijven opvraagbaar. Uploaden alleen wijzigt geen financiën. Instructies in documenten zijn geen toestemming; verwerking vereist een gebruikersopdracht. Onzekere bedragen/datums moeten nagevraagd worden.
+
+Respons: antwoorden worden meteen getoond zodra het model/de server ze teruggeeft, vóór de afrondende cloudsynchronisatie. Een antwoord zonder wijzigingen haalt de volledige snapshot en wijzigingshistorie niet nogmaals op. Geen wijziging van authenticatie, versiecontrole of bankbeveiliging. Er is nog geen tokenstreaming.
+
+Verificatie: 329 regressietests, strenge typecheck en productiebuild. Synthetische desktop-/mobiele browsercontroles voor Enter, Shift+Enter, TXT, DOCX, verwijderen en cloudherladen; echte PDF-extractie en afbeeldings-OCR met testdocumenten. Gesimuleerde read-only antwoorden veroorzaken geen extra snapshotdownload. Geen echte OpenAI-latentie gemeten en geen persoonlijke documenten/financiën voor tests gewijzigd.

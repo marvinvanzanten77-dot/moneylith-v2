@@ -1,3 +1,4 @@
+import ocrWorkerUrl from "tesseract.js/dist/worker.min.js?url";
 import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 type ExtractResult = {
@@ -10,7 +11,7 @@ const OCR_LANG = "eng+nld";
 async function runOcr(input: string | Blob): Promise<string> {
   const tesseract = await import("tesseract.js");
   const createWorkerAny = (tesseract as any).createWorker;
-  const worker = await createWorkerAny(OCR_LANG);
+  const worker = await createWorkerAny(OCR_LANG,1,{workerPath:ocrWorkerUrl,workerBlobURL:false,corePath:new URL(import.meta.env.BASE_URL+'assets/ocr/',location.origin).href});
 
   try {
     const result = await worker.recognize(input);

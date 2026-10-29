@@ -34,3 +34,5 @@
 .ml-chat-popup{position:fixed;right:24px;bottom:84px;z-index:41;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 110px);overflow:auto;background:#fffdf9;border:1px solid #deded4;border-radius:22px;box-shadow:0 16px 70px #19232b30;padding:18px}
 .ml-chat-popup[hidden]{display:none}.ml-chat-popup>header{display:flex;align-items:center;justify-content:space-between}.ml-chat-popup .ml-agent-messages{max-height:30dvh}
 @media(max-width:650px){.ml-chat-popup{right:16px;bottom:82px}.ml-chat-launcher{right:16px}.personal-footer{padding-bottom:90px}}
+
+.ml-document-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font:12px/1.6 system-ui}.ml-agent input[type=file]{display:block;max-width:100%;font-size:12px;margin-top:8px}
