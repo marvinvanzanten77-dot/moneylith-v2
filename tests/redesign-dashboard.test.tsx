@@ -43,3 +43,31 @@ test('connected presentation consumes the same classified snapshot as the projec
  assert.equal(d.spending.pots[0]?.cents,2400);
  assert.equal(JSON.stringify(source),before);
 });
+test('incomplete input exposes a labelled known subtotal without changing strict projection',()=>{
+ const s=state({accounts:[account('ing',519.19)],fixedCosts:[
+  {id:'rent',naam:'Huur',bedrag:369,amountEntered:true,dagVanMaand:30},
+  {id:'phone',naam:'Simyo',bedrag:144.95,amountEntered:true,dagVanMaand:19},
+  {id:'unknown',naam:'Onbekende last',amountEntered:false,dagVanMaand:1},
+ ],income:[{id:'salary',naam:'Salaris',bedrag:2000,amountEntered:true,dagVanMaand:23}]});
+ const before=JSON.stringify(s),d=dashboard(s,asOf);
+ assert.equal(d.view.available,null);assert.equal(d.planned,null);
+ assert.equal(d.provisional,true);assert.equal(d.knownPlanned,51395);
+ assert.equal(d.available,524);assert.equal(d.knownProtected,51395);
+ assert.equal(d.input.reserve,null);
+ assert.ok(d.view.missing.some(m=>m.includes('Onbekende last')));
+ assert.equal(JSON.stringify(s),before);
+});
+test('provisional subtotal deducts declared reserves and preserves a negative remaining amount',()=>{
+ const d=dashboard(state({accounts:[account('ing',100)],fixedCosts:[{id:'rent',naam:'Huur',bedrag:150,dagVanMaand:30,amountEntered:true}]}),asOf,{...emptyOptions(),reservedNow:2500});
+ assert.equal(d.available,-7500);assert.equal(d.knownProtected,17500);
+});
+test('missing account balance never becomes a spendable estimate',()=>{
+ const d=dashboard(state({accounts:[{...account('ing',100),bankBalance:null}],fixedCosts:[{id:'rent',naam:'Huur',bedrag:50,dagVanMaand:30,amountEntered:true}]}),asOf);
+ assert.equal(d.available,null);assert.equal(d.knownPlanned,5000);
+});
+test('remaining budget enters known totals once and paid purchases are not deducted again',()=>{
+ const s=state({accounts:[account('ing',500)],fixedCosts:[{id:'food',naam:'Boodschappen',bedrag:100,amountEntered:true,dagVanMaand:23,budgetCategory:'Boodschappen',budgetSince:'2026-10'}],income:[{id:'salary',naam:'Salaris',bedrag:1000,amountEntered:true,dagVanMaand:23}],transactions:[{id:'paid',date:'2026-10-24',amount:-40,accountId:'ing',provider:'lunchflow',currency:'EUR',bankPatternKind:'variable',category:'Boodschappen'}]});
+ const d=dashboard(s,asOf);
+ assert.equal(d.available,44000);assert.equal(d.knownProtected,6000);
+ assert.ok(d.view.outgoing.some(e=>e.id.includes(':budget:')));
+});

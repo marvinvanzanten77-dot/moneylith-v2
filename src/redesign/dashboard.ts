@@ -37,7 +37,18 @@ export function presentPersonal(source: Parameters<typeof personalInput>[0], asO
   // Missing dates and incomplete obligations must not produce a deceptively exact total.
   const planned = !input.missing.length && view.outgoing.every(e => e.amount !== null && e.date !== null)
     ? view.outgoing.reduce((sum, e) => sum + Math.abs(e.amount!), 0) : null;
-  return { input, view, accounts, bank: mobileBankBalance(accounts, rules), spending,
+  // A subtotal is useful even when completeness is not yet established. Never
+  // change the authoritative projection or silently turn missing amounts into zero.
+  const knownOutgoing=view.outgoing.filter(e=>e.amount!==null);
+  const knownPlanned=knownOutgoing.length?knownOutgoing.reduce((sum,e)=>sum+Math.abs(e.amount!),0):planned;
+  const relevant=input.events.filter(e=>e.date===null||e.date>asOf&&e.date<=view.until);
+  const knownCommitments=relevant.filter(e=>e.amount!==null&&(e.kind==='reserve'?e.amount>0:e.amount<0));
+  // Deduct all known obligations, including undated ones, and no future income.
+  // This is a cautious remaining subtotal, not a complete affordability verdict.
+  const knownProtected=knownCommitments.reduce((sum,e)=>sum+Math.abs(e.amount!),input.reserve??0);
+  const provisional=view.available===null;
+  const available=view.available??(input.opening!==null&&knownCommitments.length>0?input.opening-knownProtected:null);
+  return { input, view, available, provisional, knownPlanned, knownProtected, accounts, bank: mobileBankBalance(accounts, rules), spending,
     planned, period: periodBounds(salaryPeriod(asOf)),
     protected: input.opening !== null && view.available !== null ? input.opening - view.available : null,
   };

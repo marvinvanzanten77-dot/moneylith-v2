@@ -21,3 +21,11 @@
 
 .ml-agent{display:grid;gap:16px}.ml-agent-messages{display:grid;gap:12px;max-height:42vh;overflow:auto}.ml-agent-message{padding:14px;border-radius:14px;background:#edf0e9}.ml-agent-message.user{background:#f1eee6;margin-left:24px}.ml-agent-message p,.ml-agent-receipt p{white-space:pre-wrap;margin:6px 0;overflow-wrap:anywhere}.ml-agent-message small,.ml-agent-receipt small{color:#647268}.ml-agent form{display:grid;gap:10px}.ml-agent textarea{box-sizing:border-box;width:100%;resize:vertical;border:1px solid #ccd5cd;border-radius:12px;padding:12px;font:inherit;background:#fffdf8;color:#23332c}.ml-agent button:disabled{opacity:.5;cursor:wait}.ml-agent-receipt{display:grid;gap:8px;border-bottom:1px solid #e4e1d9;padding:12px 0}.ml-agent details summary{cursor:pointer;color:#315848}
 @media(max-width:600px){.ml-header-actions{gap:8px}.ml-header-actions>.ml-text-button{font-size:12px;max-width:65px}}
+
+/* Dashboard rows remain compact without breaking words inside merchant names. */
+.ml-payment-rows .ml-row-label>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ml-payment-rows .ml-row-label small{font-size:11px}
+.ml-estimate-note{color:#805628;font-size:12px;line-height:1.5;margin:-8px 0 14px}
+.ml-card{min-height:0}
+.ml-row-label{overflow-wrap:normal;word-break:normal;hyphens:auto}
+.ml-card-grid .ml-row-value{white-space:nowrap}
