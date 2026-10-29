@@ -1,3 +1,4 @@
+import moneylithLogo from './moneylith-logo.png';
 import {AgentChat} from './AgentChat';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Workspace, destinations, type Page } from './Workspace';
@@ -15,7 +16,8 @@ const money = (value: number | null | undefined) => value == null ? 'Nog onbeken
 const dateLabel = (value: string | null) => value ? new Intl.DateTimeFormat('nl-NL', { day:'numeric', month:'short', timeZone:'UTC' }).format(new Date(value + 'T12:00:00Z')) : 'Datum onbekend';
 const safe = (value: string) => cleanBankText(value);
 function greeting() { const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone:'Europe/Amsterdam', hour:'2-digit', hourCycle:'h23' }).format(new Date())); return hour < 6 ? 'Goedenacht' : hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'; }
-function Mark() { return <svg viewBox="0 0 40 30" fill="none" aria-hidden="true"><path d="m3 25 7-12q3-4 6 1l4-8q3-5 6 1l11 18H3Z" fill="#8b9694" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="m12 25 9-15 6 7 3-2 6 10" fill="#596967" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
+// Frame the original emblem without modifying the supplied transparent image.
+function Mark() { return <svg className="personal-brand-mark" viewBox="260 103 98 122" aria-hidden="true"><image href={moneylithLogo} width="612" height="408"/></svg>; }
 function Badge({ icon, small=false }: {icon:IconName;small?:boolean}) { return <span className={`ml-badge ml-${icon}${small?' ml-small':''}`}><Icon name={icon}/></span>; }
 function Row({ icon, label, value, note }: { icon?:IconName;label:string;value:ReactNode;note?:string }) { return <div className="ml-row">{icon&&<Badge icon={icon} small/>}<div className="ml-row-label"><span title={safe(label)}>{safe(label)}</span>{note&&<small>{note}</small>}</div><span className="ml-row-value">{value}</span></div>; }
 function CardTitle({icon,title,subtitle,onOpen}:{icon:IconName;title:string;subtitle:string;onOpen:()=>void}) { return <button className="ml-card-heading" onClick={onOpen}><Badge icon={icon}/><span><h2>{title}</h2><span className="ml-subtitle">{subtitle}</span></span></button>; }
