@@ -1,14 +1,14 @@
-import {returnedPayments} from '../bank/returnedPayments';
-import type { CloudState } from '../storage/cloudState';
-import type { MoneylithAccount, MoneylithTransaction, FixedCostManualItem } from '../types';
-import { emptyBankRules, validateBankRules } from '../bank/classificationRules';
-import { debtLedgerKey, emptyDebtLedger, validateDebtLedger } from '../bank/debtPayments';
-import { salaryPeriod, periodBounds } from '../bank/periodReconciliation';
-import { spendingRows, spendingSummary, spendingAboveBudgets } from '../bank/spending';
-import { personalInput } from '../projection/adapters';
-import { emptyOptions, type Options } from '../projection/engine';
-import { dailyOverview } from '../projection/dailyOverview';
-import { mobileBankBalance } from '../mobile/bankBalance';
+import {returnedPayments} from '../bank/returnedPayments.js';
+import type { CloudState } from '../storage/cloudState.js';
+import type { MoneylithAccount, MoneylithTransaction, FixedCostManualItem } from '../types.js';
+import { emptyBankRules, validateBankRules } from '../bank/classificationRules.js';
+import { debtLedgerKey, emptyDebtLedger, validateDebtLedger } from '../bank/debtPayments.js';
+import { salaryPeriod, periodBounds } from '../bank/periodReconciliation.js';
+import { spendingRows, spendingSummary, spendingAboveBudgets } from '../bank/spending.js';
+import { personalInput } from '../projection/adapters.js';
+import { emptyOptions, type Options } from '../projection/engine.js';
+import { dailyOverview } from '../projection/dailyOverview.js';
+import { mobileBankBalance } from '../mobile/bankBalance.js';
 
 function read(state: CloudState, key: string, fallback: unknown): unknown {
   try { return state[key] === undefined ? fallback : JSON.parse(state[key]); } catch { return fallback; }

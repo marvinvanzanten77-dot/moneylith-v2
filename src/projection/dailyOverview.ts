@@ -1,5 +1,5 @@
-import {salaryPeriod} from "../bank/periodReconciliation";
-import {addDays, missingThrough, project, type Input, type Event} from './engine';
+import {salaryPeriod} from "../bank/periodReconciliation.js";
+import {addDays, missingThrough, project, type Input, type Event} from './engine.js';
 /** Read-only view of the projection, never a stored balance or a bank mutation. */
 export function dailyOverview(input: Input) {
  const result=project(input);
