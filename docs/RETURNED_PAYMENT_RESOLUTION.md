@@ -9,3 +9,5 @@
 - Questions explaining spending room use the shared dashboard calculation, without waiting for the language model. Known line items, reserves and missing-information limitations are stated explicitly.
 
 Validation includes card settlements, reference disambiguation, month deferral, paid confirmation, unconfirmed refunds, undo, isolation, protected price changes and read-only deterministic explanations. Historical refunds still requiring review are not silently treated as debts or as paid.
+
+Automatic return discovery is limited to credits booked in the active salary period (23rd–22nd). Previously user-confirmed resolutions stay available across periods, including open arrears. Matching still uses the full bank history; no transactions are deleted or silently marked paid. Internal action validation can explicitly inspect historical evidence so existing resolutions remain editable. The dashboard, planning, projection, monitoring and agent index use the same default scope.

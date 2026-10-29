@@ -5,10 +5,10 @@ import {emptyBankRules} from '../src/bank/classificationRules';
 import {personalInput} from '../src/projection/adapters';
 import {emptyOptions} from '../src/projection/engine';
 import type {MoneylithTransaction} from '../src/types';
-const debit={id:'d',accountId:'a',provider:'bunq',currency:'EUR',amount:-60,date:'2026-09-25',description:'Incasso factuur INV12345',counterparty:'Testbedrijf',bankPatternKind:'fixed',bankRuleLabel:'Abonnement'} as MoneylithTransaction;
-const credit={...debit,id:'c',amount:60,date:'2026-09-27',description:'Storno incasso factuur INV12345'};
+const debit={id:'d',accountId:'a',provider:'bunq',currency:'EUR',amount:-60,date:'2026-10-24',description:'Incasso factuur INV12345',counterparty:'Testbedrijf',bankPatternKind:'fixed',bankRuleLabel:'Abonnement'} as MoneylithTransaction;
+const credit={...debit,id:'c',amount:60,date:'2026-10-25',description:'Storno incasso factuur INV12345'};
 const asOf='2026-10-29';
-test('explicit reversal stays outstanding across periods without modifying bank data',()=>{
+test('current-period reversal is followed without modifying bank data',()=>{
  const txs=[debit,credit];const before=JSON.stringify(txs);
  const rows=returnedPayments(txs,emptyBankRules,asOf);
  assert.equal(rows[0].status,'pending');assert.equal(rows[0].cents,6000);
@@ -27,13 +27,13 @@ test('multiple possible original payments require review, not automatic obligati
  assert.equal(personalInput({transactions:txs},emptyOptions(),asOf).events.filter(e=>e.source==='returned-payment').length,0);
 });
 test('unique re-payment with same invoice closes obligation; another invoice does not',()=>{
- const retry={...debit,id:'retry',date:'2026-10-01'};
+ const retry={...debit,id:'retry',date:'2026-10-26'};
  assert.equal(returnedPayments([debit,credit,retry],emptyBankRules,asOf)[0].status,'repaid');
  assert.equal(returnedPayments([debit,credit,{...retry,description:'Incasso factuur INV99999'}],emptyBankRules,asOf)[0].status,'pending');
 });
 test('reversed replacement does not close original obligation',()=>{
- const retry={...debit,id:'retry',date:'2026-10-01'};
- const bounced={...credit,id:'again',date:'2026-10-02'};
+ const retry={...debit,id:'retry',date:'2026-10-26'};
+ const bounced={...credit,id:'again',date:'2026-10-27'};
  assert.notEqual(returnedPayments([debit,credit,retry,bounced],emptyBankRules,asOf)[0].status,'repaid');
 });
 test('business and future transactions cannot affect personal obligations',()=>{
@@ -48,8 +48,8 @@ test('known current fixed cost is reopened once, not a duplicate new bill',()=>{
 });
 test('card settlement reversals are not unpaid invoices, even for fixed subscriptions',()=>{
  const card={...debit,description:'SUNO INC.',counterparty:'SUNO INC.',providerData:{paymentSubType:'PAYMENT'}} as MoneylithTransaction;
- const reversal={...card,id:'rev',amount:60,date:'2026-09-27',providerData:{paymentSubType:'REVERSAL'}} as MoneylithTransaction;
- assert.deepEqual(returnedPayments([card,reversal,{...card,id:'settled',amount:-60.12,date:'2026-09-27'}],emptyBankRules,asOf),[]);
+ const reversal={...card,id:'rev',amount:60,date:'2026-10-25',providerData:{paymentSubType:'REVERSAL'}} as MoneylithTransaction;
+ assert.deepEqual(returnedPayments([card,reversal,{...card,id:'settled',amount:-60.12,date:'2026-10-25'}],emptyBankRules,asOf),[]);
 });
 test('confirmed repayment and deferred month persist without changing base rent',()=>{
  const txs=[{...debit,date:'2026-10-24'},{...credit,date:'2026-10-25'}];
@@ -72,4 +72,31 @@ test('generic bank refund is reviewable, never automatically a new outstanding d
  const txs=[debit,{...credit,description:'Terugboeking op verzoek klant factuur INV12345'}];
  assert.equal(returnedPayments(txs,emptyBankRules,asOf)[0].status,'review');
  assert.equal(personalInput({transactions:txs},emptyOptions(),asOf).events.filter(e=>e.source==='returned-payment').length,0);
+});
+
+test('older unconfirmed reversals do not create current warnings or obligations',()=>{
+ const txs=[{...debit,date:'2025-05-01'},{...credit,date:'2025-05-02'}];
+ const before=JSON.stringify(txs);
+ assert.deepEqual(returnedPayments(txs,emptyBankRules,asOf),[]);
+ const input=personalInput({transactions:txs},emptyOptions(),asOf);
+ assert.ok(!input.missing.some(m=>m.includes('terugboeking')));
+ assert.ok(!input.events.some(e=>e.source==='returned-payment'));
+ assert.equal(returnedPayments(txs,emptyBankRules,asOf,[],{includeHistorical:true}).length,1);
+ assert.equal(JSON.stringify(txs),before);
+});
+test('confirmed open arrears survive salary-period rollover without reviving other history',()=>{
+ const txs=[debit,credit,{...debit,id:'old-d',date:'2025-01-02'},{...credit,id:'old-c',date:'2025-01-03'}];
+ const decisions=[{id:'decision',returnedId:'returned:c',status:'open',dueMonth:'2026-11',note:'Bevestigde achterstand'}];
+ const rows=returnedPayments(txs,emptyBankRules,'2026-12-01',decisions);
+ assert.equal(rows.length,1);assert.equal(rows[0].id,'returned:c');assert.equal(rows[0].status,'pending');
+ const input=personalInput({transactions:txs,paymentResolutions:decisions},emptyOptions(),'2026-12-01');
+ assert.equal(input.events.find(e=>e.source==='returned-payment')?.amount,-6000);
+ assert.equal(returnedPayments(txs,emptyBankRules,'2026-12-01',[{...decisions[0],status:'paid'}])[0].status,'repaid');
+});
+test('salary-period boundary uses return date and still matches an older original debit',()=>{
+ const txs=[{...debit,date:'2026-09-28'},{...credit,date:'2026-10-23'}];
+ assert.equal(returnedPayments(txs,emptyBankRules,'2026-10-23')[0].debitId,'d');
+ assert.equal(returnedPayments(txs,emptyBankRules,'2026-11-22').length,1);
+ assert.equal(returnedPayments(txs,emptyBankRules,'2026-11-23').length,0);
+ assert.equal(returnedPayments([{...debit,date:'2026-09-28'},{...credit,date:'2026-10-22'}],emptyBankRules,asOf).length,0);
 });

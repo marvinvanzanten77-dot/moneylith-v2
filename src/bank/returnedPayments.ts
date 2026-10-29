@@ -1,12 +1,13 @@
 import type {MoneylithTransaction} from '../types.js';
 import type {BankRuleSettings} from './classificationRules.js';
-import {findBankReversals} from './periodReconciliation.js';
+import {findBankReversals,salaryPeriod,periodBounds} from './periodReconciliation.js';
 export type ReturnedPayment={id:string;debitId:string|null;creditId:string;label:string;cents:number;date:string;status:'pending'|'repaid'|'review';replacementId?:string;dueMonth?:string;userConfirmed?:boolean};
 export type PaymentResolution={id:string;returnedId:string;status:'paid'|'open';dueMonth?:string;note:string};
 const norm=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').trim();
 const ref=(s:string)=>s.match(/(?:factuur(?:nummer)?|invoice|kenmerk|referentie|reference)\s*[:#-]?\s*([a-z0-9-]{4,})/i)?.[1]?.toLowerCase();
 /** Derived bank evidence, not a second debt ledger. Retail refunds never create obligations. */
-export function returnedPayments(transactions:MoneylithTransaction[],rules:BankRuleSettings,asOf:string,resolutions:unknown=[]):ReturnedPayment[]{
+export function returnedPayments(transactions:MoneylithTransaction[],rules:BankRuleSettings,asOf:string,resolutions:unknown=[],options:{includeHistorical?:boolean}={}):ReturnedPayment[]{
+ const periodStart=periodBounds(salaryPeriod(asOf)).start;
  const seen=new Set<string>();
  const all=transactions.map(t=>({...t,...t.providerData})).filter(t=>{
   if(seen.has(t.id)||!['bunq','lunchflow'].includes(t.provider??'')||t.currency!=='EUR'||rules.accountRoles[t.accountId]==='business'||!Number.isFinite(t.amount)||t.date>asOf||!/^\d{4}-\d{2}-\d{2}$/.test(t.date)||['transfer','ignore'].includes(t.bankPatternKind??''))return false;
@@ -33,5 +34,5 @@ export function returnedPayments(transactions:MoneylithTransaction[],rules:BankR
   if(retries.length===1){usedReplacements.add(retries[0].id);return {...base,status:'repaid' as const,replacementId:retries[0].id};}
   // A generic bank refund does not prove the underlying invoice is still due.
   return {...base,status:(!/storno|incasso/i.test(credit.description)&&credit.providerData?.paymentSubType!=='REVERSAL'?'review':'pending') as ReturnedPayment['status']};
- }).map(row=>{const decision=decisions.find(d=>d.returnedId===row.id);return decision?.status==='paid'?{...row,status:'repaid',userConfirmed:true}:decision?.status==='open'?{...row,status:'pending',...(/^\d{4}-(0[1-9]|1[0-2])$/.test(decision.dueMonth??'')?{dueMonth:decision.dueMonth}:{}),userConfirmed:true}:row;});
+ }).map<ReturnedPayment>(row=>{const decision=decisions.find(d=>d.returnedId===row.id);return decision?.status==='paid'?{...row,status:'repaid',userConfirmed:true}:decision?.status==='open'?{...row,status:'pending',...(/^\d{4}-(0[1-9]|1[0-2])$/.test(decision.dueMonth??'')?{dueMonth:decision.dueMonth}:{}),userConfirmed:true}:row;}).filter(row=>options.includeHistorical||row.date>=periodStart||row.userConfirmed);
 }

@@ -56,7 +56,7 @@ export function applyEdits(state:CloudState,input:unknown):{state:CloudState;cha
   const merged={...before,...patch};
   if(!['paid','open'].includes(String(merged.status))||merged.dueMonth!==undefined&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(merged.dueMonth)))fail('Ongeldige betaalstatus of betaalmaand.');
   const rawRules=JSON.parse(state['moneylith.personal.bankRules.v1']??'{}');
-  const returns=returnedPayments(JSON.parse(state['moneylith.personal.transactions']??'[]').filter((t:MoneylithTransaction)=>rawRules.accountRoles?.[t.accountId]!=='business'),validateBankRules(rawRules)?rawRules:emptyBankRules,today());
+  const returns=returnedPayments(JSON.parse(state['moneylith.personal.transactions']??'[]').filter((t:MoneylithTransaction)=>rawRules.accountRoles?.[t.accountId]!=='business'),validateBankRules(rawRules)?rawRules:emptyBankRules,today(),[],{includeHistorical:true});
   const target=returns.find(r=>r.id===merged.returnedId);
   if(!target)fail('Deze terugboeking bestaat niet in je persoonlijke bankgegevens.');
   if(rows.some(r=>r.id!==id&&r.returnedId===merged.returnedId))fail('Deze terugboeking heeft al een afhandeling. Wijzig die bestaande regel.');
