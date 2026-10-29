@@ -1,3 +1,4 @@
+import {personalExpectations} from './expectations.js';
 import {classifyBunq,addBunqObservedCosts} from './bunqClassification.js';
 import {periodPlansKey,capturePeriodPlan,makePeriodPlan,type PeriodPlans} from "./periodReconciliation.js";
 import {reconcileDebtPayments,debtLedgerKey,emptyDebtLedger,validateDebtLedger} from './debtPayments.js';
@@ -33,7 +34,9 @@ export function processBankSync(state:CloudState,snapshots:LunchSnapshot[],mappi
   financial.updatedIncome=income.filter((item,index)=>JSON.stringify(item)!==JSON.stringify(financial.income[index])).length;
  }
  const next={...state};
- const periodPlans=financial?capturePeriodPlan(read<PeriodPlans>(state,periodPlansKey,{}),makePeriodPlan(income,fixed,detected,read<import('../types').SchuldItem[]>(state,'moneylith.personal.debts',[]),asOf),asOf):undefined;
+ const expected=personalExpectations({income,fixedCosts:fixed,detectedFixedCosts:detected,transactions:txs,bankRules:rules,debtPayments:read(state,debtLedgerKey,emptyDebtLedger()),debts:read(state,'moneylith.personal.debts',[])},asOf);
+ const initialPlan=makePeriodPlan(income,expected.data.fixedCosts as FixedCostManualItem[],detected,read<import('../types').SchuldItem[]>(state,'moneylith.personal.debts',[]),asOf);
+ const periodPlans=financial&&initialPlan.rows.length?capturePeriodPlan(read<PeriodPlans>(state,periodPlansKey,{}),initialPlan,asOf):undefined;
  if(periodPlans)next[periodPlansKey]=JSON.stringify(periodPlans);
  const ledger=read(state,debtLedgerKey,emptyDebtLedger());
  if(!validateDebtLedger(ledger))throw Error('Ongeldige aflossingshistorie; synchronisatie niet opgeslagen.');

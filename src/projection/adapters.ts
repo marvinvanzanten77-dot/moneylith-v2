@@ -1,3 +1,4 @@
+import {personalExpectations} from '../bank/expectations.js';
 import {validateBankRules} from "../bank/classificationRules.js";
 import {remainingPayments} from "./remainingPayments.js";
 import {costForMonth,costPlannedInMonth} from "../logic/monthlyCosts.js";
@@ -76,6 +77,8 @@ export function personalInput(
   options: Options,
   asOf: string,
 ): Input {
+  const estimated=personalExpectations(data,asOf);
+  data=estimated.data;
   const input: Input = {
     scope: "personal",
     asOf,
@@ -84,7 +87,7 @@ export function personalInput(
     events: [],
     debts: {},
     missing: [],
-    assumptions: [],
+    assumptions: [...estimated.notes],
     goals: [],
   };
   const income = rows(data.income),
@@ -130,7 +133,10 @@ export function personalInput(
   };
   const bankIncome = checks.income.bankVerified;
   if (!checks.income.ready && !bankIncome) input.missing.push("Inkomen nog controleren");
-  if (!checks.fixed.ready) input.missing.push("Vaste lasten nog controleren");
+  if (!checks.fixed.ready) {
+    if(estimated.notes.length && checks.fixed.valid) input.assumptions.push("Vaste lasten voorlopig berekend met bankschattingen; volledigheid is nog niet bevestigd.");
+    else input.missing.push("Vaste lasten nog controleren");
+  }
   if (!checks.debts.valid || (!debts.length && !checks.debts.ready)) input.missing.push("Schulden nog controleren");
   if (bankIncome) input.assumptions.push("Inkomen volgt de gekoppelde bankontvangst; herhaling is een verwachting, geen gegarandeerd salaris.");
   if (options.reservedNow == null) input.assumptions.push("Reserveringen zijn onbekend. De banksaldoprojectie en besteedbaarheid zijn verschillende waarden; bevestig nul wanneer er geen reserveringen zijn.");
@@ -189,7 +195,7 @@ export function personalInput(
       for(const date of dates){
         if(!costPlannedInMonth(row,date.slice(0,7)))continue;
         const resolved=costForMonth(row,date.slice(0,7));
-        input.events.push({id:"fixed:"+r.id+":"+date,label:name(r),date,amount:resolved.paymentRoute==="withheld"?0:resolved.amountEntered===false?null:resolved.bedrag===0?0:-amount(resolved.bedrag)!,source:"fixed",basis:"input"});
+        input.events.push({id:"fixed:"+r.id+":"+date,label:name(r),date,amount:resolved.paymentRoute==="withheld"?0:resolved.amountEntered===false?null:resolved.bedrag===0?0:-amount(resolved.bedrag)!,source:"fixed",basis:resolved.bankEstimate?.months.includes(date.slice(0,7))?"assumption":"input"});
       }
     }else recurring(input,"fixed:"+r.id,name(r),r.paymentRoute==="withheld"?0:r.amountEntered===false||amount(r.bedrag)===null?null:-amount(r.bedrag)!,day,"fixed");
   }

@@ -78,7 +78,7 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
    const end=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).getUTCDate();
    date=month+'-'+String(Math.min(day,end)).padStart(2,'0');
   }
-  let remaining=row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
+  let remaining=row.settlesOnPayment&&row.actual!==null&&!row.reversed?0:row.expected===null?null:Math.max(0,row.expected-(row.actual??0));
   let funded=0;
   if((row.route==='cash'||(row.route==='card'&&!list<MoneylithAccount>(data.accounts).some(a=>a.active&&a.bankProvider==='bunq'&&rules.accountRoles[a.id]!=='business')))&&remaining!==null){funded=Math.min(remaining,funding[row.route]);funding[row.route]-=funded;remaining-=funded;}
   const pending=remaining===null||remaining>0;

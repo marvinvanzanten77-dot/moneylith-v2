@@ -11,7 +11,7 @@ export const cloudHeaders = { "Content-Type": "application/json", "X-Moneylith-C
 export async function cloudRequest(action: string, method = "GET", body?: unknown) {
   const response = await fetch(`/api/cloud?action=${action}`, {
     method, headers: {...cloudHeaders,...(action==='snapshot'&&typeof DecompressionStream!=='undefined'?{'X-Moneylith-Encoding':cloudEncoding}:{})}, body: body === undefined ? undefined : action==='snapshot'?await packCloudRequest(body):JSON.stringify(body),
-    signal: AbortSignal.timeout(action==='bunq'?120000:20000),
+    signal: AbortSignal.timeout(action==='bunq'||action==='agent'?120000:20000),
   });
   const data = await unpackCloudResponse(await response.json());
   if (!response.ok || !data.ok) throw Error(data.error || "Accountopslag is niet bereikbaar.");

@@ -66,6 +66,8 @@ test("owner account activation, durable storage, conflict protection and bank au
     assert.equal((await call(request("login", "POST", { email: owner, password: "wrong-password-long" }))).code, 401);
     assert.equal((await call(request("login", "POST", { email: owner, password }))).code, 200);
     assert.equal((await call(request('bunq','POST',{operation:'accounts'}))).code,401);
+    assert.equal((await call(request('agent','POST',{operation:'chat',question:'Wijzig mijn saldo'}))).code,401);
+    const forbiddenAgent=request('agent','POST',{operation:'status'},cookie);forbiddenAgent.headers.origin='https://attacker.test';assert.equal((await call(forbiddenAgent)).code,403);
     const forbiddenBunq=request('bunq','POST',{operation:'accounts'},cookie);forbiddenBunq.headers.origin='https://attacker.test';assert.equal((await call(forbiddenBunq)).code,403);
     delete process.env.BUNQ_API_KEY;
     assert.equal((await call(request('bunq','POST',{operation:'status'},cookie))).body.configured,false);

@@ -1,3 +1,4 @@
+import {AgentChat} from './AgentChat';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Workspace, destinations, type Page } from './Workspace';
 import { useDashboard } from './useDashboard';
@@ -8,8 +9,8 @@ import { cloudRequest, runBankScan, loadCloudVersion, prepareCloudReload, stopCl
 import { disableDevicePush } from '../pwa/PushSettings';
 import { emptyOptions, type Event } from '../projection/engine';
 
-type Panel = 'accounts' | 'payments' | 'space' | 'spending' | 'profile' | 'menu';
-const labels: Record<Panel, string> = { accounts:'Wat heb ik?', payments:'Wat komt eraan?', space:'Wat kan ik vrij besteden?', spending:'Waar gaat mijn geld naartoe?', profile:'Mijn persoonlijke Moneylith', menu:'Jouw overzicht' };
+type Panel = 'assistant' | 'accounts' | 'payments' | 'space' | 'spending' | 'profile' | 'menu';
+const labels: Record<Panel, string> = { assistant:'Je Moneylith-assistent', accounts:'Wat heb ik?', payments:'Wat komt eraan?', space:'Wat kan ik vrij besteden?', spending:'Waar gaat mijn geld naartoe?', profile:'Mijn persoonlijke Moneylith', menu:'Jouw overzicht' };
 const money = (value: number | null | undefined) => value == null ? 'Nog onbekend' : formatCurrency(value / 100, true);
 const dateLabel = (value: string | null) => value ? new Intl.DateTimeFormat('nl-NL', { day:'numeric', month:'short', timeZone:'UTC' }).format(new Date(value + 'T12:00:00Z')) : 'Datum onbekend';
 const safe = (value: string) => cleanBankText(value);
@@ -58,7 +59,7 @@ export default function PersonalShell() {
   <a className="personal-skip" href="#overzicht">Naar het overzicht</a>
   <header className="personal-header">
    <a className="personal-brand" href="#overzicht" onClick={()=>navigate("overview")} aria-label="Moneylith overzicht"><Mark/><span>Moneylith</span></a>
-   <div className="ml-header-actions"><button className="ml-sync" disabled={busy} onClick={()=>void sync()} aria-label={busy?'Synchroniseren…':'Bankgegevens synchroniseren'} title="Bankgegevens synchroniseren"><Icon name="refresh" className={busy?'ml-spinning':''}/><span><small>{busy?'Synchroniseren…':'Laatst bijgewerkt'}</small><span>{synced}</span></span></button><button className="ml-icon-button ml-profile" aria-label="Mijn profiel" onClick={()=>setPanel('profile')}><Icon name="user"/></button><button className="ml-icon-button" aria-label="Menu openen" onClick={()=>setPanel('menu')}><Icon name="menu"/></button></div>
+   <div className="ml-header-actions"><button className="ml-text-button" onClick={()=>setPanel('assistant')} aria-label="AI-assistent openen">AI assistent</button><button className="ml-sync" disabled={busy} onClick={()=>void sync()} aria-label={busy?'Synchroniseren…':'Bankgegevens synchroniseren'} title="Bankgegevens synchroniseren"><Icon name="refresh" className={busy?'ml-spinning':''}/><span><small>{busy?'Synchroniseren…':'Laatst bijgewerkt'}</small><span>{synced}</span></span></button><button className="ml-icon-button ml-profile" aria-label="Mijn profiel" onClick={()=>setPanel('profile')}><Icon name="user"/></button><button className="ml-icon-button" aria-label="Menu openen" onClick={()=>setPanel('menu')}><Icon name="menu"/></button></div>
   </header>
   {syncMessage&&<div className={`ml-sync-message${syncError?' ml-warning':''}`} role={syncError?'alert':'status'}>{syncMessage}<button aria-label="Melding sluiten" className="ml-icon-button" onClick={()=>setSyncMessage('')}><Icon name="close"/></button></div>}
   {import.meta.env.DEV&&<div className="ml-preview-access"><span>Ontwerpversie · je echte financiën staan in je privéomgeving.</span><a href="https://www.moneylith.nl/prive/">Mijn financiën openen <Icon name="chevron"/></a></div>}
@@ -83,7 +84,8 @@ export default function PersonalShell() {
    {panel==='spending'&&<><p className="ml-help">Salarisperiode {dateLabel(data.period.start)} – {dateLabel(data.period.end)}. Boodschappen en tanken verschijnen hier alleen voor zover ze boven een bevestigd budget uitkomen. Vaste lasten, interne overboekingen, opwaarderingen en toegewezen schuldaflossingen worden niet als vrije aankopen meegeteld.</p>{pots.length?pots.map(p=><Row key={p.label} icon={categoryIcon(p.label)} label={p.label} note={`${p.count} aankopen`} value={money(p.cents)}/>):<Empty>Nog geen uitgaven buiten vaste budgetten waargenomen.</Empty>}{data.spending.unknownCount>0&&<Row icon="more" label="Nog in te delen" note={`${data.spending.unknownCount} aankopen`} value={money(data.spending.unknownCents)}/>}<p className="ml-help">Dit zijn waargenomen aankopen; terugbetalingen zijn niet verrekend.</p></>}
 
    {panel==='profile'&&<Profile/>}
-   {panel==='menu'&&<nav className="ml-menu" aria-label="Overzichtsonderdelen"><button onClick={()=>navigate('overview')}>Overzicht<Icon name="chevron"/></button>{destinations.map(d=><button key={d.id} onClick={()=>navigate(d.id)}>{d.label}<Icon name="chevron"/></button>)}{(['accounts','profile'] as Panel[]).map(target=><button key={target} onClick={()=>setPanel(target)}>{labels[target]}<Icon name="chevron"/></button>)}</nav>}
+   {panel==='assistant'&&<AgentChat/>}
+   {panel==='menu'&&<nav className="ml-menu" aria-label="Overzichtsonderdelen"><button onClick={()=>navigate('overview')}>Overzicht<Icon name="chevron"/></button>{destinations.map(d=><button key={d.id} onClick={()=>navigate(d.id)}>{d.label}<Icon name="chevron"/></button>)}{(['accounts','assistant','profile'] as Panel[]).map(target=><button key={target} onClick={()=>setPanel(target)}>{labels[target]}<Icon name="chevron"/></button>)}</nav>}
   </DetailDialog>}
  </div>;
 }

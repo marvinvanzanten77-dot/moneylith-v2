@@ -25,6 +25,9 @@ export interface SchuldenPlanItem {
 }
 
 export interface FixedCostManualItem {
+  /** Transient calculation metadata; never a confirmed user amount. */
+  bankBudgetLabels?: string[]; // Transient aggregate for observed work-tool purchases.
+  bankEstimate?: { months: string[]; samples: number; settlesOnPayment: boolean };
   bankObservedOnly?: boolean; // Actual payments only until the user enters a forecast.
   costGroup?: "work-tools";
   costKind?: "subscription" | "credits";

@@ -5,7 +5,7 @@ import type {DebtLedger} from './debtPayments.js';
 import type {BankRuleSettings} from './classificationRules.js';
 export const periodPlansKey='moneylith.personal.periodPlans.v1';
 export const periodPaidKey='moneylith.personal.periodPaid.v1';
-export type PeriodRow={id:string;label:string;kind:'income'|'fixed'|'debt';expected:number|null;costGroup?:'work-tools';route?:string;paymentFrom?:string;budget?:string;evidence?:{key:string;transactionIds:string[]};party?:string};
+export type PeriodRow={id:string;label:string;kind:'income'|'fixed'|'debt';expected:number|null;costGroup?:'work-tools';budgetLabels?:string[];estimated?:boolean;settlesOnPayment?:boolean;route?:string;paymentFrom?:string;budget?:string;evidence?:{key:string;transactionIds:string[]};party?:string};
 export type PeriodPlan={capturedAt:string;rows:PeriodRow[]};
 export type PeriodPlans=Record<string,PeriodPlan>;
 export type PeriodPaid=Record<string,Record<string,number>>;
@@ -28,7 +28,7 @@ export function makePeriodPlan(income:IncomeItem[],fixed:FixedCostManualItem[],d
   const month=raw.dagVanMaand>0&&raw.dagVanMaand<23?periodBounds(period).end.slice(0,7):period;
   if(!costPlannedInMonth(raw,month))continue;
   const i=costForMonth(raw,month);
-  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.bankObservedOnly?null:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
+  rows.push({id:'fixed:'+i.id,label:i.naam,kind:'fixed',expected:i.bankObservedOnly?null:i.amountEntered===false||(i.bedrag===0&&i.amountEntered!==true)?null:cents(i.bedrag),budgetLabels:i.bankBudgetLabels,estimated:i.bankEstimate?.months.includes(month),settlesOnPayment:i.bankEstimate?.months.includes(month)&&i.bankEstimate.settlesOnPayment,costGroup:i.costGroup,route:i.paymentRoute,paymentFrom:i.bankPaymentFrom,budget:i.budgetCategory,evidence:i.bankEvidence});
  }
  for(const i of active)rows.push({id:'detected:'+i.id,label:i.customLabel||i.descriptionPattern,kind:'fixed',expected:cents(i.customMonthlyAmount??i.estimatedMonthlyAmount),party:i.descriptionPattern});
  for(const d of debts)rows.push({id:'debt:'+d.id,label:d.naam,kind:'debt',expected:(d.saldo??d.openBedrag)===0?0:cents(d.minimaleMaandlast??d.minBetaling)??0});
@@ -69,6 +69,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   const candidates=plan.rows.filter(r=>{
    if(r.kind==='debt'||r.route==='withheld'||r.route==='cash'||(r.kind==='income')!==(t.amount>0))return false;
    if(r.paymentFrom&&/^\d{4}-\d{2}-\d{2}$/.test(r.paymentFrom)&&Number.isFinite(Date.parse(r.paymentFrom))&&new Date(r.paymentFrom).toISOString().slice(0,10)===r.paymentFrom&&period>=salaryPeriod(r.paymentFrom)&&t.date<r.paymentFrom)return false;
+   if(r.budgetLabels)return t.bankPatternKind==='fixed'&&r.budgetLabels.some(label=>norm(label)===norm(t.bankRuleLabel??t.category??''));
    if(r.budget)return norm(r.budget)===norm(t.bankRuleLabel??t.category??'');
    const explicitlyLinked=t.bankPatternKind==='fixed'&&norm(r.label)===norm(t.bankRuleLabel??t.category??'');
    if(explicitlyLinked)return true;
@@ -95,8 +96,8 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   const confirmed=Number.isSafeInteger(manual[r.id])&&manual[r.id]>=0?manual[r.id]:null;
   const actual=uncertain?null:ids.length?(amounts.get(r.id)??0):confirmed??(r.kind==='debt'&&hasSavedPlan&&r.expected===0?0:null);
   const expected=hasSavedPlan?r.expected:null;
-  const forecast=r.route==='withheld'?0:closed?actual:(r.budget||r.kind==='fixed')?(expected===null?null:Math.max(expected,actual??0)):actual!==null&&!isReversed?actual:expected;
-  const status=uncertain?'Mogelijke terugboeking — controleren':r.route==='withheld'?'Al ingehouden; geen tweede afschrijving':isReversed?'Teruggeboekt — controleren':ids.length?'Via bank herkend':confirmed!==null?'Zelf bevestigd':r.kind==='debt'&&expected===0?'Geen aflossing ingepland':r.route==='card'?'Bunq/card: betaling nog bevestigen':r.route==='cash'?'Contant: betaling nog bevestigen':closed?'Geen betaling herkend':'Nog verwacht / niet herkend';
+  const forecast=r.route==='withheld'?0:closed?actual:r.settlesOnPayment&&actual!==null&&!isReversed?actual:(r.budget||r.kind==='fixed')?(expected===null?null:Math.max(expected,actual??0)):actual!==null&&!isReversed?actual:expected;
+  const status=uncertain?'Mogelijke terugboeking — controleren':r.route==='withheld'?'Al ingehouden; geen tweede afschrijving':isReversed?'Teruggeboekt — controleren':ids.length?'Via bank herkend':confirmed!==null?'Zelf bevestigd':r.kind==='debt'&&expected===0?'Geen aflossing ingepland':r.route==='card'?'Bunq/card: betaling nog bevestigen':r.route==='cash'?'Contant: betaling nog bevestigen':closed?'Geen betaling herkend':r.estimated?'Voorlopige schatting uit eerdere perioden':'Nog verwacht / niet herkend';
   return {...r,expected,actual,forecast,difference:actual!==null&&expected!==null?actual-expected:null,status,transactionIds:ids,reversed:isReversed};
  });
  const sum=(kind:'income'|'fixed'|'debt',field:'actual'|'expected'|'forecast')=>{

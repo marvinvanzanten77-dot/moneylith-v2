@@ -1,3 +1,6 @@
+import {runPersonalAgent} from '../server/agent/service.js';
+import {AgentInputError} from '../server/agent/actions.js';
+import {rateLimit} from '../server/utils/rateLimit.js';
 import {bunqAccounts,bunqTest,bunqConnect} from '../server/bunq/service.js';
 import {bunqFailure} from '../server/bunq/client.js';
 import {CloudTransportError,packCloudResponse,unpackCloudRequest} from '../server/utils/cloudTransport.js';
@@ -62,6 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, email });
     }
     if (!authenticated) return fail(401, "Log in met je Moneylith-account.");
+    if(req.method === "POST" && action === "agent") {
+      if(!rateLimit(req,res,{limit:15,windowMs:60_000}))return;
+      return res.status(200).json({ok:true,...await runPersonalAgent(config.email,body)});
+    }
     if(req.method === "POST" && action === "bunq") {
       if(body.operation==='status')return res.status(200).json({ok:true,configured:!!process.env.BUNQ_API_KEY?.trim()});
       if(body.operation==='accounts')return res.status(200).json({ok:true,accounts:await bunqAccounts(config.email)});
@@ -109,6 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return fail(405, "Actie niet beschikbaar.");
   } catch (error) {
+    if(error instanceof AgentInputError)return fail(400,error.message);
+    if(action === "agent")return fail(503,"De assistent kon de opdracht niet afronden. Controleer de laatste wijzigingen voordat je opnieuw probeert.");
     if(action === "bunq"){const e=bunqFailure(error);return res.status(503).json({ok:false,error:e.message,code:e.code});}
     if (error instanceof CloudTransportError) return fail(400,error.message);
     if (error instanceof PushInputError) return fail(400,error.message);

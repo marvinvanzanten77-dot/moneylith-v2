@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { collectCloudState } from '../storage/cloudState';
 import { today, type Options } from '../projection/engine';
 import {workspaceModel,stored} from './workspaceModel';
-import {salaryPeriod,periodPlansKey,capturePeriodPlan,refreshWorkCostPlan,type PeriodPlans} from '../bank/periodReconciliation';
+import {salaryPeriod,periodPlansKey,capturePeriodPlan,type PeriodPlans} from '../bank/periodReconciliation';
 import { dashboard } from './dashboard';
 
 export function useDashboard(options: Options) {
@@ -17,9 +17,11 @@ export function useDashboard(options: Options) {
   }, []);
   useEffect(()=>{
     const latest=collectCloudState(localStorage),asOf=today(),period=salaryPeriod(asOf);
-    const plans=stored<PeriodPlans>(latest,periodPlansKey,{}),plan=workspaceModel(latest,period,asOf).latestPlan;
+    const plans=stored<PeriodPlans>(latest,periodPlansKey,{});
+    if(plans[period])return;
+    const plan=workspaceModel(latest,period,asOf).latestPlan;
     if(!plan.rows.length&&!plans[period])return;
-    const next=plans[period]?{...plans,[period]:refreshWorkCostPlan(plans[period],plan)}:capturePeriodPlan(plans,plan,asOf);
+    const next=capturePeriodPlan(plans,plan,asOf);
     if(JSON.stringify(next)===JSON.stringify(plans))return;
     try{localStorage.setItem(periodPlansKey,JSON.stringify(next));window.dispatchEvent(new Event('moneylith:local-change'));}
     catch{window.dispatchEvent(new CustomEvent('moneylith:storage-error',{detail:'De periode-inschatting kon niet worden opgeslagen. Eerdere gegevens blijven bewaard.'}));}
