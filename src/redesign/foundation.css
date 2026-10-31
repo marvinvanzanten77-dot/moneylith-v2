@@ -48,4 +48,4 @@
 @media(max-width:1050px){.ml-topnav button{flex-direction:column;gap:5px;padding:9px 6px;font-size:12px}}
 @media(max-width:650px){.ml-topnav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:6px;margin-bottom:18px;border-radius:16px}.ml-topnav button{font-size:11px;min-height:58px;padding:7px 2px;gap:5px}.ml-topnav svg{width:19px;height:19px}}
 
-.personal-brand .personal-brand-mark{width:36px;height:48px;overflow:hidden}@media(max-width:650px){.personal-brand .personal-brand-mark{width:30px;height:40px}}
+.personal-brand .personal-brand-mark{width:48px;height:48px;object-fit:contain}@media(max-width:650px){.personal-brand .personal-brand-mark{width:40px;height:40px}}

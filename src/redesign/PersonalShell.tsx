@@ -16,8 +16,8 @@ const money = (value: number | null | undefined) => value == null ? 'Nog onbeken
 const dateLabel = (value: string | null) => value ? new Intl.DateTimeFormat('nl-NL', { day:'numeric', month:'short', timeZone:'UTC' }).format(new Date(value + 'T12:00:00Z')) : 'Datum onbekend';
 const safe = (value: string) => cleanBankText(value);
 function greeting() { const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone:'Europe/Amsterdam', hour:'2-digit', hourCycle:'h23' }).format(new Date())); return hour < 6 ? 'Goedenacht' : hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'; }
-// Frame the original emblem without modifying the supplied transparent image.
-function Mark() { return <svg className="personal-brand-mark" viewBox="260 103 98 122" aria-hidden="true"><image href={moneylithLogo} width="612" height="408"/></svg>; }
+// Use the supplied transparent green emblem without altering its pixels.
+function Mark() { return <img className="personal-brand-mark" src={moneylithLogo} alt="" width="48" height="48"/>; }
 function Badge({ icon, small=false }: {icon:IconName;small?:boolean}) { return <span className={`ml-badge ml-${icon}${small?' ml-small':''}`}><Icon name={icon}/></span>; }
 function Row({ icon, label, value, note }: { icon?:IconName;label:string;value:ReactNode;note?:string }) { return <div className="ml-row">{icon&&<Badge icon={icon} small/>}<div className="ml-row-label"><span title={safe(label)}>{safe(label)}</span>{note&&<small>{note}</small>}</div><span className="ml-row-value">{value}</span></div>; }
 function CardTitle({icon,title,subtitle,onOpen}:{icon:IconName;title:string;subtitle:string;onOpen:()=>void}) { return <button className="ml-card-heading" onClick={onOpen}><Badge icon={icon}/><span><h2>{title}</h2><span className="ml-subtitle">{subtitle}</span></span></button>; }
