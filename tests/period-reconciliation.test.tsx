@@ -121,3 +121,17 @@ test('current debt list does not invent obligations in uncaptured historical per
  const legacy={...p,rows:[{...p.rows[0],expected:null}]};
  assert.deepEqual(reconcilePeriod('2026-09','2026-11-01',legacy,true,[],emptyDebtLedger(),emptyBankRules).rows,[]);
 });
+
+ test('unscheduled debts stay outside current and future planning while repayments remain',()=>{
+ const p=makePeriodPlan([],[],[],[{id:'none',naam:'No arrangement',saldo:500},{id:'zero',naam:'Explicit zero',saldo:300,minimaleMaandlast:0},{id:'scheduled',naam:'Arrangement',saldo:200,minimaleMaandlast:100}],'2026-11-01');
+ const before=JSON.stringify(p);
+ for(const period of ['2026-10','2026-11','2026-12']){
+  const result=reconcilePeriod(period,'2026-11-01',p,true,[],emptyDebtLedger(),emptyBankRules);
+  assert.deepEqual(result.rows.map(r=>r.id),['debt:scheduled']);
+  assert.equal(result.forecast.debt,10000);
+ }
+ const paid=reconcilePeriod('2026-10','2026-11-01',p,true,[],emptyDebtLedger(),emptyBankRules,{'debt:none':2500});
+ assert.equal(paid.rows.find(r=>r.id==='debt:none')?.actual,2500);
+ assert.equal(paid.forecast.debt,12500);
+ assert.equal(JSON.stringify(p),before);
+ });

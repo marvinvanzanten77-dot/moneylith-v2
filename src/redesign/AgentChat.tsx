@@ -7,7 +7,7 @@ import {cloudRequest,prepareCloudReload,refreshCloudChanges} from '../storage/cl
 const loadChat=(_scope:string)=>{try{return agentHistory(JSON.parse(localStorage.getItem(chatKey('personal'))??'[]'));}catch{return [];}};
 const loadDocuments=()=>{try{return agentDocuments(JSON.parse(localStorage.getItem(documentKey)??'[]'));}catch{return [];}};
 type Receipt={id:string;at:string;summary:string;undone:boolean};
-export function AgentChat(){
+export function AgentChat({stabilizing=false}:{stabilizing?:boolean}){
  const [messages,setMessages]=useState(()=>loadChat('personal')),[question,setQuestion]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[changes,setChanges]=useState<Receipt[]>([]);
  const [documents,setDocuments]=useState<AgentDocument[]>(loadDocuments),[reading,setReading]=useState(false),[phase,setPhase]=useState('');
  const upload=async(files:FileList|null)=>{
@@ -52,7 +52,7 @@ export function AgentChat(){
   finally{if(request.current())setBusy(false);}
  };
  return <div className="ml-agent"><p className="ml-help">Vraag om inzicht of geef een concrete opdracht. Administratieve wijzigingen worden direct opgeslagen; de assistent voert geen bankbetalingen uit.</p>
- <div className="ml-agent-messages" role="log" aria-label="Gesprek met Moneylith">{messages.length?messages.map((m,i)=><div className={'ml-agent-message '+m.role} key={i}><small>{m.role==='user'?'Jij':'Moneylith'}</small><p>{m.content}</p></div>):<p className="ml-help">Bijvoorbeeld: “Voeg een spaarrekening toe” of “Ik heb een betalingsregeling getroffen”. Ik vraag door als gegevens ontbreken.</p>}</div>
+ <div className="ml-agent-messages" role="log" aria-label="Gesprek met Moneylith">{messages.length?messages.map((m,i)=><div className={'ml-agent-message '+m.role} key={i}><small>{m.role==='user'?'Jij':'Moneylith'}</small><p>{m.content}</p></div>):<p className="ml-help">{stabilizing?'Bijvoorbeeld: “Welke betaling vraagt nu aandacht?”, “Help me mijn achterstanden te ordenen” of “Ik heb een betalingsregeling getroffen”.':'Bijvoorbeeld: “Welke betaling komt eraan?” of “Ik heb een betalingsregeling getroffen”.'} Ik vraag door als gegevens ontbreken.</p>}</div>
  <form onSubmit={e=>{e.preventDefault();void run('chat');}}><label htmlFor="agent-question">Wat wil je weten of bijwerken?</label><textarea id="agent-question" value={question} onChange={e=>setQuestion(e.target.value)} maxLength={6000} rows={3} disabled={busy||reading} onKeyDown={e=>{if(enterSends(e)){e.preventDefault();void run('chat');}}}/><small className="ml-help">Enter verstuurt · Shift+Enter voor een nieuwe regel</small><button className="nw-primary" disabled={busy||reading||!question.trim()}>{busy?'Bezig met verwerken…':'Versturen'}</button></form>
  <label className="ml-text-button">Bijlage toevoegen<input type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp" multiple disabled={busy||reading} onChange={e=>{void upload(e.target.files);e.target.value='';}}/></label>
  {reading&&<p role="status">Document lezen… Bij scans kan dit even duren.</p>}

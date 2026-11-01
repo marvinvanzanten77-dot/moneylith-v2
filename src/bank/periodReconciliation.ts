@@ -101,7 +101,9 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
   const forecast=r.route==='withheld'?0:closed?actual:r.observedOnly?(actual!==null&&!isReversed?actual:null):r.settlesOnPayment&&actual!==null&&!isReversed?actual:(r.budget||r.kind==='fixed')?(expected===null?null:Math.max(expected,actual??0)):actual!==null&&!isReversed?actual:expected;
   const status=uncertain?'Mogelijke terugboeking — controleren':r.route==='withheld'?'Al ingehouden; geen tweede afschrijving':isReversed?'Teruggeboekt — controleren':ids.length?'Via bank herkend':confirmed!==null?'Zelf bevestigd':r.kind==='debt'&&expected===0?'Geen aflossing ingepland':r.route==='card'?'Bunq/card: betaling nog bevestigen':r.route==='cash'?'Contant: betaling nog bevestigen':closed?'Geen betaling herkend':r.estimated?'Voorlopige schatting uit eerdere perioden':'Nog verwacht / niet herkend';
   return {...r,expected,actual,forecast,difference:actual!==null&&expected!==null?actual-expected:null,status,transactionIds:ids,reversed:isReversed};
- }).filter(r=>!(r.kind==='debt'&&r.actual===null&&!r.transactionIds.length&&(!hasSavedPlan||r.expected===null||r.expected===0)));
+ // Debt balances alone are not cash-flow commitments. Keep actual repayments,
+ // including reversed bank evidence, but never invent a planned payment.
+ }).filter(r=>r.kind!=='debt'||(r.expected!==null&&r.expected>0)||r.transactionIds.length>0||(r.actual!==null&&r.actual>0));
  const sum=(kind:'income'|'fixed'|'debt',field:'actual'|'expected'|'forecast')=>{
   const rs=rows.filter(r=>r.kind===kind&&r.route!=='withheld');
   return !rs.length?(kind==='debt'?0:null):rs.some(r=>r[field]===null)?null:rs.reduce((s,r)=>s+r[field]!,0);
