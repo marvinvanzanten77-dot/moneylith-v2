@@ -29,12 +29,12 @@ test('unknown future costs affect only horizons reaching the event, with no manu
  const result=project(input);assert.equal(result.horizons[0].cash,50000);assert.deepEqual(result.horizons[0].missing,[]);assert.equal(result.horizons[1].cash,null);assert.match(result.horizons[1].missing.join(),/Testtool/);
  assert.deepEqual(missingThrough(input,'2026-05-09'),[]);
 });
-test('observed recurring costs remain unknown in forecast and period capacity; credits do not become subscriptions',()=>{
+test('observed paid costs count in the period while future prices stay unknown; credits do not become subscriptions',()=>{
  const fixed={id:'tool',naam:'Testtool',bedrag:0,dagVanMaand:5,amountEntered:false,bankObservedOnly:true,paymentRoute:'card' as const,costKind:'subscription' as const};
  const input=personalInput({fixedCosts:[fixed]},emptyOptions(),'2026-04-24');assert.ok(input.events.some(e=>e.label.includes('Testtool')&&e.amount===null));
  const credits=personalInput({fixedCosts:[{...fixed,costKind:'credits'}]},emptyOptions(),'2026-04-24');assert.ok(!credits.events.some(e=>e.id.includes('unknown-future')));
  const report=reconcilePeriod('2026-04','2026-04-24',makePeriodPlan([], [fixed],[],[],'2026-04-24'),true,[],emptyDebtLedger(),emptyBankRules,{'fixed:tool':2200});
- assert.equal(report.rows[0].actual,2200);assert.equal(report.forecast.fixed,null);assert.equal(periodRoom(report.forecast),null);
+ assert.equal(report.rows[0].actual,2200);assert.equal(report.forecast.fixed,2200);assert.equal(report.rows[0].expected,null);assert.equal(periodRoom(report.forecast),null);
  assert.equal(periodRoom({income:100000,fixed:40000,debt:10000}),50000);
 });
 test('dashboard groups daily budget allocations while keeping their full remaining sum',()=>{

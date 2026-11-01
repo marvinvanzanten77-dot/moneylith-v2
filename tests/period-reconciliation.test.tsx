@@ -108,3 +108,16 @@ test('confirmed earlier-invoice payments do not settle the next bill in the same
  const historic={...older,id:'historic',date:'2026-09-24'};
  assert.equal(reconcilePeriod('2026-09','2026-10-25',plan,false,[historic],emptyDebtLedger(),emptyBankRules).rows[0].actual,13099);
 });
+test('current debt list does not invent obligations in uncaptured historical periods',()=>{
+ const p=makePeriodPlan([],[],[],[{id:'no-plan',naam:'Geen regeling',saldo:500,openBedrag:500},{id:'new-plan',naam:'Nieuwe regeling',saldo:200,openBedrag:200,minimaleMaandlast:100}],'2026-11-01');
+ const before=JSON.stringify(p);
+ const past=reconcilePeriod('2026-09','2026-11-01',p,false,[],emptyDebtLedger(),emptyBankRules);
+ assert.deepEqual(past.rows,[]);assert.equal(past.forecast.debt,0);assert.equal(JSON.stringify(p),before);
+ const saved=reconcilePeriod('2026-09','2026-11-01',p,true,[],emptyDebtLedger(),emptyBankRules);
+ assert.ok(saved.rows.some(r=>r.id==='debt:new-plan'&&r.forecast===null));
+ // An actual allocation is retained even without a historical expectation.
+ const paid=reconcilePeriod('2026-09','2026-11-01',p,false,[],emptyDebtLedger(),emptyBankRules,{'debt:no-plan':3000});
+ assert.equal(paid.rows.length,1);assert.equal(paid.rows[0].actual,3000);assert.equal(paid.forecast.debt,3000);
+ const legacy={...p,rows:[{...p.rows[0],expected:null}]};
+ assert.deepEqual(reconcilePeriod('2026-09','2026-11-01',legacy,true,[],emptyDebtLedger(),emptyBankRules).rows,[]);
+});

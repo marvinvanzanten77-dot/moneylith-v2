@@ -27,3 +27,18 @@ test('payroll deductions are not deducted twice',()=>{
  const report=workspaceModel({...state,'moneylith.personal.fixedCosts':JSON.stringify([{id:'withheld',naam:'Inhouding',bedrag:100,amountEntered:true,paymentRoute:'withheld'}])},'2026-10','2026-11-01').report;
  const s=planningSummary(report,{income:true,fixed:true});assert.equal(s.out,10000);assert.equal(s.remaining,174440);
 });
+test('observed bunq billing counts once when paid, without inventing a recurring price',()=>{
+ const fee={id:'fee',naam:'bunq-bankkosten',bedrag:0,amountEntered:false,dagVanMaand:0,paymentRoute:'card',bankObservedOnly:true};
+ const debit={id:'fee-debit',accountId:'bunq',provider:'bunq',currency:'EUR',date:'2026-10-26',amount:-9.99,counterparty:'bunq bv',description:'Bankkosten',bankPatternKind:'fixed',bankRuleLabel:'bunq-bankkosten',providerData:{paymentSubType:'BILLING'}};
+ const s={...state,'moneylith.personal.fixedCosts':JSON.stringify([fee]),'moneylith.personal.transactions':JSON.stringify([debit,debit])};const before=JSON.stringify(s);
+ const report=workspaceModel(s,'2026-10','2026-11-01').report;
+ const row=report.rows.find(r=>r.id==='fixed:fee')!;
+ assert.equal(row.actual,999);assert.equal(row.forecast,999);assert.equal(row.expected,null);
+ const summary=planningSummary(report,{income:true,fixed:false},{fixed:'previous-signature'});
+ assert.equal(summary.out,10999);assert.ok(!summary.issues.some(i=>i.id==='fixed:fee'));
+ assert.match(summary.issues.find(i=>i.id==='review-fixed')!.reason,/Eerder bevestigd/);
+ assert.equal(workspaceModel(s,'2026-11','2026-11-01').report.rows.find(r=>r.id==='fixed:fee')!.forecast,null);
+ const refund={...debit,id:'refund',date:'2026-10-27',amount:9.99,description:'Terugboeking incasso',providerData:{paymentSubType:'REVERSAL'}};
+ const reversed=workspaceModel({...s,'moneylith.personal.transactions':JSON.stringify([debit,refund])},'2026-10','2026-11-01').report.rows.find(r=>r.id==='fixed:fee')!;
+ assert.equal(reversed.reversed,true);assert.equal(reversed.forecast,null);assert.equal(JSON.stringify(s),before);
+});
