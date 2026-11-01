@@ -71,3 +71,18 @@ test('remaining budget enters known totals once and paid purchases are not deduc
  assert.equal(d.available,44000);assert.equal(d.knownProtected,6000);
  assert.ok(d.view.outgoing.some(e=>e.id.includes(':budget:')));
 });
+
+test('upcoming shows both directions through payday and rolls on the 23rd',()=>{
+ const s=state({income:[{id:'salary',naam:'Salaris',bedrag:2000,amountEntered:true,dagVanMaand:23}],fixedCosts:[{id:'rent',naam:'Huur',bedrag:369,amountEntered:true,dagVanMaand:19},{id:'later',naam:'Later',bedrag:20,amountEntered:true,dagVanMaand:25}]});
+ const before=JSON.stringify(s);
+ const d=dashboard(s,'2026-11-01');
+ assert.equal(d.upcoming.until,'2026-11-23');assert.equal(d.upcoming.days,22);
+ assert.ok(d.upcoming.incoming.some(e=>e.label==='Salaris'&&e.date==='2026-11-23'&&e.amount===200000));
+ assert.ok(d.upcoming.outgoing.some(e=>e.label.includes('Huur')));
+ assert.ok(!d.upcoming.events.some(e=>e.date&&e.date>'2026-11-23'));
+ assert.equal(dashboard(s,'2026-11-22').upcoming.days,1);
+ const next=dashboard(s,'2026-11-23');assert.equal(next.upcoming.until,'2026-12-23');assert.equal(next.upcoming.days,30);
+ assert.ok(next.upcoming.events.every(e=>e.date===null||e.date>'2026-11-23'));
+ assert.equal(dashboard(s,'2026-12-23').upcoming.until,'2027-01-23');
+ assert.equal(JSON.stringify(s),before);
+});

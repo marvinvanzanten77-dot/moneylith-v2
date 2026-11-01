@@ -1,7 +1,7 @@
 import {salaryPeriod} from "../bank/periodReconciliation.js";
 import {addDays, missingThrough, project, type Input, type Event} from './engine.js';
 /** Read-only view of the projection, never a stored balance or a bank mutation. */
-export function dailyOverview(input: Input) {
+export function dailyOverview(input: Input, eventThrough=addDays(input.asOf,30)) {
  const result=project(input);
  const nextReceipt=result.events.find(e=>e.date&&e.date>input.asOf&&e.amount!==null&&e.amount>0&&e.kind!=='reserve');
  const until=nextReceipt?.date?addDays(nextReceipt.date,-1):addDays(input.asOf,30);
@@ -13,7 +13,7 @@ export function dailyOverview(input: Input) {
  const lowest=knownCash.reduce<{date:string;cash:number}|null>((a,b)=>!a||b.cash<a.cash?b:a,null);
  // Group synthetic daily budget allocations into one period entry.
  const grouped=new Map<string,Event>();
- for(const event of result.events.filter(e=>(e.date===null||e.date>input.asOf&&e.date<=addDays(input.asOf,30))&&e.amount!==0)) {
+ for(const event of result.events.filter(e=>(e.date===null||e.date>input.asOf&&e.date<=eventThrough)&&e.amount!==0)) {
   const budget=event.id.includes(':budget:');
   const key=budget?event.id.split(':budget:')[0]+':'+salaryPeriod(event.date!):event.id;
   const old=grouped.get(key);

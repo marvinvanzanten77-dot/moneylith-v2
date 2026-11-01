@@ -6,7 +6,7 @@ import { debtLedgerKey, emptyDebtLedger, validateDebtLedger } from '../bank/debt
 import { salaryPeriod, periodBounds } from '../bank/periodReconciliation.js';
 import { spendingRows, spendingSummary, spendingAboveBudgets } from '../bank/spending.js';
 import { personalInput } from '../projection/adapters.js';
-import { emptyOptions, type Options } from '../projection/engine.js';
+import { addDays, emptyOptions, type Options } from '../projection/engine.js';
 import { dailyOverview } from '../projection/dailyOverview.js';
 import { mobileBankBalance } from '../mobile/bankBalance.js';
 
@@ -33,6 +33,13 @@ export function presentPersonal(source: Parameters<typeof personalInput>[0], asO
   const ledger=validateDebtLedger(source.debtPayments)?source.debtPayments:emptyDebtLedger();
   const input=personalInput(source,options,asOf);
   const view = dailyOverview(input);
+  const payday=addDays(periodBounds(salaryPeriod(asOf)).end,1);
+  const upcomingView=dailyOverview(input,payday);
+  const upcoming={until:payday,days:Math.round((Date.parse(payday)-Date.parse(asOf))/86400000),
+    incoming:upcomingView.incoming,outgoing:upcomingView.outgoing,
+    events:[...upcomingView.incoming,...upcomingView.outgoing].sort((a,b)=>(a.date??'9999').localeCompare(b.date??'9999')),
+    income:upcomingView.incoming.length?upcomingView.incoming.reduce((n,e)=>n+(e.amount??0),0):null,
+    expenses:upcomingView.outgoing.some(e=>e.amount!==null)?upcomingView.outgoing.reduce((n,e)=>n+Math.abs(e.amount??0),0):null};
   const rows = spendingAboveBudgets(spendingRows(transactions, rules, fixed, ledger), fixed, 'salary');
   const spending = spendingSummary(rows, salaryPeriod(asOf), asOf, 'salary');
   // Missing dates and incomplete obligations must not produce a deceptively exact total.
@@ -49,7 +56,7 @@ export function presentPersonal(source: Parameters<typeof personalInput>[0], asO
   const knownProtected=knownCommitments.reduce((sum,e)=>sum+Math.abs(e.amount!),input.reserve??0);
   const provisional=view.available===null;
   const available=view.available??(input.opening!==null&&knownCommitments.length>0?input.opening-knownProtected:null);
-  return { returnedPayments:returnedPayments(transactions,rules,asOf,source.paymentResolutions), input, view, available, provisional, knownPlanned, knownProtected, knownCommitments, accounts, bank: mobileBankBalance(accounts, rules), spending,
+  return { returnedPayments:returnedPayments(transactions,rules,asOf,source.paymentResolutions), input, view, upcoming, available, provisional, knownPlanned, knownProtected, knownCommitments, accounts, bank: mobileBankBalance(accounts, rules), spending,
     planned, period: periodBounds(salaryPeriod(asOf)),
     protected: input.opening !== null && view.available !== null ? input.opening - view.available : null,
   };
