@@ -17,3 +17,26 @@ test('complete-section confirmation uses projection-compatible review signatures
 test('unknown spending stays unknown; own transfers and business transactions are excluded',()=>{const tx={id:'t',accountId:'a',date:'2026-10-24',amount:-20,currency:'EUR',provider:'lunchflow',description:'Test',category:'Kleding en schoenen'};const m=workspaceModel(state({transactions:[{...tx,bankPatternKind:'transfer'},{...tx,id:'b',accountId:'business'}],'bankRules.v1':{accountRoles:{business:'business'},rules:[]}}),'2026-10',date);assert.deepEqual(m.gross,[]);assert.equal(m.spending.totalCents,null);});
 test('forecast groups daily budgets without losing cents or hiding real payments',async()=>{const {forecastMoments}=await import('../src/redesign/workspaceModel');const events=[{id:'fixed:food:budget:2026-10-29',label:'Boodschappen',date:'2026-10-29',amount:-848,source:'fixed',basis:'assumption' as const},{id:'fixed:food:budget:2026-10-30',label:'Boodschappen',date:'2026-10-30',amount:-849,source:'fixed',basis:'assumption' as const},{id:'rent',label:'Huur',date:'2026-11-01',amount:-110000,source:'fixed',basis:'input' as const}];const result=forecastMoments(events,date,'2026-11-10');assert.equal(result.length,2);assert.equal(result[0].amount,-1697);assert.equal(result[1].label,'Huur');assert.equal(events.length,3);});
 test('editing a current bill uses latest inputs even when the initial period estimate exists',()=>{const s=state({fixedCosts:[{id:'rent',naam:'Huur',bedrag:1150,amountEntered:true,dagVanMaand:1,paymentRoute:'bank'}],periodPlans:{}});s['moneylith.personal.periodPlans.v1']=JSON.stringify({'2026-10':{capturedAt:'2026-10-23',rows:[{id:'fixed:rent',label:'Huur',kind:'fixed',expected:100000}]}});const m=workspaceModel(s,'2026-10',date);assert.equal(m.report.rows[0].expected,115000);assert.equal(m.report.rows[0].forecast,115000);});
+test('future planning uses selected period monthly amounts, not the current month',()=>{
+ const s=state({fixedCosts:[{id:'phone',naam:'Telefoon',bedrag:20,amountEntered:true,dagVanMaand:19,paymentRoute:'bank',monthlyVariable:true,monthlyAmounts:{'2026-11':144.95,'2026-12':30,'2027-01':40}}]});
+ const before=JSON.stringify(s);
+ assert.equal(workspaceModel(s,'2026-11',date).report.rows[0].expected,3000);
+ assert.equal(workspaceModel(s,'2026-12',date).report.rows[0].expected,4000);
+ assert.equal(JSON.stringify(s),before);
+});
+test('forecast displays known cash movements with explicit omissions without changing strict results',async()=>{
+ const {forecastDisplay}=await import('../src/redesign/forecastDisplay');
+ const input:import('../src/projection/engine').Input={scope:'personal',asOf:date,opening:100000,reserve:null,missing:['Vaste lasten nog controleren'],assumptions:[],goals:[],debts:{},events:[
+ {id:'rent',label:'Huur',date:'2026-10-30',amount:-36900,source:'fixed',basis:'input'},
+ {id:'unknown',label:'Nog onbekende last',date:'2026-11-01',amount:null,source:'fixed',basis:'input'},
+ {id:'undated',label:'Zonder datum',date:null,amount:-1000,source:'fixed',basis:'input'}]};
+ const before=JSON.stringify(input);
+ for(const days of [7,30,90]){
+ const result=forecastDisplay(input,days);assert.equal(result.provisional,true);assert.equal(result.base.timeline[days-1].cash,63100);
+ assert.ok(result.issues.includes('Nog onbekende last: bedrag onbekend'));assert.ok(result.issues.includes('Zonder datum: betaaldatum onbekend'));
+ assert.ok(!result.issues.some(s=>s.startsWith('Huidige reserveringen')));
+ }
+ const alt=forecastDisplay(input,30,{kind:'purchase',date:'2026-11-02',amount:10000});assert.equal(alt.alt!.timeline[29].cash,53100);
+ assert.equal(forecastDisplay(input,30).alt,null);assert.equal(project(input).timeline[29].cash,null);assert.equal(JSON.stringify(input),before);
+ const absent=forecastDisplay({...input,opening:null},30);assert.equal(absent.base.timeline[29].cash,null);assert.ok(absent.issues.some(s=>s.includes('rekeningsaldo')));
+});

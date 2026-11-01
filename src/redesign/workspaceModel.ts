@@ -17,7 +17,7 @@ export function workspaceModel(state:CloudState,period:string,asOf:string) {
  const plans=stored<PeriodPlans>(state,periodPlansKey,{});
  const detected=stored<FixedCostItem[]>(state,'fixed-cost-items',[]);
  const expectations=personalExpectations({income,fixedCosts:fixed,detectedFixedCosts:detected,debts,transactions,bankRules:rules,debtPayments:ledger},closed?bounds.start:asOf);
- const latest=makePeriodPlan(income,expectations.data.fixedCosts as FixedCostManualItem[],detected,debts,closed?bounds.start:asOf);
+ const latest=makePeriodPlan(income,expectations.data.fixedCosts as FixedCostManualItem[],detected,debts,period===salaryPeriod(asOf)?asOf:bounds.start);
  const plan=closed?(plans[period]??latest):latest;
  const report=reconcilePeriod(period,asOf,plan,!closed||!!plans[period],transactions,ledger,rules,stored<PeriodPaid>(state,periodPaidKey,{})[period]);
  const gross=spendingRows(transactions,rules,fixed,ledger).filter(r=>r.date<=asOf);
