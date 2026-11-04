@@ -16,7 +16,7 @@ const sections: Record<LegalKind, { title: string; blocks: { heading: string; bu
         bullets: [
           "Na jouw toestemming bewaren we de pushregistratie van dit apparaat versleuteld bij je account. We gebruiken deze om meldingen te versturen via de pushdienst van je browser of telefoon.",
           "De pushmelding bevat geen bedragen, transactieomschrijvingen of rekeninggegevens. De details bekijk je in Moneylith. De pushdienst ontvangt wel technische bezorggegevens.",
-          "De achtergrondcontrole haalt drie keer per dag gegevens van je gekoppelde Lunch Flow-rekeningen op en verwerkt deze in je eigen administratie. Je kunt monitoring pauzeren, potjes dempen en push per apparaat uitschakelen bij Meldingen.",
+          "Automatische banksynchronisatie is uitgeschakeld. Alleen tankprijzen worden dagelijks gecontroleerd. Je kunt bankgegevens handmatig ophalen en verwerken in je eigen administratie. Je kunt monitoring pauzeren, potjes dempen en push per apparaat uitschakelen bij Meldingen.",
           "Uitschakelen of uitloggen verwijdert de pushregistratie van dit apparaat. Technische verzendmarkeringen verlopen na 120 dagen. Een al verstuurde melding kan nog door de pushdienst worden bezorgd.",
         ],
       },

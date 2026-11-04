@@ -1,5 +1,4 @@
 import {scanFuel} from '../server/fuel/prices.js';
-import {syncBankAccount} from '../server/lunchflow/accountSync.js';
 import crypto from 'node:crypto';
 import type {VercelRequest,VercelResponse} from '@vercel/node';
 import {ownerConfig} from '../server/lunchflow/ownerAuth.js';
@@ -16,9 +15,9 @@ export default async function handler(req:VercelRequest,res:VercelResponse){
   try{
     if(!(await getCloudUser(owner.email))?.bankOwnerVerified)return res.status(403).json({ok:false});
     const now=new Date();
-    const scanId=`scheduled:${now.toISOString().slice(0,13)}`;
-    const [scan]=await Promise.all([syncBankAccount(owner.email,owner.apiKey,scanId,now),scanFuel(now).catch(()=>null)]);
+    // Private scheduled monitoring now checks fuel prices only. Bank sync remains manual.
+    await scanFuel(now);
     const result=await dispatchPush(owner.email,await monitorAccount(owner.email));
-    return res.status(result.failed?503:200).json({ok:!result.failed,...result,bank:{ok:scan.ok,failed:scan.failed,at:scan.at}});
+    return res.status(result.failed?503:200).json({ok:!result.failed,...result,bank:{skipped:true,reason:'manual-only'}});
   }catch{return res.status(503).json({ok:false});}
 }

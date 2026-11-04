@@ -81,3 +81,11 @@ test('service worker shows generic text and opens only the fixed personal notifi
  handlers.get('notificationclick')!({notification:{close:()=>{closed=true;},data:{url:'https://evil.test'}},waitUntil});await task;
  assert.equal(closed,true);assert.equal(opened,'/prive?app=1&view=notifications#persoonlijk');
 });
+
+test('fuel-only preference blocks old financial pushes but retains tank advice',()=>{
+ const state={...emptyMonitoring(),preferences:{enabled:true,financialEnabled:false,mutedLabels:[]},notices:[notice,{...notice,id:'fuel',kind:'fuel' as const,label:'Brandstofprijzen'}]};
+ assert.deepEqual(pendingNotices(state,'2000-01-01').map(n=>n.id),['fuel']);
+ const cronSource=fs.readFileSync('api/monitoring-cron.ts','utf8');
+ assert.ok(!cronSource.includes('syncBankAccount'));
+ assert.equal(JSON.parse(fs.readFileSync('vercel.json','utf8')).crons.find(c=>c.path==='/api/monitoring-cron').schedule,'0 7 * * *');
+});

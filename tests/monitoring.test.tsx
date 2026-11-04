@@ -91,8 +91,16 @@ test('authenticated API and encrypted CAS storage preserve cross-device actions 
  const samples=Array.from({length:8},(_,i)=>{const day='2026-10-'+(15+i);return {station:'arnhem-eduard-van-beinumlaan',day,fetchedAt:day+'T12:00:00.000Z',milliEuros:i===7?2170:2200};});
  redis.set('ml:fuel:tinq-e10:v1',JSON.stringify({checkedAt:now.toISOString(),failed:0,samples}));
  const fuel=await monitorAccount(owner,undefined,now);assert.equal(fuel.notices.filter(n=>n.kind==='fuel'&&n.active).length,1);assert.equal(fuel.fuel?.stations[0].price,'2,170');
+ const fuelOnly=await monitorAccount(owner,{action:'preferences',enabled:true,financialEnabled:false,mutedLabels:[]},now);assert.equal(fuelOnly.notices.filter(n=>n.active&&n.kind!=='fuel').length,0);assert.equal(fuelOnly.notices.filter(n=>n.active&&n.kind==='fuel').length,1);
  const muted=await monitorAccount(owner,{action:'preferences',enabled:true,mutedLabels:['Brandstofprijzen']},now);assert.equal(muted.notices.filter(n=>n.kind==='fuel'&&n.active).length,0);
  assert.equal(redis.get('ml:cloud:snapshot:'+owner),snapshot);
 
  }finally{globalThis.fetch=originalFetch;for(const k of Object.keys(process.env))if(!(k in previous))delete process.env[k];Object.assign(process.env,previous);}
+});
+
+test('financial pause survives ordinary preference updates and suppresses financial evaluation',()=>{
+ const paused=updateMonitoring(emptyMonitoring(),{action:'preferences',enabled:true,financialEnabled:false,mutedLabels:[]},now.toISOString());
+ const updated=updateMonitoring(paused,{action:'preferences',enabled:true,mutedLabels:['Example']},now.toISOString());
+ assert.equal(updated.preferences.financialEnabled,false);assert.deepEqual(evaluateMonitoring(fixture(),updated.preferences,now).signals,[]);
+ assert.throws(()=>updateMonitoring(paused,{action:'preferences',enabled:true,financialEnabled:'false',mutedLabels:[]},now.toISOString()));
 });

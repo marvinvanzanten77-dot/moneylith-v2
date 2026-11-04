@@ -36,7 +36,7 @@ function endpointId(endpoint:unknown){if(typeof endpoint!=='string'||endpoint.le
 export async function removeDevice(email:string,endpoint:unknown){await cloudCommand(['HDEL',key(email),endpointId(endpoint)]);}
 export async function deviceExists(email:string,endpoint:unknown){return await cloudCommand(['HEXISTS',key(email),endpointId(endpoint)])===1;}
 export function pendingNotices(state:MonitoringState,since:string){
-  return state.preferences.enabled?state.notices.filter(n=>n.scope==='personal'&&n.active&&!n.readAt&&!n.dismissedAt&&!state.preferences.mutedLabels.includes(n.label)&&n.createdAt>=since):[];
+  return state.preferences.enabled?state.notices.filter(n=>n.scope==='personal'&&(state.preferences.financialEnabled!==false||n.kind==='fuel')&&n.active&&!n.readAt&&!n.dismissedAt&&!state.preferences.mutedLabels.includes(n.label)&&n.createdAt>=since):[];
 }
 async function send(subscription:webpush.PushSubscription,test=false){
   const vapidDetails=pushConfig();if(!vapidDetails)throw Error('Push niet geconfigureerd.');

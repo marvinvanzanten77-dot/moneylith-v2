@@ -15,7 +15,7 @@ export type Signal = {
   observedCents: number; referenceCents: number | null;
 };
 export type Notice = Signal & { createdAt: string; updatedAt: string; readAt: string | null; dismissedAt: string | null; active: boolean };
-export type Preferences = { enabled: boolean; mutedLabels: string[] };
+export type Preferences = { enabled: boolean; financialEnabled?: boolean; mutedLabels: string[] };
 export type MonitoringState = { version: 1; fuel?: ReturnType<typeof import('../../server/fuel/prices').fuelOverview>; preferences: Preferences; notices: Notice[]; checkedAt: string | null; sourceRevision: string | null; sourceFetchedAt: string | null; status: string };
 export const emptyMonitoring = (): MonitoringState => ({version:1,preferences:{enabled:true,mutedLabels:[]},notices:[],checkedAt:null,sourceRevision:null,sourceFetchedAt:null,status:'Nog niet gecontroleerd.'});
 export function amsterdamDate(now: Date) {
@@ -37,7 +37,7 @@ export function evaluateMonitoring(state:CloudState, preferences:Preferences, no
   const timestamps=selected.map(a=>a.bankLastSync).filter((s):s is string=>typeof s==='string'&&Number.isFinite(Date.parse(s)));
   const fetchedAt=timestamps.length===selected.length && timestamps.length ? timestamps.sort()[0]:null;
   const signals:Signal[]=[];
-  if(!preferences.enabled)return {signals,fetchedAt,status:'Monitoring gepauzeerd.'};
+  if(!preferences.enabled||preferences.financialEnabled===false)return {signals,fetchedAt,status:preferences.enabled?'Alleen tankprijzen actief; financiële meldingen gepauzeerd.':'Monitoring gepauzeerd.'};
   const scan=read<import('../bank/processSync.js').BankScan|null>(state,'moneylith.personal.bankScan.v1',null);
   if(scan&&typeof scan.id==='string'&&typeof scan.message==='string'&&Number.isFinite(Date.parse(scan.at))&&now.getTime()-Date.parse(scan.at)<2*86400000){
     signals.push({id:`personal:sync:${scan.id}`,scope:'personal',kind:'sync',month,label:'Bankcontrole',title:scan.failed?'Bankcontrole: aandacht nodig':'Bankcontrole uitgevoerd',message:scan.message,observedCents:0,referenceCents:null});
@@ -98,13 +98,14 @@ export function reconcileNotices(old:Notice[], signals:Signal[], now:string):Not
   return merged.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id)).slice(0,200);
 }
 export class InvalidMonitoringAction extends Error {}
-export type MonitoringAction = {action:'read'|'dismiss';id:string}|{action:'preferences';enabled:boolean;mutedLabels:string[]};
+export type MonitoringAction = {action:'read'|'dismiss';id:string}|{action:'preferences';enabled:boolean;financialEnabled?:boolean;mutedLabels:string[]};
 export function updateMonitoring(state:MonitoringState,value:unknown,now:string):MonitoringState{
   const a=value as MonitoringAction;
   if(!a||typeof a!=='object')throw new InvalidMonitoringAction('Ongeldige meldingsactie.');
   if(a.action==='preferences'){
+    if(a.financialEnabled!==undefined&&typeof a.financialEnabled!=='boolean')throw new InvalidMonitoringAction('Ongeldige financiële voorkeur.');
     if(typeof a.enabled!=='boolean'||!Array.isArray(a.mutedLabels)||a.mutedLabels.length>100||a.mutedLabels.some(s=>typeof s!=='string'||!s.trim()||s.length>150))throw new InvalidMonitoringAction('Ongeldige voorkeuren.');
-    return {...state,preferences:{enabled:a.enabled,mutedLabels:[...new Set(a.mutedLabels)]},sourceRevision:null};
+    return {...state,preferences:{...state.preferences,...(a.financialEnabled!==undefined?{financialEnabled:a.financialEnabled}:{}),enabled:a.enabled,mutedLabels:[...new Set(a.mutedLabels)]},sourceRevision:null};
   }
   if(!['read','dismiss'].includes(a.action)||typeof a.id!=='string'||!state.notices.some(n=>n.id===a.id))throw new InvalidMonitoringAction('Melding niet gevonden.');
   return {...state,notices:state.notices.map(n=>n.id===a.id?{...n,...(a.action==='read'?{readAt:n.readAt??now}:{dismissedAt:n.dismissedAt??now,readAt:n.readAt??now})}:n)};
