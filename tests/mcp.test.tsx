@@ -20,7 +20,8 @@ import {
 } from "../server/mcp/auth";
 import { readTool } from "../server/mcp/reads";
 import handler from "../api/mcp";
-import { encryptCloudPayload } from "../server/utils/cloudAuth";
+import oauthHandler from "../api/mcp-oauth";
+import { setCloudSession, encryptCloudPayload } from "../server/utils/cloudAuth";
 const state = {
   "moneylith.personal.accounts": JSON.stringify([
     {
@@ -126,6 +127,7 @@ test("OAuth + real MCP SDK: scoped access, PKCE, replay, revocation and fail clo
   delete process.env.VERCEL_ENV;
   process.env.MONEYLITH_MCP_ENABLED = "true";
   process.env.MONEYLITH_MCP_SECRET = randomBytes(48).toString("hex");
+  process.env.CLOUD_AUTH_SECRET = randomBytes(48).toString("hex");
   process.env.CLOUD_ENCRYPTION_KEY = randomBytes(48).toString("hex");
   process.env.KV_REST_API_URL = "https://test-kv.invalid";
   process.env.KV_REST_API_TOKEN = "test";
@@ -186,6 +188,36 @@ test("OAuth + real MCP SDK: scoped access, PKCE, replay, revocation and fail clo
         .get("www-authenticate")
         ?.includes("oauth-protected-resource"),
     );
+    const headers = new Map<string, any>();
+    let html = "", status = 200;
+    const response = {
+      setHeader: (key: string, value: any) => headers.set(key, value),
+      getHeader: (key: string) => headers.get(key),
+      status(code: number) { status = code; return this; },
+      send(body: string) { html = body; return this; },
+      end() { return this; },
+    };
+    setCloudSession(response as any, "owner@example.com");
+    const cookies = headers.get("Set-Cookie");
+    const cookie = (Array.isArray(cookies) ? cookies[0] : cookies).split(";")[0];
+    await oauthHandler({ method: "GET", headers: { cookie }, query: {
+      action: "authorize", response_type: "code", client_id: "moneylith-chatgpt",
+      redirect_uri: "https://chatgpt.com/connector_platform_oauth_redirect",
+      resource, scope, state: "browser-regression", code_challenge: "a".repeat(43),
+      code_challenge_method: "S256",
+    }} as any, response as any);
+    assert.equal(status, 200);
+    assert(html.includes("Leestoegang toestaan"));
+    // no-referrer makes Chrome send Origin:null on this POST, breaking consent.
+    assert.equal(headers.get("Referrer-Policy"), "same-origin");
+    assert(headers.get("Content-Security-Policy").includes("form-action 'self' https://chatgpt.com;"));
+    assert(headers.get("Content-Security-Policy").includes("frame-ancestors 'none'"));
+    for (const origin of [undefined, "null", "https://evil.example"]) {
+      await oauthHandler({ method: "POST", headers: { cookie, origin },
+        query: { action: "consent" }, body: { consent: "invalid" },
+      } as any, response as any);
+      assert.equal(status, 403, "Untrusted origins must remain forbidden");
+    }
     const grant = await createGrant("owner@example.com", "moneylith-chatgpt");
     const verifier = randomBytes(32).toString("base64url");
     const code = await seal(
