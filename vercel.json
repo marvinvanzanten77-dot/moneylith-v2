@@ -102,6 +102,18 @@
   ],
   "rewrites": [
     {
+      "source": "/.well-known/oauth-protected-resource/api/mcp",
+      "destination": "/api/mcp-oauth?action=resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "/api/mcp-oauth?action=resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/mcp-oauth?action=metadata"
+    },
+    {
       "source": "/prive/assets/:path*",
       "destination": "/assets/:path*"
     },
