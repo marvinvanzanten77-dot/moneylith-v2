@@ -86,6 +86,7 @@ test('fuel-only preference blocks old financial pushes but retains tank advice',
  const state={...emptyMonitoring(),preferences:{enabled:true,financialEnabled:false,mutedLabels:[]},notices:[notice,{...notice,id:'fuel',kind:'fuel' as const,label:'Brandstofprijzen'}]};
  assert.deepEqual(pendingNotices(state,'2000-01-01').map(n=>n.id),['fuel']);
  const cronSource=fs.readFileSync('api/monitoring-cron.ts','utf8');
- assert.ok(!cronSource.includes('syncBankAccount'));
+ assert.ok(cronSource.includes('syncBankAccount(owner.email,owner.apiKey,scanId,now)'));
+ assert.ok(cronSource.includes('scheduled:${amsterdamDate(now)}'));
  assert.equal(JSON.parse(fs.readFileSync('vercel.json','utf8')).crons.find(c=>c.path==='/api/monitoring-cron').schedule,'0 7 * * *');
 });
