@@ -278,3 +278,10 @@ test("OAuth + real MCP SDK: scoped access, PKCE, replay, revocation and fail clo
     Object.assign(process.env, env);
   }
 });
+
+test('MCP server dependency graph has Node ESM-resolvable relative imports', async()=>{
+ const ts=await import('typescript');const fs=await import('node:fs');const path=await import('node:path');const seen=new Set<string>();
+ function scan(file:string){if(seen.has(file))return;seen.add(file);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ for(const match of code.matchAll(/(?:from\s*|import\s*\()(['"])(\.[^'"]+)\1/g)){assert(match[2].endsWith('.js'),`Native Node runtime cannot resolve ${match[2]} from ${file}`);const target=path.resolve(path.dirname(file),match[2].replace(/\.js$/,'.ts'));assert(fs.existsSync(target),`Missing module ${target}`);scan(target);}}
+ scan(path.resolve('api/mcp.ts'));scan(path.resolve('api/mcp-oauth.ts'));assert(seen.size>20);
+});

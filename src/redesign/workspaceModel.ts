@@ -1,11 +1,11 @@
-import {returnedPayments} from '../bank/returnedPayments';
-import {personalExpectations} from '../bank/expectations';
-import type {CloudState} from '../storage/cloudState';
-import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithGoal,MoneylithTransaction} from '../types';
-import {emptyBankRules,validateBankRules} from '../bank/classificationRules';
-import {emptyDebtLedger,validateDebtLedger,debtLedgerKey} from '../bank/debtPayments';
-import {makePeriodPlan,reconcilePeriod,periodBounds,salaryPeriod,periodPaidKey,periodPlansKey,type PeriodPlans,type PeriodPaid} from '../bank/periodReconciliation';
-import {spendingRows,spendingAboveBudgets,spendingSummary} from '../bank/spending';
+import {returnedPayments} from '../bank/returnedPayments.js';
+import {personalExpectations} from '../bank/expectations.js';
+import type {CloudState} from '../storage/cloudState.js';
+import type {IncomeItem,FixedCostManualItem,FixedCostItem,SchuldItem,MoneylithGoal,MoneylithTransaction} from '../types.js';
+import {emptyBankRules,validateBankRules} from '../bank/classificationRules.js';
+import {emptyDebtLedger,validateDebtLedger,debtLedgerKey} from '../bank/debtPayments.js';
+import {makePeriodPlan,reconcilePeriod,periodBounds,salaryPeriod,periodPaidKey,periodPlansKey,type PeriodPlans,type PeriodPaid} from '../bank/periodReconciliation.js';
+import {spendingRows,spendingAboveBudgets,spendingSummary} from '../bank/spending.js';
 export function stored<T>(state:CloudState,key:string,fallback:T):T {try{return state[key]===undefined?fallback:JSON.parse(state[key]);}catch{return fallback;}}
 export function workspaceModel(state:CloudState,period:string,asOf:string) {
  const get=<T,>(key:string,fallback:T)=>stored(state,'moneylith.personal.'+key,fallback);
@@ -48,7 +48,7 @@ export function foundationChecks(state:CloudState,asOf:string){
  const reviews=stored<InputReviews>(state,'moneylith.personal.inputReviews.v1',{});
  return {income:reviewBankIncome(income,stored(state,'moneylith.personal.transactions',[]),reviews,asOf),fixed:reviewSection('fixed','Vaste lasten',detected.length?[...detected.map(r=>({id:r.id,name:r.customLabel||r.descriptionPattern,amount:r.customMonthlyAmount??r.estimatedMonthlyAmount,details:r})),...manualReviewRows(fixed.filter(r=>r.paymentRoute||r.budgetCategory),asOf.slice(0,7))]:manualReviewRows(fixed,asOf.slice(0,7)),reviews)};
 }
-import {manualReviewRows,reviewBankIncome,reviewSection,type InputReviews} from '../logic/inputReadiness';
+import {manualReviewRows,reviewBankIncome,reviewSection,type InputReviews} from '../logic/inputReadiness.js';
 
 /** Daily budget allocations are one period expectation, not dozens of bank debits. */
 export function forecastMoments(events:import('../projection/engine').Event[],asOf:string,through:string){
