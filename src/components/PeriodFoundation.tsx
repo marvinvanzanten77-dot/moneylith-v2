@@ -1,3 +1,4 @@
+import {returnedPayments,type PaymentResolution} from '../bank/returnedPayments';
 import {periodRoom,reviewedPeriodForecast} from "../logic/periodRoom";
 import {CalculationDetails} from './CalculationDetails';
 import {useEffect,useMemo,useState} from 'react';
@@ -17,9 +18,10 @@ export function PeriodFoundation(props:Props){
  const [plans,setPlans]=useLocalStorage<PeriodPlans>(periodPlansKey,{});
  const {paid,setPaid}=props;
  const [ledger]=useLocalStorage<DebtLedger>(debtLedgerKey,emptyDebtLedger());
+ const [resolutions]=useLocalStorage<PaymentResolution[]>('moneylith.personal.paymentResolutions',[]);
  const latest=useMemo(()=>makePeriodPlan(income,fixed,detected,debts,asOf),[income,fixed,detected,debts,asOf]);
  useEffect(()=>{if(!plans[current])setPlans(capturePeriodPlan(plans,latest,asOf));else {const updated=refreshWorkCostPlan(plans[current],latest);if(updated!==plans[current])setPlans({...plans,[current]:updated});}},[current,plans,latest,asOf,setPlans]);
- const report=reconcilePeriod(period,asOf,period===current?latest:plans[period]??latest,period===current||!!plans[period],transactions,ledger,rules,paid[period]);
+ const report=reconcilePeriod(period,asOf,period===current?latest:plans[period]??latest,period===current||!!plans[period],transactions,ledger,rules,paid[period],returnedPayments(transactions,rules,asOf,resolutions,{includeHistorical:true}));
  const periods=[...new Set([current,...Object.keys(plans),...transactions.filter(t=>(t.provider === 'lunchflow' || t.provider === 'bunq')&&rules.accountRoles[t.accountId]!=='business'&&t.date<=asOf).map(t=>salaryPeriod(t.date))])].sort().reverse();
  const forecast=reviewedPeriodForecast(report,period===current?props.readiness:undefined);
  const free=period===current&&props.ready===false?null:periodRoom(forecast);

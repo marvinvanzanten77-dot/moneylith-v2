@@ -19,7 +19,7 @@ export function workspaceModel(state:CloudState,period:string,asOf:string) {
  const expectations=personalExpectations({income,fixedCosts:fixed,detectedFixedCosts:detected,debts,transactions,bankRules:rules,debtPayments:ledger},closed?bounds.start:asOf);
  const latest=makePeriodPlan(income,expectations.data.fixedCosts as FixedCostManualItem[],detected,debts,period===salaryPeriod(asOf)?asOf:bounds.start);
  const plan=closed?(plans[period]??latest):latest;
- const report=reconcilePeriod(period,asOf,plan,!closed||!!plans[period],transactions,ledger,rules,stored<PeriodPaid>(state,periodPaidKey,{})[period]);
+ const report=reconcilePeriod(period,asOf,plan,!closed||!!plans[period],transactions,ledger,rules,stored<PeriodPaid>(state,periodPaidKey,{})[period],returnedPayments(transactions,rules,asOf,stored(state,'moneylith.personal.paymentResolutions',[]),{includeHistorical:true}));
  const gross=spendingRows(transactions,rules,fixed,ledger).filter(r=>r.date<=asOf);
  const spending=spendingSummary(spendingAboveBudgets(gross,fixed,'salary'),period,asOf,'salary');
  return {returnedPayments:returnedPayments(transactions,rules,closed?bounds.end:asOf,stored(state,'moneylith.personal.paymentResolutions',[])),baselinePlan:plans[period],income,fixed,debts,goals,transactions,rules,ledger,report,spending,gross,bounds,closed,estimatedFixed:expectations.data.fixedCosts as FixedCostManualItem[],expectationNotes:expectations.notes,latestPlan:latest};

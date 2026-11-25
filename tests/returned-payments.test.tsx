@@ -100,3 +100,31 @@ test('salary-period boundary uses return date and still matches an older origina
  assert.equal(returnedPayments(txs,emptyBankRules,'2026-11-23').length,0);
  assert.equal(returnedPayments([{...debit,date:'2026-09-28'},{...credit,date:'2026-10-22'}],emptyBankRules,asOf).length,0);
 });
+
+test('unique confirmed arrears paid in a later salary period does not settle the new rent',async()=>{
+ const fixed=[{id:'sub',naam:'Abonnement',bedrag:60,amountEntered:true,dagVanMaand:28}];
+ const txs=[debit,credit,{...debit,id:'late',date:'2026-11-23',amount:-60.54,description:'Nabetaling achterstallige huur'}];
+ const decisions=[{id:'r',returnedId:'returned:c',status:'open',dueMonth:'2026-11',note:'Bevestigd'}];
+ const before=JSON.stringify(txs);
+ const rows=returnedPayments(txs,emptyBankRules,'2026-11-25',decisions);
+ assert.equal(rows[0].status,'repaid');assert.equal(rows[0].replacementId,'late');
+ const input=personalInput({transactions:txs,fixedCosts:fixed,paymentResolutions:decisions},emptyOptions(),'2026-11-25');
+ assert.equal(input.events.filter(e=>e.source==='returned-payment').length,0);
+ assert.equal(input.commitments?.find(c=>c.label==='Abonnement')?.remaining,6000);
+ const {makePeriodPlan,reconcilePeriod}=await import('../src/bank/periodReconciliation');
+ const {emptyDebtLedger}=await import('../src/bank/debtPayments');
+ const p=makePeriodPlan([],fixed,[],[],'2026-11-25');
+ const old=reconcilePeriod('2026-10','2026-11-25',p,true,txs,emptyDebtLedger(),emptyBankRules,{},rows);
+ assert.equal(old.rows[0].actual,6054);assert.equal(JSON.stringify(txs),before);
+});
+test('generic, short, ambiguous, or reversed arrears payments require review',()=>{
+ const decisions=[{id:'r',returnedId:'returned:c',status:'open',note:'Bevestigd'}];
+ const late={...debit,id:'late',date:'2026-11-23',description:'Nabetaling achterstallige huur'};
+ for(const payment of [{...late,description:'Betaling'},{...late,description:'Nabetaling factuur INV99999'},{...late,amount:-59},{...late,amount:-62}]){
+  assert.equal(returnedPayments([debit,credit,payment],emptyBankRules,'2026-11-25',decisions)[0].status,'pending');
+ }
+ const duplicate={...late,id:'late2'};
+ assert.equal(returnedPayments([debit,credit,late,duplicate],emptyBankRules,'2026-11-25',decisions)[0].status,'pending');
+ const reversed={...late,id:'rev',amount:60,date:'2026-11-24',description:'Storno incasso factuur INV12345'};
+ assert.notEqual(returnedPayments([debit,credit,late,reversed],emptyBankRules,'2026-11-25',decisions)[0].status,'repaid');
+});

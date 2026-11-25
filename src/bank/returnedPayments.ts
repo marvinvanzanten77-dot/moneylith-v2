@@ -17,10 +17,10 @@ export function returnedPayments(transactions:MoneylithTransaction[],rules:BankR
  const decisions=Array.isArray(resolutions)?resolutions as PaymentResolution[]:[];
  const directDebit=(t:MoneylithTransaction)=>t.providerData?.paymentSubType==='SDD'||/incasso|storno|terugboek/i.test(t.description);
  const usedDebits=new Set<string>(),usedReplacements=new Set<string>();
- return all.filter(t=>t.amount>0&&(
+ const rows=all.filter(t=>t.amount>0&&(
   (t.providerData?.paymentSubType==='REVERSAL'&&all.some(d=>d.amount<0&&d.accountId===t.accountId&&norm(d.counterparty??'')===norm(t.counterparty??'')&&Math.round(-d.amount*100)===Math.round(t.amount*100)&&d.date<=t.date&&directDebit(d)))||
   /storno|terugboeking|(?:incasso.*(?:terug|geweigerd)|terug.*incasso)/i.test(t.description)
- )).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)).map(credit=>{
+ )).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)).map<ReturnedPayment>(credit=>{
   const cents=Math.round(credit.amount*100),party=norm(credit.counterparty??'');
   const candidates=all.filter(t=>t.amount<0&&t.accountId===credit.accountId&&t.date<=credit.date&&Math.round(-t.amount*100)===cents&&party&&norm(t.counterparty??'')===party&&!usedDebits.has(t.id));
   const reference=ref(credit.description);
@@ -34,5 +34,17 @@ export function returnedPayments(transactions:MoneylithTransaction[],rules:BankR
   if(retries.length===1){usedReplacements.add(retries[0].id);return {...base,status:'repaid' as const,replacementId:retries[0].id};}
   // A generic bank refund does not prove the underlying invoice is still due.
   return {...base,status:(!/storno|incasso/i.test(credit.description)&&credit.providerData?.paymentSubType!=='REVERSAL'?'review':'pending') as ReturnedPayment['status']};
- }).map<ReturnedPayment>(row=>{const decision=decisions.find(d=>d.returnedId===row.id);return decision?.status==='paid'?{...row,status:'repaid',userConfirmed:true}:decision?.status==='open'?{...row,status:'pending',...(/^\d{4}-(0[1-9]|1[0-2])$/.test(decision.dueMonth??'')?{dueMonth:decision.dueMonth}:{}),userConfirmed:true}:row;}).filter(row=>options.includeHistorical||row.date>=periodStart||row.userConfirmed);
+ }).map<ReturnedPayment>(row=>{const decision=decisions.find(d=>d.returnedId===row.id);return decision?.status==='paid'?{...row,status:'repaid',userConfirmed:true}:decision?.status==='open'?{...row,status:row.replacementId?'repaid':'pending',...(/^\d{4}-(0[1-9]|1[0-2])$/.test(decision.dueMonth??'')?{dueMonth:decision.dueMonth}:{}),userConfirmed:true}:row;});
+ // Explicit arrears wording plus one confirmed outstanding invoice can identify
+ // a late payment without an invoice number. A small surcharge is not a new debt.
+ const replacements=all.filter(t=>t.amount<0&&/nabetaling|achterstallige|achterstand/i.test(t.description)&&!reversed.reversedDebits.has(t.id)&&!reversed.uncertainDebits.has(t.id)&&!usedReplacements.has(t.id));
+ const eligible=(row:ReturnedPayment,t:MoneylithTransaction)=>row.status==='pending'&&row.userConfirmed&&!!row.debitId&&row.date<t.date&&norm(row.label)===norm(t.counterparty??'')&&(!ref(t.description)||ref(t.description)===ref(all.find(d=>d.id===row.debitId)?.description??''))&&Math.round(-t.amount*100)>=row.cents&&Math.round(-t.amount*100)-row.cents<=100;
+ for(const row of rows){
+  const candidates=replacements.filter(t=>eligible(row,t));
+  if(candidates.length!==1)continue;
+  const t=candidates[0];
+  if(rows.filter(other=>eligible(other,t)).length!==1||usedReplacements.has(t.id))continue;
+  row.status='repaid';row.replacementId=t.id;usedReplacements.add(t.id);
+ }
+ return rows.filter(row=>options.includeHistorical||row.date>=periodStart||row.userConfirmed);
 }

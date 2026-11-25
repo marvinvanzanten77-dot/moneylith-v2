@@ -16,11 +16,13 @@ export function remainingPayments(input:Input,data:MoneylithSnapshotDomain,optio
  const period=salaryPeriod(input.asOf),bounds=periodBounds(period);
  const plan=makePeriodPlan(list<IncomeItem>(data.income),fixed,detected,list<SchuldItem>(data.debts),input.asOf);
  const paid=data.periodPaid&&typeof data.periodPaid==='object'?(data.periodPaid as Record<string,Record<string,number>>)[period]:undefined;
- const report=reconcilePeriod(period,input.asOf,plan,true,list<MoneylithTransaction>(data.transactions),ledger,rules,paid&&typeof paid==='object'?paid:{});
+ const returned=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf,data.paymentResolutions);
+ const settlements=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf,data.paymentResolutions,{includeHistorical:true});
+ const report=reconcilePeriod(period,input.asOf,plan,true,list<MoneylithTransaction>(data.transactions),ledger,rules,paid&&typeof paid==='object'?paid:{},settlements);
  const funding:Record<string,number>={card:0,cash:0};
  for(const move of report.cashMoves)funding[move.label==='Naar bunq'?'card':'cash']+=move.cents;
  for(const row of report.rows)if((row.route==='card'||row.route==='cash')&&!row.transactionIds.length)funding[row.route]=Math.max(0,funding[row.route]-(row.actual??0));
- const returned=returnedPayments(list<MoneylithTransaction>(data.transactions),rules,input.asOf,data.paymentResolutions);
+
  const pendingReturns=returned.filter(r=>r.status==='pending');
  const coveredReturns=new Set<string>();
  input.commitments=[];

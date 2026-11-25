@@ -1,3 +1,4 @@
+import type {ReturnedPayment} from './returnedPayments.js';
 import type {IncomeItem, FixedCostManualItem, FixedCostItem, SchuldItem, MoneylithTransaction} from '../types.js';
 import {costForMonth,costPlannedInMonth} from '../logic/monthlyCosts.js';
 import {patternKey} from './patterns.js';
@@ -39,7 +40,7 @@ export function capturePeriodPlan(plans:PeriodPlans,plan:PeriodPlan,asOf:string)
 }
 export type ReconciledRow=PeriodRow & {actual:number|null;forecast:number|null;difference:number|null;status:string;transactionIds:string[];reversed:boolean};
 /** Derived from booked transactions and saved expectations. Never mutates a balance or transaction. */
-export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSavedPlan:boolean,transactions:MoneylithTransaction[],ledger:DebtLedger,rules:BankRuleSettings,manual:Record<string,number>={}){
+export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSavedPlan:boolean,transactions:MoneylithTransaction[],ledger:DebtLedger,rules:BankRuleSettings,manual:Record<string,number>={},settlements:ReturnedPayment[]=[]){
  const {start,end}=periodBounds(period),through=end<asOf?end:asOf,closed=end<asOf;
  const seen=new Set<string>();
  const all=transactions.filter(t=>{
@@ -56,7 +57,9 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
  const {reversedDebits,credits,uncertainDebits}=findBankReversals(all);
  for(const id of credits)reversals.add(id);
  const ledgerTx=new Map(ledger.entries.map(e=>[e.transactionId,e]));
- for(const t of all.filter(t=>booked.includes(t)||[...(ledgerTx.get(t.id)?.allocations??[]),...(ledgerTx.get(t.id)?.fixedAllocations??[])].some(a=>a.period===period))){
+ const settled=new Map(settlements.filter(r=>r.status==='repaid'&&r.replacementId&&r.debitId&&!ledgerTx.has(r.replacementId)).map(r=>[r.replacementId!,r]));
+ const settlementPeriod=(id:string)=>{const debit=all.find(t=>t.id===settled.get(id)?.debitId);return debit?salaryPeriod(debit.date):null;};
+ for(const t of all.filter(t=>booked.includes(t)||settlementPeriod(t.id)===period||[...(ledgerTx.get(t.id)?.allocations??[]),...(ledgerTx.get(t.id)?.fixedAllocations??[])].some(a=>a.period===period))){
   if(reversals.has(t.id))continue;
   const payment=ledgerTx.get(t.id);
   if(payment){
@@ -65,6 +68,7 @@ export function reconcilePeriod(period:string,asOf:string,plan:PeriodPlan,hasSav
    for(const a of payment.fixedAllocations??[]){if((a.period??salaryPeriod(payment.date))!==period)continue;const id='fixed:'+a.fixedId;matches.set(id,[...(matches.get(id)??[]),t.id]);if(reversedDebits.has(t.id))reversed.add(id);else amounts.set(id,(amounts.get(id)??0)+a.cents);}
    continue;
   }
+  if(settled.has(t.id)&&settlementPeriod(t.id)!==period)continue;
   if(['transfer','financing','ignore'].includes(t.bankPatternKind??''))continue;
   const candidates=plan.rows.filter(r=>{
    if(r.kind==='debt'||r.route==='withheld'||r.route==='cash'||(r.kind==='income')!==(t.amount>0))return false;
